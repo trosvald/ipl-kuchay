@@ -67,7 +67,7 @@ Plans:
 
 Plans:
 - [x] 07-01-PLAN.md — Close Phase 1 human-verification blockers and regenerate requirement/milestone audit status to passed.
-- [ ] 07-02-PLAN.md — Regenerate stale milestone audit after verification artifact exists, then re-verify Phase 7 to passed.
+- [x] 07-02-PLAN.md — Regenerate stale milestone audit after verification artifact exists, then re-verify Phase 7 to passed.
 **UI hint**: yes
 
 ### Phase 4: Announcements, Events & Resident Home
