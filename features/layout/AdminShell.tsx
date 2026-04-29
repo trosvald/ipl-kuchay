@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  Cog,
   Home,
   LayoutDashboard,
   LogOut,
+  ReceiptText,
   Search,
   Shield,
   Users,
+  Wallet,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -39,11 +42,16 @@ const navGroups: NavGroup[] = [
       { title: "Default", href: "/admin", icon: LayoutDashboard },
       { title: "Kavlings", href: "/admin/kavlings", icon: Building2 },
       { title: "Residents", href: "/admin/residents", icon: Users },
+      { title: "Settings", href: "/admin/settings", icon: Cog },
+      { title: "Billing", href: "/admin/billing", icon: Wallet },
     ],
   },
   {
     label: "Pages",
-    items: [{ title: "User Portal", href: "/app", icon: Home }],
+    items: [
+      { title: "User Portal", href: "/app", icon: Home },
+      { title: "Resident Invoices", href: "/app/invoices", icon: ReceiptText },
+    ],
   },
 ];
 
@@ -53,16 +61,21 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  const isNavItemActive = useCallback(
+    (href: string) => pathname === href || (href !== "/admin" && href !== "/app" && pathname.startsWith(`${href}/`)),
+    [pathname],
+  );
+
   const currentPageTitle = useMemo(() => {
     for (const group of navGroups) {
       for (const item of group.items) {
-        if (pathname === item.href) {
+        if (isNavItemActive(item.href)) {
           return item.title;
         }
       }
     }
     return "Admin";
-  }, [pathname]);
+  }, [isNavItemActive]);
 
   const handleSignOut = () => {
     signOut().catch(() => undefined);
@@ -76,7 +89,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
             <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <Shield className="size-4" />
             </div>
-            {!collapsed ? <span className="font-semibold text-sm">{APP_NAME}</span> : null}
+            {collapsed ? null : <span className="font-semibold text-sm">{APP_NAME}</span>}
           </div>
           <Button variant="ghost" size="icon" onClick={() => setCollapsed((value) => !value)} className="hidden md:inline-flex">
             {collapsed ? <ChevronRight className="size-4" /> : <ChevronLeft className="size-4" />}
@@ -87,12 +100,12 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
       <div className="flex-1 overflow-y-auto px-2 py-3">
         {navGroups.map((group) => (
           <div key={group.label} className="mb-4">
-            {!collapsed ? (
+            {collapsed ? null : (
               <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-            ) : null}
+            )}
             <div className="space-y-1">
               {group.items.map((item) => {
-                const active = pathname === item.href;
+                const active = isNavItemActive(item.href);
                 return (
                   <Link
                     key={item.href}
@@ -107,7 +120,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
                     )}
                   >
                     <item.icon className="size-4" />
-                    {!collapsed ? <span>{item.title}</span> : null}
+                    {collapsed ? null : <span>{item.title}</span>}
                   </Link>
                 );
               })}
@@ -123,7 +136,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
         </div>
         <Button variant="ghost" className={cn("w-full", collapsed ? "justify-center" : "justify-start")} onClick={handleSignOut}>
           <LogOut className="size-4" />
-          {!collapsed ? <span>Sign out</span> : null}
+          {collapsed ? null : <span>Sign out</span>}
         </Button>
       </div>
     </>
@@ -142,8 +155,14 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
         </aside>
 
         {mobileOpen ? (
-          <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)}>
-            <aside className="h-full w-72 bg-sidebar text-sidebar-foreground" onClick={(event) => event.stopPropagation()}>
+          <div className="fixed inset-0 z-40 md:hidden">
+            <button
+              type="button"
+              aria-label="Tutup menu"
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setMobileOpen(false)}
+            />
+            <aside className="relative h-full w-72 bg-sidebar text-sidebar-foreground">
               {navContent}
             </aside>
           </div>

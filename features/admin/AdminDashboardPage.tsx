@@ -18,12 +18,12 @@ export function AdminDashboardPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        {[
-          { title: "Residents", value: "Ready", icon: Users },
-          { title: "Kavlings", value: "Ready", icon: LayoutDashboard },
-          { title: "Billing", value: "In Progress", icon: Wallet },
-          { title: "Security", value: "RLS Active", icon: ShieldCheck },
-        ].map((item) => (
+          {[
+            { title: "Residents", value: "Ready", icon: Users },
+            { title: "Kavlings", value: "Ready", icon: LayoutDashboard },
+            { title: "Billing", value: "Ready", icon: Wallet },
+            { title: "Security", value: "RLS Active", icon: ShieldCheck },
+          ].map((item) => (
           <div key={item.title} className="rounded-lg border border-slate-200 bg-white p-3">
             <p className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
                 <item.icon className="size-4" /> {item.title}
@@ -76,19 +76,23 @@ export function AdminDashboardPage() {
                 <Badge variant="secondary">Aktif</Badge>
               </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-between" disabled>
-              <span className="inline-flex items-center gap-2">
-                <Wallet className="size-4" />
-                Billing & Tagihan
-              </span>
-              <Badge variant="outline">Segera</Badge>
+            <Button asChild variant="secondary" className="w-full justify-between">
+              <Link href="/admin/settings">
+                <span className="inline-flex items-center gap-2">
+                  <ReceiptText className="size-4" />
+                  Pengaturan Biaya
+                </span>
+                <Badge variant="secondary">Aktif</Badge>
+              </Link>
             </Button>
-            <Button variant="outline" className="w-full justify-between" disabled>
-              <span className="inline-flex items-center gap-2">
-                <ReceiptText className="size-4" />
-                Verifikasi Pembayaran
-              </span>
-              <Badge variant="outline">Segera</Badge>
+            <Button asChild variant="secondary" className="w-full justify-between">
+              <Link href="/admin/billing">
+                <span className="inline-flex items-center gap-2">
+                  <Wallet className="size-4" />
+                  Billing & Tagihan
+                </span>
+                <Badge variant="secondary">Aktif</Badge>
+              </Link>
             </Button>
           </CardContent>
         </Card>

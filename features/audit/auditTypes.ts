@@ -10,11 +10,22 @@ export type AuditAction =
   | "resident.role_change"
   | "mapping.create"
   | "mapping.update"
-  | "mapping.deactivate";
+  | "mapping.deactivate"
+  | "fee_type.create"
+  | "fee_type.update"
+  | "fee_type.activate"
+  | "fee_type.deactivate"
+  | "fee_override.create"
+  | "fee_override.update"
+  | "fee_override.end"
+  | "billing_period.create"
+  | "billing_period.generate_invoices"
+  | "billing_period.status_open"
+  | "billing_period.status_closed";
 
 export interface AuditLogInput {
   action: AuditAction;
-  entityTable: "kavlings" | "profiles" | "kavling_residents";
+  entityTable: "kavlings" | "profiles" | "kavling_residents" | "fee_types" | "kavling_fee_overrides" | "billing_periods";
   entityId: string;
   beforeData?: unknown;
   afterData?: unknown;

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isValidBillingMonth, parseIsoDateInput } from "@/lib/date";
+
 export const uuidSchema = z.uuid();
 export const appRoleSchema = z.enum(["resident", "treasurer", "admin", "super_admin"]);
 
@@ -73,6 +75,111 @@ export const kavlingResidentMappingSchema = z.object({
   active: z.boolean(),
 });
 
+export const feeTypeFormSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9_-]+$/, "Kode hanya boleh huruf kapital, angka, underscore, atau dash")
+    .min(2, "Kode minimal 2 karakter")
+    .max(40, "Kode maksimal 40 karakter"),
+  name: z.string().trim().min(2, "Nama minimal 2 karakter").max(120, "Nama maksimal 120 karakter"),
+  description: z
+    .string()
+    .trim()
+    .max(400, "Deskripsi maksimal 400 karakter")
+    .optional()
+    .or(z.literal("")),
+  default_amount: z.number().int("Nominal harus bilangan bulat").min(0, "Nominal minimal 0"),
+  is_recurring: z.boolean(),
+  billing_cycle: z.enum(["monthly", "yearly"]),
+  charge_month: z.number().int("Bulan tagih harus bilangan bulat").min(1, "Minimal 1").max(12, "Maksimal 12").nullable(),
+  is_penalty: z.boolean(),
+  active: z.boolean(),
+  sort_order: z.number().int("Urutan harus bilangan bulat").min(0, "Urutan minimal 0"),
+}).superRefine((value, ctx) => {
+  if (!value.is_recurring && (value.billing_cycle !== "monthly" || value.charge_month !== null)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["billing_cycle"],
+      message: "Biaya one-off harus pakai siklus monthly tanpa charge month.",
+    });
+  }
+
+  if (value.is_recurring && value.billing_cycle === "yearly" && value.charge_month === null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["charge_month"],
+      message: "Biaya yearly wajib memilih bulan tagih.",
+    });
+  }
+
+  if (value.is_recurring && value.billing_cycle === "monthly" && value.charge_month !== null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["charge_month"],
+      message: "Biaya monthly tidak perlu bulan tagih.",
+    });
+  }
+});
+
+const optionalDateInputSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.length === 0 || parseIsoDateInput(value) !== null, "Format tanggal harus yyyy-mm-dd")
+  .optional()
+  .or(z.literal(""));
+
+export const feeOverrideFormSchema = z
+  .object({
+    kavling_id: uuidSchema,
+    fee_type_id: uuidSchema,
+    amount: z.number().int("Nominal harus bilangan bulat").min(0, "Nominal minimal 0"),
+    active_from: optionalDateInputSchema,
+    active_until: optionalDateInputSchema,
+    notes: z.string().trim().max(500, "Catatan maksimal 500 karakter").optional().or(z.literal("")),
+  })
+  .refine(
+    (value) => {
+      if (!value.active_from || !value.active_until) {
+        return true;
+      }
+
+      const from = parseIsoDateInput(value.active_from);
+      const until = parseIsoDateInput(value.active_until);
+      if (!from || !until) {
+        return false;
+      }
+
+      return until.getTime() >= from.getTime();
+    },
+    {
+      path: ["active_until"],
+      message: "Tanggal akhir harus sama atau setelah tanggal mulai",
+    },
+  );
+
+export const billingPeriodStatusSchema = z.enum(["draft", "open", "closed", "archived"]);
+
+export const billingPeriodFormSchema = z
+  .object({
+    year: z.number().int("Tahun harus bilangan bulat"),
+    month: z.number().int("Bulan harus bilangan bulat"),
+    due_date: z
+      .string()
+      .trim()
+      .refine((value) => parseIsoDateInput(value) !== null, "Format tanggal harus yyyy-mm-dd"),
+    label: z.string().trim().min(2, "Label minimal 2 karakter").max(120, "Label maksimal 120 karakter"),
+  })
+  .refine((value) => isValidBillingMonth(value.year, value.month), {
+    path: ["month"],
+    message: "Periode harus dalam rentang tahun 2020-2100 dan bulan 1-12",
+  });
+
 export type KavlingFormInput = z.infer<typeof kavlingFormSchema>;
 export type ResidentFormInput = z.infer<typeof residentFormSchema>;
 export type KavlingResidentMappingInput = z.infer<typeof kavlingResidentMappingSchema>;
+export type FeeTypeFormInput = z.infer<typeof feeTypeFormSchema>;
+export type FeeOverrideFormInput = z.infer<typeof feeOverrideFormSchema>;
+export type BillingPeriodFormInput = z.infer<typeof billingPeriodFormSchema>;
+export type BillingPeriodStatus = z.infer<typeof billingPeriodStatusSchema>;

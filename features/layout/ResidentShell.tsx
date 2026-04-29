@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Home, Shield } from "lucide-react";
+import { ArrowLeft, Home, ReceiptText, Shield } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/authHooks";
@@ -22,13 +22,18 @@ export function ResidentShell({ children }: Readonly<{ children: React.ReactNode
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {pathname !== "/app" ? (
+            {pathname === "/app" ? null : (
               <Button asChild variant="secondary" size="sm">
                 <Link href="/app">
                   <ArrowLeft className="size-4" /> Kembali
                 </Link>
               </Button>
-            ) : null}
+            )}
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/app/invoices">
+                <ReceiptText className="size-4" /> Invoice
+              </Link>
+            </Button>
             <Button asChild variant="ghost" size="sm">
               <Link href="/">
                 <Home className="size-4" /> Publik

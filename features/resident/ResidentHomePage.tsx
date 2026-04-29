@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, CreditCard, FileText, Home } from "lucide-react";
 
@@ -165,8 +166,10 @@ export function ResidentHomePage() {
           <Button size="sm" className="shrink-0 justify-start">
           <Home className="size-4" /> Ringkasan
           </Button>
-          <Button size="sm" variant="outline" className="shrink-0 justify-start" disabled>
-            <FileText className="size-4" /> Tagihan
+          <Button asChild size="sm" variant="outline" className="shrink-0 justify-start">
+            <Link href="/app/invoices">
+              <FileText className="size-4" /> Tagihan
+            </Link>
           </Button>
           <Button size="sm" variant="outline" className="shrink-0 justify-start" disabled>
             <CreditCard className="size-4" /> Pembayaran
@@ -181,7 +184,7 @@ export function ResidentHomePage() {
             <Badge variant="outline">{linkedKavlings.length} data</Badge>
           </div>
           <div>{kavlingWorkspace}</div>
-          {!loading ? (
+          {loading ? null : (
             <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-sm text-muted-foreground">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
@@ -217,7 +220,7 @@ export function ResidentHomePage() {
                 </Button>
               </div>
             </div>
-          ) : null}
+          )}
         </section>
 
         <section className="overflow-hidden rounded-lg border border-border bg-background">
@@ -229,7 +232,7 @@ export function ResidentHomePage() {
               <Clock3 className="mt-0.5 size-4 text-muted-foreground" />
               <div>
                 <p className="font-medium text-foreground">Tagihan Periode Aktif</p>
-                <p className="text-muted-foreground">Modul dibuka pada milestone M04.</p>
+                <p className="text-muted-foreground">Tersedia di menu Invoice pada portal warga.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 px-4 py-3 text-sm">
