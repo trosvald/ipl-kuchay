@@ -26,6 +26,23 @@ npm run test
 npm run build
 ```
 
+Supabase local database (Milestone 1 schema):
+
+```bash
+npm run supabase:start
+npm run supabase:reset
+```
+
+Manual SQL checks after reset:
+
+```sql
+select count(*) from public.kavlings;
+select count(*) from public.fee_types;
+select id, public from storage.buckets where id in ('payment-proofs', 'report-files');
+```
+
+Reference check script: `supabase/tests/sql/m01_acceptance_checks.sql`.
+
 ## Scripts
 
 - `npm run dev` - start Vite.
@@ -60,4 +77,10 @@ VITE_TELEGRAM_BOT_USERNAME="<bot_username_without_at>"
 ## Milestone Status
 
 - Milestone 0: project baseline and tooling.
-- Later milestones add Supabase schema, auth, billing, private proof uploads, verification, reports, Telegram, imports, PWA, and optional QRIS.
+- Milestone 1: Supabase schema, RLS, private storage buckets, and initial seed data are defined in `supabase/migrations/0001` through `0007`.
+- Later milestones add auth, billing UI, private proof upload flow, verification workflow, reports, Telegram, imports, PWA, and optional QRIS.
+
+## Deprecated SQL
+
+`supabase-setup.sql` is intentionally deprecated and kept only as historical reference.
+Do not execute it for current environments.
