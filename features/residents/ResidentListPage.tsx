@@ -25,6 +25,11 @@ interface ResidentRow {
   created_at: string;
 }
 
+interface MappingStatus {
+  activeCount: number;
+  historyOnlyCount: number;
+}
+
 async function writeAuditLog(payload: AuditLogInput) {
   const client = getSupabaseBrowserClient();
   if (!client) {
@@ -53,6 +58,7 @@ export function ResidentListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [expandedResidentId, setExpandedResidentId] = useState<string | null>(null);
+  const [mappingStatusByResident, setMappingStatusByResident] = useState<Record<string, MappingStatus>>({});
 
   const canManageSuperAdmin = profile?.role === "super_admin";
 
@@ -102,7 +108,35 @@ export function ResidentListPage() {
       return;
     }
 
-    setItems((data ?? []) as ResidentRow[]);
+    const residents = (data ?? []) as ResidentRow[];
+    const residentIds = residents.map((item) => item.id);
+
+    const nextMappingStatus: Record<string, MappingStatus> = {};
+    if (residentIds.length > 0) {
+      const { data: mappings, error: mappingsError } = await client
+        .from("kavling_residents")
+        .select("profile_id, active")
+        .in("profile_id", residentIds);
+
+      if (mappingsError) {
+        setErrorMessage(mappingsError.message);
+        setLoading(false);
+        return;
+      }
+
+      for (const mapping of mappings ?? []) {
+        const existing = nextMappingStatus[mapping.profile_id] ?? { activeCount: 0, historyOnlyCount: 0 };
+        if (mapping.active) {
+          existing.activeCount += 1;
+        } else {
+          existing.historyOnlyCount += 1;
+        }
+        nextMappingStatus[mapping.profile_id] = existing;
+      }
+    }
+
+    setItems(residents);
+    setMappingStatusByResident(nextMappingStatus);
     setLoading(false);
   }, [client]);
 
@@ -248,6 +282,20 @@ export function ResidentListPage() {
     await loadResidents();
   };
 
+  const getMappingStatusLabel = (residentId: string) => {
+    const mappingStatus = mappingStatusByResident[residentId];
+    if (!mappingStatus) {
+      return { text: "Belum terhubung", variant: "default" as const };
+    }
+    if (mappingStatus.activeCount > 0) {
+      return { text: `${mappingStatus.activeCount} kavling aktif`, variant: "success" as const };
+    }
+    if (mappingStatus.historyOnlyCount > 0) {
+      return { text: "Riwayat saja", variant: "default" as const };
+    }
+    return { text: "Belum terhubung", variant: "default" as const };
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -337,6 +385,7 @@ export function ResidentListPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Mapping</TableHead>
+                    <TableHead>Kelola Mapping</TableHead>
                     <TableHead>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -358,6 +407,12 @@ export function ResidentListPage() {
                           <Badge variant={item.is_active ? "success" : "default"}>
                             {item.is_active ? "Aktif" : "Nonaktif"}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const status = getMappingStatusLabel(item.id);
+                            return <Badge variant={status.variant}>{status.text}</Badge>;
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Button
