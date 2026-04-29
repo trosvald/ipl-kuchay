@@ -176,6 +176,20 @@ export const billingPeriodFormSchema = z
     message: "Periode harus dalam rentang tahun 2020-2100 dan bulan 1-12",
   });
 
+export const paymentSubmissionFormSchema = z.object({
+  invoiceId: uuidSchema,
+  amountSubmitted: z.number().int("Nominal harus bilangan bulat").min(1, "Nominal minimal 1"),
+  bankAccountId: uuidSchema,
+  note: z.string().trim().max(500, "Catatan maksimal 500 karakter").optional().or(z.literal("")),
+});
+
+export const paymentProofMetadataSchema = z.object({
+  submissionId: uuidSchema,
+  proofPath: z.string().trim().min(1, "Path bukti wajib diisi"),
+  mimeType: z.string().trim().min(1, "MIME type wajib diisi"),
+  sizeBytes: z.number().int("Ukuran file harus bilangan bulat").min(1, "Ukuran file tidak valid"),
+});
+
 export type KavlingFormInput = z.infer<typeof kavlingFormSchema>;
 export type ResidentFormInput = z.infer<typeof residentFormSchema>;
 export type KavlingResidentMappingInput = z.infer<typeof kavlingResidentMappingSchema>;
@@ -183,3 +197,5 @@ export type FeeTypeFormInput = z.infer<typeof feeTypeFormSchema>;
 export type FeeOverrideFormInput = z.infer<typeof feeOverrideFormSchema>;
 export type BillingPeriodFormInput = z.infer<typeof billingPeriodFormSchema>;
 export type BillingPeriodStatus = z.infer<typeof billingPeriodStatusSchema>;
+export type PaymentSubmissionFormInput = z.infer<typeof paymentSubmissionFormSchema>;
+export type PaymentProofMetadataInput = z.infer<typeof paymentProofMetadataSchema>;

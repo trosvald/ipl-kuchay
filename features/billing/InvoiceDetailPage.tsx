@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PaymentSubmissionForm } from "@/features/payments/PaymentSubmissionForm";
+import { SubmissionHistory } from "@/features/payments/SubmissionHistory";
 import {
   formatDateId,
   formatInvoiceStatusLabel,
@@ -82,6 +84,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [submissionReloadToken, setSubmissionReloadToken] = useState(0);
 
   const loadInvoice = useCallback(async () => {
     if (!client) {
@@ -243,6 +246,20 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
         </Card>
       </div>
 
+      {invoice ? (
+        <PaymentSubmissionForm
+          invoiceId={invoice.id}
+          invoiceStatus={invoice.status}
+          outstandingAmount={outstanding}
+          onSubmitted={async () => {
+            await loadInvoice();
+            setSubmissionReloadToken((value) => value + 1);
+          }}
+        />
+      ) : null}
+
+      <SubmissionHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+
       <Card>
         <CardHeader>
           <CardTitle>Rincian Item</CardTitle>
@@ -270,7 +287,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
               </Table>
             </div>
           )}
-          {!loading ? (
+          {loading ? null : (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
@@ -307,7 +324,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
                 </Button>
               </div>
             </div>
-          ) : null}
+          )}
         </CardContent>
       </Card>
     </section>
