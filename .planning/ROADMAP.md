@@ -63,7 +63,11 @@ Plans:
   2. Resident can track payment states, rejection reasons, next steps, and payment/receipt history for their own invoices.
   3. Treasurer or admin can review payment proof through permission-checked access and verify or reject submissions through an audited workflow.
   4. Collection summaries, arrears views, CSV exports, monthly report outputs, receipt outputs, and audit trail all reflect the same invoice and payment truth shown in resident-facing screens.
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [x] 07-01-PLAN.md — Close Phase 1 human-verification blockers and regenerate requirement/milestone audit status to passed.
+- [ ] 07-02-PLAN.md — Regenerate stale milestone audit after verification artifact exists, then re-verify Phase 7 to passed.
 **UI hint**: yes
 
 ### Phase 4: Announcements, Events & Resident Home
