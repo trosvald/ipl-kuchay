@@ -49,9 +49,11 @@ Plans:
   2. Admin can apply per-kavling overrides and generate invoices for active kavlings for a selected billing period.
   3. Resident can view invoice breakdowns by billing period and fee item, including current dues, arrears, and due dates.
   4. Resident can review historical invoice statuses from the same billing area without needing manual admin explanation.
-**Plans**: 1 plan
+**Plans**: 3 plans
 Plans:
-- [x] 07-01-PLAN.md — Close Phase 1 human-verification blockers and regenerate requirement/milestone audit status to passed.
+- [ ] 02-01-PLAN.md — Finalize SQL contract for invoice generation, override resolution, and overdue penalty application.
+- [ ] 02-02-PLAN.md — Complete admin billing period + fee configuration interfaces with auditable lifecycle operations.
+- [ ] 02-03-PLAN.md — Complete resident billing list/detail experience for clear dues, arrears, and history visibility.
 **UI hint**: yes
 
 ### Phase 3: Manual Payments, Reporting & Audit
