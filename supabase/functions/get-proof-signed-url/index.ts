@@ -101,6 +101,26 @@ async function handleGetProofSignedUrl(request: Request): Promise<Response> {
     throw new HttpError(500, signedUrlError?.message ?? "Failed to create signed URL");
   }
 
+  if (caller.role === "treasurer" || caller.role === "admin" || caller.role === "super_admin") {
+    const { error: auditError } = await serviceClient.from("audit_logs").insert({
+      actor_id: caller.id,
+      actor_role: caller.role,
+      action: "payment_submission.proof_signed_url",
+      entity_table: "payment_submissions",
+      entity_id: row.id,
+      before_data: null,
+      after_data: {
+        submission_id: row.id,
+        expires_in_seconds: expiresInSeconds,
+      },
+      request_id: request.headers.get("x-request-id"),
+    });
+
+    if (auditError) {
+      throw new HttpError(500, auditError.message);
+    }
+  }
+
   return jsonResponse(200, {
     signedUrl: signed.signedUrl,
     expiresInSeconds,

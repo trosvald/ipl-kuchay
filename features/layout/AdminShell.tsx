@@ -7,6 +7,7 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Cog,
   Home,
   LayoutDashboard,
@@ -14,6 +15,7 @@ import {
   ReceiptText,
   Search,
   Shield,
+  ShieldCheck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -44,6 +46,8 @@ const navGroups: NavGroup[] = [
       { title: "Residents", href: "/admin/residents", icon: Users },
       { title: "Settings", href: "/admin/settings", icon: Cog },
       { title: "Billing", href: "/admin/billing", icon: Wallet },
+      { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
+      { title: "Audit Log", href: "/admin/audit", icon: ShieldCheck },
     ],
   },
   {
