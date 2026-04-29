@@ -4,20 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Building2,
   ChevronLeft,
   ChevronRight,
-  ClipboardCheck,
-  Cog,
-  Home,
   LayoutDashboard,
   LogOut,
-  ReceiptText,
   Search,
   Shield,
-  ShieldCheck,
-  Users,
-  Wallet,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -25,45 +17,14 @@ import { Button } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authHooks";
-
-interface NavItem {
-  title: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
-const navGroups: NavGroup[] = [
-  {
-    label: "Dashboards",
-    items: [
-      { title: "Default", href: "/admin", icon: LayoutDashboard },
-      { title: "Kavlings", href: "/admin/kavlings", icon: Building2 },
-      { title: "Residents", href: "/admin/residents", icon: Users },
-      { title: "Settings", href: "/admin/settings", icon: Cog },
-      { title: "Billing", href: "/admin/billing", icon: Wallet },
-      { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
-      { title: "Audit Log", href: "/admin/audit", icon: ShieldCheck },
-    ],
-  },
-  {
-    label: "Pages",
-    items: [
-      { title: "User Portal", href: "/app", icon: Home },
-      { title: "Resident Invoices", href: "/app/invoices", icon: ReceiptText },
-    ],
-  },
-];
+import { getAdminNavigationByRole } from "@/features/layout/adminNavigation";
 
 export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
-  const { profile, signOut } = useAuth();
+  const { profile, role, signOut } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navGroups = useMemo(() => getAdminNavigationByRole(role), [role]);
 
   const isNavItemActive = useCallback(
     (href: string) => pathname === href || (href !== "/admin" && href !== "/app" && pathname.startsWith(`${href}/`)),
