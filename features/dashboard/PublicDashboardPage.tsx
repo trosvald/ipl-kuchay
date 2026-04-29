@@ -1,224 +1,128 @@
 import Link from "next/link";
-import {
-  BanknoteArrowDown,
-  BellRing,
-  CalendarClock,
-  CheckCircle2,
-  ClipboardCheck,
-  FileCheck2,
-  LayoutGrid,
-  MessageSquareShare,
-  ReceiptText,
-  ShieldCheck,
-  WalletCards,
-} from "lucide-react";
+import { ArrowRight, Building2, ChartNoAxesColumn, Lock, MessageSquare, Wallet } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { APP_NAME } from "@/lib/constants";
-import { formatDateId, formatRupiah } from "@/lib/format";
 
-const residentActions = [
+const features = [
   {
-    icon: ReceiptText,
-    title: "Lihat tagihan periode aktif",
-    helper: "Status: unpaid, partial, pending, paid",
+    icon: Wallet,
+    title: "Kas & Iuran Lebih Rapi",
+    description: "Pengurus mencatat pemasukan dan pengeluaran dalam satu alur kerja yang jelas.",
   },
   {
-    icon: BanknoteArrowDown,
-    title: "Bayar via transfer bank",
-    helper: "Upload bukti transfer secara aman",
+    icon: Building2,
+    title: "Data Kavling Terkelola",
+    description: "Kavling dan warga terhubung dengan akses per pengguna berbasis role.",
   },
   {
-    icon: BellRing,
-    title: "Pantau notifikasi pembayaran",
-    helper: "Status verifikasi tercatat jelas",
+    icon: MessageSquare,
+    title: "Komunikasi Terarah",
+    description: "Notifikasi dan status pembayaran disampaikan lebih transparan ke warga.",
   },
 ] as const;
 
-const paymentSteps = [
-  "Cek total tagihan pada periode berjalan.",
-  "Transfer ke rekening resmi pengurus.",
-  "Kirim bukti pembayaran untuk diverifikasi.",
-  "Pantau status hingga lunas dan tercatat.",
+const portalBenefits = [
+  "Akses via browser HP tanpa instalasi",
+  "RLS untuk batasi data antar warga",
+  "Jejak audit untuk aksi penting admin",
+  "Siap lanjut ke modul tagihan & pembayaran",
 ] as const;
 
 export function PublicDashboardPage() {
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-5 md:py-10">
-      <section className="mb-5 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="border-slate-200 bg-gradient-to-br from-white via-white to-emerald-50/30 shadow-xl">
-          <CardHeader className="pb-3">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge className="rounded-md" variant="default">
-                <LayoutGrid className="mr-1 size-3.5" /> Portal IPL Jatiloka
-              </Badge>
-              <Badge variant="success">Resident-first</Badge>
-            </div>
-            <CardTitle className="text-3xl leading-tight md:text-5xl">{APP_NAME}</CardTitle>
-            <CardDescription className="max-w-2xl text-base leading-relaxed md:text-lg">
-              Dashboard transparansi iuran warga dengan alur pembayaran yang jelas,
-              verifikasi terkontrol, dan siap digunakan nyaman di mobile maupun desktop.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white/90 p-4 sm:grid-cols-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Periode aktif</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">April 2026</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Pembaruan</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{formatDateId(new Date())}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Mode publik</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">Aggregate aman</p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="lg" className="h-11 min-w-52">
-                <Link href="/login">Masuk untuk lihat tagihan saya</Link>
+    <main className="bg-background text-foreground">
+      <section className="relative overflow-hidden border-b">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(15,23,42,0.08),transparent_45%),radial-gradient(circle_at_80%_20%,rgba(14,165,233,0.09),transparent_35%)]" />
+        <div className="relative mx-auto grid w-full max-w-7xl gap-10 px-4 py-14 md:px-6 md:py-20 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <Badge variant="outline" className="mb-4">
+              Portal Warga Publik
+            </Badge>
+            <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight md:text-6xl">
+              Administrasi IPL lebih rapi, cepat, dan transparan
+            </h1>
+            <p className="mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
+              {APP_NAME} membantu pengurus dan warga memantau data kavling, iuran, dan proses pembayaran
+              dalam satu sistem yang jelas alurnya.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button asChild size="lg" className="h-10 px-5">
+                <Link href="/login">
+                  Masuk ke User Portal <ArrowRight className="size-4" />
+                </Link>
               </Button>
-              <Button asChild variant="secondary" size="lg" className="h-11 min-w-52">
-                <Link href="/app">Buka portal warga</Link>
+              <Button asChild size="lg" variant="outline" className="h-10 px-5">
+                <Link href="/app">Lihat Demo User Portal</Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card className="border-slate-200 bg-white/95 shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CalendarClock className="size-5 text-slate-600" />
-              Ringkasan Bulan Ini
-            </CardTitle>
-            <CardDescription>Informasi kunci untuk keputusan cepat warga.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-slate-700">
-            <div className="rounded-lg border border-slate-200 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Nominal iuran contoh</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900">{formatRupiah(350000)}</p>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-3">
-              <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
-                <span>Kepatuhan pembayaran</span>
-                <span>92%</span>
+          <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
+            <p className="mb-4 text-sm font-semibold text-foreground">Sekilas Status Layanan</p>
+            <div className="space-y-3">
+              <div className="rounded-xl border bg-background px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Mode Publik</p>
+                <p className="mt-1 text-sm font-semibold">Aman & ringkas</p>
               </div>
-              <div className="h-2 rounded-full bg-slate-200">
-                <div className="h-2 w-[92%] rounded-full bg-emerald-600" />
+              <div className="rounded-xl border bg-background px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Akses Internal</p>
+                <p className="mt-1 text-sm font-semibold">User Portal + Admin Panel</p>
               </div>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Status layanan</p>
-              <p className="mt-1 inline-flex items-center gap-2 font-semibold text-slate-900">
-                <ShieldCheck className="size-4 text-emerald-600" />
-                Verifikasi admin aktif
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="mb-5 grid gap-4 lg:grid-cols-3">
-        <Card className="border-slate-200 bg-white/90 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg">Yang Bisa Warga Lakukan</CardTitle>
-            <CardDescription>Fokus alur resident portal dalam satu halaman.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {residentActions.map((item) => (
-              <div key={item.title} className="rounded-lg border border-slate-200 p-3">
-                <p className="mb-1 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <item.icon className="size-4 text-slate-600" />
-                  {item.title}
+              <div className="rounded-xl border bg-background px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Fondasi Keamanan</p>
+                <p className="mt-1 inline-flex items-center gap-2 text-sm font-semibold">
+                  <Lock className="size-4 text-muted-foreground" /> RLS aktif
                 </p>
-                <p className="text-sm text-slate-600">{item.helper}</p>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white/90 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <WalletCards className="size-5 text-slate-600" />
-              Cara Bayar IPL
-            </CardTitle>
-            <CardDescription>Proses sederhana untuk meminimalkan kesalahan pembayaran.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {paymentSteps.map((item, index) => (
-              <div key={item} className="flex gap-3 rounded-lg border border-slate-200 p-3">
-                <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                  {index + 1}
-                </span>
-                <p className="text-sm text-slate-700">{item}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="border-slate-200 bg-white/90 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ClipboardCheck className="size-5 text-slate-600" />
-              Verifikasi dan Transparansi
-            </CardTitle>
-            <CardDescription>Semua langkah terekam untuk akuntabilitas pengurus.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-slate-700">
-            <p className="rounded-lg border border-slate-200 p-3">
-              <span className="mb-1 inline-flex items-center gap-2 font-semibold text-slate-900">
-                <FileCheck2 className="size-4 text-slate-600" />
-                Pemeriksaan bukti
-              </span>
-              <br />
-              Bukti transfer diverifikasi admin sebelum status invoice berubah.
-            </p>
-            <p className="rounded-lg border border-slate-200 p-3">
-              <span className="mb-1 inline-flex items-center gap-2 font-semibold text-slate-900">
-                <MessageSquareShare className="size-4 text-slate-600" />
-                Riwayat jelas
-              </span>
-              <br />
-              Setiap perubahan status pembayaran punya jejak audit.
-            </p>
-            <Separator />
-            <Button asChild variant="ghost" className="w-full justify-start">
-              <Link href="/login">Masuk untuk uji role-based route guard</Link>
-            </Button>
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Kavling Tercakup", value: "34 unit" },
-          { label: "Status Pembayaran", value: "Live" },
-          { label: "Model Akses", value: "Role-based" },
-          { label: "Keamanan Data", value: "RLS + private proofs" },
-        ].map((item) => (
-          <Card key={item.label} className="border-slate-200 bg-white/90 shadow-sm">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs uppercase tracking-wide">
-                {item.label}
-              </CardDescription>
-              <CardTitle className="text-lg">{item.value}</CardTitle>
-            </CardHeader>
-          </Card>
-        ))}
+      <section className="mx-auto w-full max-w-7xl px-4 py-12 md:px-6 md:py-16">
+        <div className="mb-8 flex items-center gap-2">
+          <ChartNoAxesColumn className="size-5 text-muted-foreground" />
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Kenapa pakai platform ini</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          {features.map((item) => (
+            <article key={item.title} className="rounded-xl border bg-card p-5">
+              <item.icon className="mb-3 size-5 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">{item.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="border-y bg-muted/30">
+        <div className="mx-auto w-full max-w-7xl px-4 py-12 md:px-6 md:py-16">
+          <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">Siap dipakai warga & pengurus</h2>
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {portalBenefits.map((item) => (
+              <div key={item} className="rounded-lg border bg-background px-4 py-3 text-sm text-foreground">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-7xl px-4 py-14 text-center md:px-6 md:py-20">
+        <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Mulai kelola IPL dengan alur yang jelas</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+          Gunakan User Portal untuk warga dan Admin Panel untuk pengurus dalam satu sistem terpadu.
+        </p>
+        <div className="mt-7 flex justify-center gap-3">
+          <Button asChild size="lg" className="h-10 px-5">
+            <Link href="/login">Masuk Sekarang</Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="h-10 px-5">
+            <Link href="/admin">Buka Admin Panel</Link>
+          </Button>
+        </div>
       </section>
     </main>
   );

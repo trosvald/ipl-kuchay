@@ -1,84 +1,254 @@
 "use client";
 
-import { Bell, Home, LogOut, UserRound } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Clock3, CreditCard, FileText, Home } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { APP_NAME } from "@/lib/constants";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { useAuth } from "../auth/authHooks";
 
-export function ResidentHomePage() {
-  const { profile, signOut } = useAuth();
+interface ResidentKavlingMapping {
+  id: string;
+  relation: string;
+  is_primary: boolean;
+  active: boolean;
+  kavlings: {
+    id: string;
+    code: string;
+    block: string | null;
+    active: boolean;
+  } | null;
+}
 
-  const handleSignOut = () => {
-    signOut().catch(() => undefined);
-  };
+function normalizeJoinedKavling(
+  value:
+    | ResidentKavlingMapping["kavlings"]
+    | ResidentKavlingMapping["kavlings"][]
+    | null,
+): ResidentKavlingMapping["kavlings"] {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+  return value;
+}
+
+export function ResidentHomePage() {
+  const { profile } = useAuth();
+  const client = getSupabaseBrowserClient();
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [linkedKavlings, setLinkedKavlings] = useState<ResidentKavlingMapping[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const totalRows = linkedKavlings.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const pagedKavlings = useMemo(
+    () => linkedKavlings.slice((page - 1) * pageSize, page * pageSize),
+    [linkedKavlings, page, pageSize],
+  );
+  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalRows);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const loadResidentKavlings = useCallback(async () => {
+    if (!client || !profile) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage(null);
+
+    const { data, error } = await client
+      .from("kavling_residents")
+      .select("id, relation, is_primary, active, kavlings(id, code, block, active)")
+      .eq("profile_id", profile.id)
+      .eq("active", true)
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const normalized = ((data ?? []) as Array<
+      ResidentKavlingMapping & {
+        kavlings:
+          | ResidentKavlingMapping["kavlings"]
+          | ResidentKavlingMapping["kavlings"][];
+      }
+    >).map((item) => ({
+      ...item,
+      kavlings: normalizeJoinedKavling(item.kavlings),
+    }));
+
+    setLinkedKavlings(normalized);
+    setLoading(false);
+  }, [client, profile]);
+
+  useEffect(() => {
+    loadResidentKavlings().catch(() => {
+      setErrorMessage("Gagal memuat data portal.");
+      setLoading(false);
+    });
+  }, [loadResidentKavlings]);
+
+  let kavlingWorkspace: ReactNode;
+  if (loading) {
+    kavlingWorkspace = <p className="px-4 py-5 text-sm text-muted-foreground">Memuat kavling...</p>;
+  } else if (errorMessage) {
+    kavlingWorkspace = <p className="px-4 py-5 text-sm text-red-600">{errorMessage}</p>;
+  } else if (linkedKavlings.length === 0) {
+    kavlingWorkspace = (
+      <p className="px-4 py-5 text-sm text-muted-foreground">
+        Belum ada kavling terhubung. Hubungi admin untuk sinkronisasi data.
+      </p>
+    );
+  } else {
+    kavlingWorkspace = (
+      <Table>
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-muted-foreground">
+            <TableHead>Kavling</TableHead>
+            <TableHead>Blok</TableHead>
+            <TableHead>Relasi</TableHead>
+            <TableHead>Primary</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedKavlings.map((mapping) => (
+            <TableRow key={mapping.id}>
+              <TableCell className="font-medium text-foreground">{mapping.kavlings?.code ?? "-"}</TableCell>
+              <TableCell className="text-muted-foreground">{mapping.kavlings?.block ?? "-"}</TableCell>
+              <TableCell className="text-muted-foreground">{mapping.relation}</TableCell>
+              <TableCell>
+                <Badge variant={mapping.is_primary ? "success" : "secondary"}>
+                  {mapping.is_primary ? "Primary" : "Tambahan"}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant={mapping.kavlings?.active ? "success" : "secondary"}>
+                  {mapping.kavlings?.active ? "Aktif" : "Nonaktif"}
+                </Badge>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
+  }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6 md:py-10">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <section className="space-y-4">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Portal Warga
-          </p>
-          <h1 className="text-2xl font-semibold text-slate-900 md:text-3xl">{APP_NAME}</h1>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">User Portal</p>
+          <h2 className="text-xl font-semibold text-foreground">Layanan IPL Jatiloka</h2>
         </div>
-        <Button variant="secondary" onClick={handleSignOut}>
-          <LogOut className="size-4" /> Keluar
-        </Button>
+        <Badge variant={profile?.is_active ? "success" : "destructive"}>
+          {profile?.is_active ? "Akun aktif" : "Akun nonaktif"}
+        </Badge>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserRound className="size-5 text-slate-600" />
-              Halo, {profile?.display_name ?? profile?.full_name}
-            </CardTitle>
-            <CardDescription>
-              Data kavling, tagihan, dan pembayaran akan dihubungkan penuh pada
-              milestone berikutnya.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Role</p>
-              <p className="mt-2 font-semibold text-slate-900">{profile?.role ?? "resident"}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Status</p>
-              <p className="mt-2">
-                <Badge variant={profile?.is_active ? "success" : "default"}>
-                  {profile?.is_active ? "Aktif" : "Nonaktif"}
-                </Badge>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <nav className="overflow-x-auto rounded-lg border border-border bg-background p-2">
+        <div className="flex w-max min-w-full gap-2 whitespace-nowrap">
+          <Button size="sm" className="shrink-0 justify-start">
+          <Home className="size-4" /> Ringkasan
+          </Button>
+          <Button size="sm" variant="outline" className="shrink-0 justify-start" disabled>
+            <FileText className="size-4" /> Tagihan
+          </Button>
+          <Button size="sm" variant="outline" className="shrink-0 justify-start" disabled>
+            <CreditCard className="size-4" /> Pembayaran
+          </Button>
+        </div>
+      </nav>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Bell className="size-4 text-slate-600" />
-              Ringkasan Cepat
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-slate-600">
-            <p className="rounded-lg border border-slate-200 p-3">Tagihan terbuka: segera hadir.</p>
-            <p className="rounded-lg border border-slate-200 p-3">Status Telegram: siap diaktifkan milestone M08.</p>
-            <Button variant="ghost" className="w-full justify-start" disabled>
-              <Home className="size-4" /> Detail kavling menyusul
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-    </main>
+      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <section className="overflow-hidden rounded-lg border border-border bg-background">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <p className="text-sm font-semibold text-foreground">Kavling Terdaftar</p>
+            <Badge variant="outline">{linkedKavlings.length} data</Badge>
+          </div>
+          <div>{kavlingWorkspace}</div>
+          {!loading ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-sm text-muted-foreground">
+              <p>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </p>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-1">
+                  <span>Rows</span>
+                  <select
+                    className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                    value={String(pageSize)}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      setPageSize(next);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+                  Prev
+                </Button>
+                <span className="text-xs">Page {page}/{totalPages}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-border bg-background">
+          <div className="border-b px-4 py-3">
+            <p className="text-sm font-semibold text-foreground">Antrian Layanan</p>
+          </div>
+          <div className="divide-y">
+            <div className="flex items-start gap-3 px-4 py-3 text-sm">
+              <Clock3 className="mt-0.5 size-4 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-foreground">Tagihan Periode Aktif</p>
+                <p className="text-muted-foreground">Modul dibuka pada milestone M04.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 px-4 py-3 text-sm">
+              <Clock3 className="mt-0.5 size-4 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-foreground">Pembayaran & Upload Bukti</p>
+                <p className="text-muted-foreground">Modul dibuka pada milestone M05.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 px-4 py-3 text-sm">
+              <Clock3 className="mt-0.5 size-4 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-foreground">Riwayat Pembayaran</p>
+                <p className="text-muted-foreground">Modul dibuka pada milestone M07.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
   );
 }

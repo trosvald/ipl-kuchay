@@ -1,62 +1,39 @@
 "use client";
 
-import { LayoutDashboard, ShieldCheck, Users, Wallet, LogOut } from "lucide-react";
+import { Building2, LayoutDashboard, ReceiptText, ShieldCheck, Users, Wallet } from "lucide-react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { APP_NAME } from "@/lib/constants";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "../auth/authHooks";
 
 export function AdminDashboardPage() {
-  const { profile, signOut } = useAuth();
-
-  const handleSignOut = () => {
-    signOut().catch(() => undefined);
-  };
+  const { profile } = useAuth();
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 md:py-10">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-            Admin Console
-          </p>
-          <h1 className="text-2xl font-semibold text-slate-900 md:text-3xl">{APP_NAME}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="success">{profile?.role}</Badge>
-          <Button variant="secondary" onClick={handleSignOut}>
-            <LogOut className="size-4" /> Keluar
-          </Button>
-        </div>
-      </header>
+    <section className="space-y-4">
+      <div className="flex items-center gap-2 text-sm text-slate-700">
+        <span>Role aktif:</span> <Badge variant="success">{profile?.role}</Badge>
+      </div>
 
-      <section className="mb-4 grid gap-4 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-4">
         {[
           { title: "Residents", value: "Ready", icon: Users },
           { title: "Kavlings", value: "Ready", icon: LayoutDashboard },
           { title: "Billing", value: "In Progress", icon: Wallet },
           { title: "Security", value: "RLS Active", icon: ShieldCheck },
         ].map((item) => (
-          <Card key={item.title}>
-            <CardHeader className="pb-2">
-              <CardDescription className="flex items-center gap-2 text-xs uppercase tracking-wide">
+          <div key={item.title} className="rounded-lg border border-slate-200 bg-white p-3">
+            <p className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
                 <item.icon className="size-4" /> {item.title}
-              </CardDescription>
-              <CardTitle className="text-xl">{item.value}</CardTitle>
-            </CardHeader>
-          </Card>
+            </p>
+            <p className="text-lg font-semibold text-slate-900">{item.value}</p>
+          </div>
         ))}
-      </section>
+      </div>
 
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card>
           <CardHeader>
             <CardTitle>Dashboard Admin</CardTitle>
@@ -77,15 +54,45 @@ export function AdminDashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Roadmap Admin</CardTitle>
+            <CardTitle>Menu Admin</CardTitle>
+            <CardDescription>Akses cepat ke layanan utama pengurus.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-slate-600">
-            <p className="rounded-lg border border-slate-200 p-3">M03: Kavling & Resident Management</p>
-            <p className="rounded-lg border border-slate-200 p-3">M04: Billing & Invoice Generation</p>
-            <p className="rounded-lg border border-slate-200 p-3">M06: Verification + Audit Workflow</p>
+          <CardContent className="space-y-2">
+            <Button asChild className="w-full justify-between">
+              <Link href="/admin/kavlings">
+                <span className="inline-flex items-center gap-2">
+                  <Building2 className="size-4" />
+                  Kelola Kavling
+                </span>
+                <Badge variant="secondary">Aktif</Badge>
+              </Link>
+            </Button>
+            <Button asChild variant="secondary" className="w-full justify-between">
+              <Link href="/admin/residents">
+                <span className="inline-flex items-center gap-2">
+                  <Users className="size-4" />
+                  Kelola Warga
+                </span>
+                <Badge variant="secondary">Aktif</Badge>
+              </Link>
+            </Button>
+            <Button variant="outline" className="w-full justify-between" disabled>
+              <span className="inline-flex items-center gap-2">
+                <Wallet className="size-4" />
+                Billing & Tagihan
+              </span>
+              <Badge variant="outline">Segera</Badge>
+            </Button>
+            <Button variant="outline" className="w-full justify-between" disabled>
+              <span className="inline-flex items-center gap-2">
+                <ReceiptText className="size-4" />
+                Verifikasi Pembayaran
+              </span>
+              <Badge variant="outline">Segera</Badge>
+            </Button>
           </CardContent>
         </Card>
-      </section>
-    </main>
+      </div>
+    </section>
   );
 }
