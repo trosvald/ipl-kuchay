@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Home, ReceiptText, Shield } from "lucide-react";
+import { ArrowLeft, Home, ReceiptText, Settings, Shield } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/authHooks";
@@ -32,6 +32,11 @@ export function ResidentShell({ children }: Readonly<{ children: React.ReactNode
             <Button asChild variant="ghost" size="sm">
               <Link href="/app/invoices">
                 <ReceiptText className="size-4" /> Invoice
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/app/settings">
+                <Settings className="size-4" /> Pengaturan
               </Link>
             </Button>
             <Button asChild variant="ghost" size="sm">
