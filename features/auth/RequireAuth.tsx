@@ -32,7 +32,7 @@ function AuthGate({
 export function RequireAuth({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, accessState, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -47,11 +47,7 @@ export function RequireAuth({
       return;
     }
 
-    if (profile && !profile.is_active) {
-      const target = `/login?reason=inactive_profile&from=${encodeURIComponent(pathname || "/app")}`;
-      router.replace(target);
-    }
-  }, [loading, pathname, profile, router, session]);
+  }, [loading, pathname, router, session]);
 
   if (loading) {
     return (
@@ -72,7 +68,7 @@ export function RequireAuth({
     );
   }
 
-  if (!profile) {
+  if (accessState === "missing-profile" || !profile) {
     return (
       <AuthGate
         title="Profil belum siap"
@@ -81,12 +77,31 @@ export function RequireAuth({
     );
   }
 
-  if (!profile.is_active) {
+  if (accessState === "inactive") {
     return (
       <AuthGate
         title="Akun nonaktif"
-        description="Profil Anda nonaktif. Hubungi pengurus untuk aktivasi ulang akun."
+        description="Akun Anda berhasil masuk, tetapi status profil saat ini nonaktif. Hubungi pengurus untuk aktivasi ulang sebelum mengakses layanan warga."
       />
+    );
+  }
+
+  if (accessState === "active-unmapped") {
+    return (
+      <>
+        <main className="mx-auto w-full max-w-5xl px-4 pt-6">
+          <Card className="border-amber-200 bg-amber-50/80 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base text-amber-900">Akses terbatas: data kavling belum terhubung</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-amber-900">
+              Akun Anda aktif, tetapi pemetaan kavling belum tersedia. Anda tetap bisa lanjut ke portal terbatas
+              (profil dan pengaturan) sambil menunggu pengurus menyelesaikan pemetaan.
+            </CardContent>
+          </Card>
+        </main>
+        {children}
+      </>
     );
   }
 

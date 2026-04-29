@@ -20,7 +20,7 @@ import { useAuth, useIsAdminLike } from "./authHooks";
 export function LoginPage({
   reason,
 }: Readonly<{ reason?: string }>) {
-  const { session, profile, signIn } = useAuth();
+  const { accessState, session, signIn } = useAuth();
   const isAdminLike = useIsAdminLike();
   const router = useRouter();
 
@@ -38,10 +38,10 @@ export function LoginPage({
   }, [reason]);
 
   useEffect(() => {
-    if (session && profile?.is_active) {
+    if (session && accessState !== "inactive" && accessState !== "missing-profile") {
       router.replace(isAdminLike ? "/admin" : "/app");
     }
-  }, [isAdminLike, profile?.is_active, router, session]);
+  }, [accessState, isAdminLike, router, session]);
 
   const onSubmitPassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -89,7 +89,7 @@ export function LoginPage({
               Masuk ke {APP_NAME}
             </CardTitle>
             <CardDescription className="text-base">
-              Login menggunakan password atau magic link email.
+              Password adalah jalur login utama. Magic link tetap tersedia untuk onboarding undangan dan pemulihan akses.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -157,14 +157,16 @@ export function LoginPage({
           <CardHeader>
             <CardTitle className="text-xl">Akses dan Undangan</CardTitle>
             <CardDescription>
-              Belum punya akses? Minta undangan dari admin via fungsi{" "}
-              <code className="ml-1 rounded bg-slate-100 px-1.5 py-0.5">admin-invite-user</code>.
+              Belum punya akses? Minta pengurus/admin membuat undangan akun terlebih dahulu.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-slate-600">
             <p>
-              Setelah login, Anda otomatis diarahkan sesuai peran:
-              {" "}
+              Warga yang menerima undangan bisa mulai lewat magic link, lalu lanjutkan dengan membuat/menyimpan password
+              untuk login berikutnya.
+            </p>
+            <p>
+              Setelah login, Anda otomatis diarahkan sesuai peran: {" "}
               <span className="font-semibold text-slate-900">warga ke /app</span>,{" "}
               <span className="font-semibold text-slate-900">admin-like ke /admin</span>.
             </p>
