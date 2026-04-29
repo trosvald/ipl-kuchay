@@ -29,7 +29,14 @@ This roadmap assumes the existing Next.js + Supabase foundation already covers b
   3. Treasurer, admin, and super admin can reach only the privileged workflows allowed for their roles, including finance operations and first-run elevated setup.
   4. Resident can view and update allowed personal/contact fields and notification preferences without changing privileged role data.
   5. Admin can manage kavlings and resident-to-kavling assignments so downstream billing and communication scope resolves correctly.
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 01-01-PLAN.md — Harden schema, helper functions, RLS, and SQL regression coverage for Phase 1 access scope.
+- [ ] 01-02-PLAN.md — Update auth provider, login flow, and guards for mapped, unmapped, inactive, and privileged states.
+- [ ] 01-03-PLAN.md — Align public dashboard and resident billing/home surfaces with aggregate-only and per-kavling scope rules.
+- [ ] 01-04-PLAN.md — Build the resident settings page with safe self-service profile and notification-preference editing.
+- [ ] 01-05-PLAN.md — Make admin navigation and audit UI role-scoped, including a finance-only treasurer audit slice.
+- [ ] 01-06-PLAN.md — Finish resident/kavling CRUD and explicit mapping handoff workflows for admins.
 **UI hint**: yes
 
 ### Phase 2: Billing Configuration & Resident Billing View
@@ -96,7 +103,7 @@ This roadmap assumes the existing Next.js + Supabase foundation already covers b
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Access, Scope & Resident Identity | 0/TBD | Not started | - |
+| 1. Access, Scope & Resident Identity | 0/6 | Not started | - |
 | 2. Billing Configuration & Resident Billing View | 0/TBD | Not started | - |
 | 3. Manual Payments, Reporting & Audit | 0/TBD | Not started | - |
 | 4. Announcements, Events & Resident Home | 0/TBD | Not started | - |
