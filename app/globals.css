@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #eef3f9;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #111827;
+  --primary-foreground: #f8fafc;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #111827;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #111827;
+  --destructive: #ef4444;
+  --destructive-foreground: #f8fafc;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #94a3b8;
+  --radius: 0.75rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  min-width: 320px;
+  background:
+    radial-gradient(circle at 0% 0%, #dce9f8 0, transparent 35%),
+    radial-gradient(circle at 100% 20%, #d9efe7 0, transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, var(--background) 48%, #eaf1f8 100%);
+  color: var(--foreground);
+  font-family: var(--font-body), "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-body), "Segoe UI", sans-serif;
+  letter-spacing: -0.02em;
+}

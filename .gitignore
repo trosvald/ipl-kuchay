@@ -4,6 +4,7 @@ CODEx_MASTER_PLAN_IPL_Jatiloka_Telegram.md
 GUIDE.md
 node_modules/
 dist/
+.next/
 coverage/
 *.tsbuildinfo
 .env
@@ -11,3 +12,4 @@ coverage/
 .env.*.local
 supabase/functions/.env
 supabase/.branches
+supabase/.temp/
