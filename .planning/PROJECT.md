@@ -8,19 +8,6 @@ IPL Jatiloka Residence is a neighborhood operations app for managing resident bi
 
 Residents can reliably check what they owe, submit payment, track status, and receive neighborhood updates without confusion or manual admin follow-up.
 
-## Current State
-
-- **Shipped milestone:** `v1.0` on 2026-04-29
-- **Archived artifacts:** `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`
-- **Delivered scope:** access/privacy/identity hardening and milestone verification closure for Phase 1 requirements
-
-## Next Milestone Goals
-
-- Complete billing configuration and resident billing experience (`BILL-*`)
-- Complete manual payment verification/reporting/audit reliability (`PAY-*`, `RPRT-*`)
-- Deliver announcements, events, resident home, and Telegram linking flows (`COMM-*`, `EVNT-*`, `HOME-*`, `TLGM-*`)
-- Complete import + operational readiness and optional QRIS scope (`IMPT-*`, `OPER-*`, `QRIS-*`)
-
 ## Requirements
 
 ### Validated
@@ -107,4 +94,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-29 after v1.0 milestone completion*
+*Last updated: 2026-04-29 after initialization*

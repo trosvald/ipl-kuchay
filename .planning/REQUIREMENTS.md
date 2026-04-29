@@ -1,12 +1,3 @@
-# Requirements Archive: v1.0 v1.0
-
-**Archived:** 2026-04-29
-**Status:** SHIPPED
-
-For current requirements, see `.planning/REQUIREMENTS.md`.
-
----
-
 # Requirements: IPL Jatiloka Residence
 
 **Defined:** 2026-04-29
