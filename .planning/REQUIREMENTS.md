@@ -9,24 +9,24 @@ Requirements for the initial release. Each maps to roadmap phases.
 
 ### Public Access
 
-- [ ] **PUBL-01**: Visitor can view aggregate collection status for the active billing period without signing in
-- [ ] **PUBL-02**: Visitor cannot view resident names, resident-level balances, payment proofs, or per-kavling payment detail from the public dashboard
+- [x] **PUBL-01**: Visitor can view aggregate collection status for the active billing period without signing in
+- [x] **PUBL-02**: Visitor cannot view resident names, resident-level balances, payment proofs, or per-kavling payment detail from the public dashboard
 
 ### Authentication & Access
 
-- [ ] **AUTH-01**: Resident can sign in securely and stay signed in across sessions
-- [ ] **AUTH-02**: Resident can access only their own billing, profile, announcements, events, and Telegram-linking data
-- [ ] **AUTH-03**: Treasurer can access billing, verification, reporting, and audit workflows required for finance operations
-- [ ] **AUTH-04**: Admin can manage residents, kavlings, billing configuration, communication content, imports, and reports
-- [ ] **AUTH-05**: Super admin can manage elevated roles and first-run administrative setup without exposing a public privilege-escalation path
+- [x] **AUTH-01**: Resident can sign in securely and stay signed in across sessions
+- [x] **AUTH-02**: Resident can access only their own billing, profile, announcements, events, and Telegram-linking data
+- [x] **AUTH-03**: Treasurer can access billing, verification, reporting, and audit workflows required for finance operations
+- [x] **AUTH-04**: Admin can manage residents, kavlings, billing configuration, communication content, imports, and reports
+- [x] **AUTH-05**: Super admin can manage elevated roles and first-run administrative setup without exposing a public privilege-escalation path
 
 ### Resident Profile & Kavling Scope
 
-- [ ] **PROF-01**: Resident can view their own profile and contact details
-- [ ] **PROF-02**: Resident can update allowed personal and contact fields without changing privileged role data
-- [ ] **PROF-03**: Resident can manage notification preferences for Telegram and in-app communication
-- [ ] **KAVL-01**: Admin can create, edit, activate, and deactivate kavlings
-- [ ] **KAVL-02**: Admin can assign residents to kavlings with correct relationship and primary-resident mapping
+- [x] **PROF-01**: Resident can view their own profile and contact details
+- [x] **PROF-02**: Resident can update allowed personal and contact fields without changing privileged role data
+- [x] **PROF-03**: Resident can manage notification preferences for Telegram and in-app communication
+- [x] **KAVL-01**: Admin can create, edit, activate, and deactivate kavlings
+- [x] **KAVL-02**: Admin can assign residents to kavlings with correct relationship and primary-resident mapping
 
 ### Billing Configuration & Invoices
 

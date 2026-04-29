@@ -55,7 +55,7 @@ completed: 2026-04-29
 
 1. **task 1: reconcile human UAT evidence into Phase 1 verification closure** - `eb0ec5f` (docs)
 2. **task 2: regenerate requirement and milestone audit artifacts from updated verification state** - `b71f92f` (docs)
-3. **task 3: run regression verification and capture closure summary** - `[pending current commit]` (docs)
+3. **task 3: run regression verification and capture closure summary** - `eddcc5b` (docs)
 
 ## Files Created/Modified
 - `.planning/phases/01-access-scope-resident-identity/01-VERIFICATION.md` - closure evidence for human checks and status transition to passed.
@@ -80,3 +80,9 @@ None - no external service configuration required.
 ## Next Phase Readiness
 - Phase 1 closure blockers are resolved and milestone audit now reports passed for the in-scope requirement set.
 - Roadmap and requirement tracking can advance without remaining `human_needed` blockers for Phase 1.
+
+## Self-Check: PASSED
+- FOUND: `.planning/phases/07-phase1-gap-closure-milestone-verification/07-01-SUMMARY.md`
+- FOUND: `eb0ec5f`
+- FOUND: `b71f92f`
+- FOUND: `eddcc5b`
