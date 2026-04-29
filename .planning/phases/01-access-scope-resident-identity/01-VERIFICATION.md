@@ -1,27 +1,30 @@
 ---
 phase: 01-access-scope-resident-identity
-verified: 2026-04-29T18:45:00Z
-status: human_needed
+verified: 2026-04-29T19:20:00Z
+status: passed
 score: 5/5 must-haves verified
 overrides_applied: 0
 human_verification:
   - test: "Public dashboard anonymous access"
     expected: "Visitor can open / without login and only sees aggregate metrics (no resident/kavling-level data)."
-    why_human: "Needs browser/session-state confirmation and UI-level privacy validation."
+    result: "pass"
+    evidence: ".planning/phases/01-access-scope-resident-identity/01-HUMAN-UAT.md#1-public-dashboard-anonymous-access"
   - test: "Role route protection (resident/treasurer/admin/super admin)"
     expected: "Unauthorized roles are redirected with explanatory states; authorized roles can access only allowed areas."
-    why_human: "Requires real authenticated accounts and end-to-end route navigation checks."
+    result: "pass"
+    evidence: ".planning/phases/01-access-scope-resident-identity/01-HUMAN-UAT.md#2-role-route-protection-residenttreasureradminsuper-admin"
   - test: "Former-resident invoice history behavior"
     expected: "Former resident can read historical invoices in ended mapping window; cannot submit new payments for inactive mapping."
-    why_human: "Needs seeded account journeys and live RLS-backed UI behavior validation."
+    result: "pass"
+    evidence: ".planning/phases/01-access-scope-resident-identity/01-HUMAN-UAT.md#3-former-resident-invoice-history-behavior"
 ---
 
 # Phase 1: Access, Scope & Resident Identity Verification Report
 
 **Phase Goal:** Residents and operators can securely access only the data and actions that belong to them, with correct resident-to-kavling identity mapping.
-**Verified:** 2026-04-29T18:45:00Z
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Verified:** 2026-04-29T19:20:00Z
+**Status:** passed
+**Re-verification:** Yes — human verification closure completed
 
 ## Goal Achievement
 
@@ -96,27 +99,17 @@ All requested phase requirement IDs are present across Phase 01 plans and accoun
 
 No Phase-1 blocker anti-patterns found in verified files (no TODO/FIXME placeholders, empty handlers, or hardcoded empty render paths affecting user-visible outcomes).
 
-### Human Verification Required
+### Human Verification Closure Evidence
 
-### 1. Public dashboard anonymous access
+All required manual checks were executed and passed in `.planning/phases/01-access-scope-resident-identity/01-HUMAN-UAT.md` (status: `complete`, updated: `2026-04-29T12:19:45Z`).
 
-**Test:** Open `/` in an incognito browser session.
-**Expected:** Public dashboard loads without auth and shows aggregate-only cards/table for public period summary.
-**Why human:** Confirms real browser behavior and copy/visibility boundaries.
-
-### 2. Role route protection
-
-**Test:** Log in as resident, treasurer, admin, super admin; navigate directly to `/admin`, `/admin/residents`, `/admin/audit`, `/app/settings`.
-**Expected:** Role-appropriate access only; blocked pages redirect and/or show explanatory gate UI.
-**Why human:** Needs authenticated role accounts and live navigation checks.
-
-### 3. Former-resident invoice read-only behavior
-
-**Test:** Use an account with ended mapping and historical invoices; open `/app/invoices` and one invoice detail.
-**Expected:** Historical invoices visible; new payment submission disabled on inactive mapping invoice.
-**Why human:** Requires seeded state and full UI+RLS interaction.
+| Human check | Result | Evidence |
+| --- | --- | --- |
+| Public dashboard anonymous access | pass | `01-HUMAN-UAT.md` lines 15-18 |
+| Role route protection (resident/treasurer/admin/super admin) | pass | `01-HUMAN-UAT.md` lines 19-22 |
+| Former-resident invoice history behavior | pass | `01-HUMAN-UAT.md` lines 23-25 |
 
 ---
 
-_Verified: 2026-04-29T18:45:00Z_
+_Verified: 2026-04-29T19:20:00Z_
 _Verifier: OpenCode (gsd-verifier)_
