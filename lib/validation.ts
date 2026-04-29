@@ -190,6 +190,79 @@ export const paymentProofMetadataSchema = z.object({
   sizeBytes: z.number().int("Ukuran file harus bilangan bulat").min(1, "Ukuran file tidak valid"),
 });
 
+export const residentNotificationCategorySchema = z.enum([
+  "billing_reminders",
+  "payment_status",
+  "announcements",
+  "events",
+]);
+
+export const residentSettingsProfileSchema = z
+  .object({
+    display_name: z
+      .string()
+      .trim()
+      .max(80, "Nama tampilan maksimal 80 karakter")
+      .optional()
+      .or(z.literal("")),
+    phone: z
+      .string()
+      .trim()
+      .max(30, "Nomor telepon maksimal 30 karakter")
+      .optional()
+      .or(z.literal("")),
+  })
+  .strict();
+
+export const residentNotificationPreferenceRowSchema = z.object({
+  category: residentNotificationCategorySchema,
+  in_app_enabled: z.boolean(),
+  telegram_enabled: z.boolean(),
+});
+
+const requiredResidentNotificationCategories = [
+  "billing_reminders",
+  "payment_status",
+  "announcements",
+  "events",
+] as const;
+
+export const residentNotificationPreferencesSchema = z
+  .object({
+    rows: z.array(residentNotificationPreferenceRowSchema),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.rows.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["rows"],
+        message: "Minimal satu preferensi wajib diisi",
+      });
+      return;
+    }
+
+    const categories = value.rows.map((row) => row.category);
+    const unique = new Set(categories);
+    if (unique.size !== categories.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["rows"],
+        message: "Kategori preferensi tidak boleh duplikat",
+      });
+    }
+
+    for (const category of requiredResidentNotificationCategories) {
+      if (!unique.has(category)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["rows"],
+          message: `Kategori ${category} wajib ada`,
+        });
+      }
+    }
+  });
+
 export type KavlingFormInput = z.infer<typeof kavlingFormSchema>;
 export type ResidentFormInput = z.infer<typeof residentFormSchema>;
 export type KavlingResidentMappingInput = z.infer<typeof kavlingResidentMappingSchema>;
@@ -199,3 +272,7 @@ export type BillingPeriodFormInput = z.infer<typeof billingPeriodFormSchema>;
 export type BillingPeriodStatus = z.infer<typeof billingPeriodStatusSchema>;
 export type PaymentSubmissionFormInput = z.infer<typeof paymentSubmissionFormSchema>;
 export type PaymentProofMetadataInput = z.infer<typeof paymentProofMetadataSchema>;
+export type ResidentSettingsProfileInput = z.infer<typeof residentSettingsProfileSchema>;
+export type ResidentNotificationCategory = z.infer<typeof residentNotificationCategorySchema>;
+export type ResidentNotificationPreferenceRowInput = z.infer<typeof residentNotificationPreferenceRowSchema>;
+export type ResidentNotificationPreferencesInput = z.infer<typeof residentNotificationPreferencesSchema>;
