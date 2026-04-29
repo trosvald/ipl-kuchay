@@ -114,7 +114,14 @@ Plans:
   2. After imports are applied, admin can run core billing, payment verification, communication, and reporting workflows without falling back to spreadsheets.
   3. When the payment gateway feature flag is disabled, the manual-transfer launch workflow still works end-to-end without breakage.
   4. When the payment gateway feature flag is enabled, eligible residents can initiate QRIS payment and the system reconciles gateway notifications to the correct invoice without duplicate or inconsistent state.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Define and test the CSV preview validation contracts for kavling, resident-mapping, and fee-override imports.
+- [ ] 06-02-PLAN.md — Build admin imports preview/apply workflow with Edge functions and import job audit persistence.
+- [ ] 06-03-PLAN.md — Implement Midtrans QRIS create/reconciliation backend with idempotent webhook handling.
+- [ ] 06-04-PLAN.md — Add admin QRIS feature flag controls and resident QRIS UI while preserving manual-transfer fallback.
+- [ ] 06-05-PLAN.md — Produce launch-readiness operational verification artifacts and spreadsheet-free workflow proof.
 
 ### Phase 7: Phase 1 Gap Closure & Milestone Verification
 **Goal**: Resolve all outstanding Phase 1 human-verification blockers so access/privacy/identity requirements are fully auditable and milestone closure is unblocked.
