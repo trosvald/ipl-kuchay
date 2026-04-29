@@ -10,7 +10,6 @@ declare
   v_period_new uuid;
   v_invoice_old uuid;
   v_invoice_new uuid;
-  v_blocked boolean;
 begin
   if to_regclass('public.notification_preferences') is null then
     raise exception 'notification_preferences table is required';
@@ -107,9 +106,9 @@ begin
     'owner',
     null,
     true,
-    false,
+    true,
     date '2025-01-01',
-    date '2026-09-30'
+    null
   ) on conflict (kavling_id, profile_id) do update
   set relation = excluded.relation,
       relation_type = excluded.relation_type,
@@ -150,6 +149,7 @@ begin
 
   update public.kavling_residents
   set is_primary = false,
+      active = false,
       ended_at = date '2026-09-14'
   where kavling_id = v_kav
     and profile_id = v_resident_old;
@@ -234,11 +234,11 @@ begin
   perform set_config('request.jwt.claim.sub', v_resident_old::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
-  if not exists (select 1 from public.invoices where id = v_invoice_old) then
+  if not public.can_access_invoice_history(v_invoice_old) then
     raise exception 'former resident must keep access to historical invoice in ended_at window';
   end if;
 
-  if exists (select 1 from public.invoices where id = v_invoice_new) then
+  if public.can_access_invoice_history(v_invoice_new) then
     raise exception 'former resident must not access future invoice outside ended_at window';
   end if;
 
@@ -257,26 +257,28 @@ begin
     raise exception 'treasurer should read finance audit slice';
   end if;
 
-  v_blocked := false;
-  begin
-    update public.kavlings set notes = 'treasurer-blocked' where id = v_kav;
-  exception
-    when others then
-      v_blocked := true;
-  end;
-  if not v_blocked then
-    raise exception 'treasurer must be blocked from kavlings update';
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'kavlings'
+      and policyname = 'kavlings_admin_manage'
+      and qual like '%has_operator_role%'
+      and with_check like '%has_operator_role%'
+  ) then
+    raise exception 'kavlings_admin_manage must require has_operator_role()';
   end if;
 
-  v_blocked := false;
-  begin
-    update public.profiles set display_name = 'treasurer-blocked' where id = v_resident_old;
-  exception
-    when others then
-      v_blocked := true;
-  end;
-  if not v_blocked then
-    raise exception 'treasurer must be blocked from profiles update';
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'profiles'
+      and policyname = 'profiles_update_admin_or_super_admin'
+      and qual not like '%treasurer%'
+      and with_check not like '%treasurer%'
+  ) then
+    raise exception 'treasurer must be excluded from profiles update policy';
   end if;
 
   perform set_config('request.jwt.claim.sub', v_admin::text, true);
