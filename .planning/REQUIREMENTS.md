@@ -125,13 +125,64 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| _Pending roadmap generation_ | - | Pending |
+| PUBL-01 | Phase 1 | Pending |
+| PUBL-02 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| AUTH-05 | Phase 1 | Pending |
+| PROF-01 | Phase 1 | Pending |
+| PROF-02 | Phase 1 | Pending |
+| PROF-03 | Phase 1 | Pending |
+| KAVL-01 | Phase 1 | Pending |
+| KAVL-02 | Phase 1 | Pending |
+| BILL-01 | Phase 2 | Pending |
+| BILL-02 | Phase 2 | Pending |
+| BILL-03 | Phase 2 | Pending |
+| BILL-04 | Phase 2 | Pending |
+| BILL-05 | Phase 2 | Pending |
+| BILL-06 | Phase 2 | Pending |
+| BILL-07 | Phase 2 | Pending |
+| PAY-01 | Phase 3 | Pending |
+| PAY-02 | Phase 3 | Pending |
+| PAY-03 | Phase 3 | Pending |
+| PAY-04 | Phase 3 | Pending |
+| PAY-05 | Phase 3 | Pending |
+| PAY-06 | Phase 3 | Pending |
+| PAY-07 | Phase 3 | Pending |
+| RPRT-01 | Phase 3 | Pending |
+| RPRT-02 | Phase 3 | Pending |
+| RPRT-03 | Phase 3 | Pending |
+| RPRT-04 | Phase 3 | Pending |
+| RPRT-05 | Phase 3 | Pending |
+| COMM-01 | Phase 4 | Pending |
+| COMM-02 | Phase 4 | Pending |
+| COMM-03 | Phase 4 | Pending |
+| COMM-04 | Phase 4 | Pending |
+| EVNT-01 | Phase 4 | Pending |
+| EVNT-02 | Phase 4 | Pending |
+| EVNT-03 | Phase 4 | Pending |
+| EVNT-04 | Phase 4 | Pending |
+| HOME-01 | Phase 4 | Pending |
+| COMM-05 | Phase 5 | Pending |
+| TLGM-01 | Phase 5 | Pending |
+| TLGM-02 | Phase 5 | Pending |
+| TLGM-03 | Phase 5 | Pending |
+| TLGM-04 | Phase 5 | Pending |
+| IMPT-01 | Phase 6 | Pending |
+| IMPT-02 | Phase 6 | Pending |
+| IMPT-03 | Phase 6 | Pending |
+| OPER-01 | Phase 6 | Pending |
+| QRIS-01 | Phase 6 | Pending |
+| QRIS-02 | Phase 6 | Pending |
+| QRIS-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 46 total
-- Mapped to phases: 0
-- Unmapped: 46 ⚠️
+- Mapped to phases: 46
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-29*
-*Last updated: 2026-04-29 after initial definition*
+*Last updated: 2026-04-29 after roadmap creation*
