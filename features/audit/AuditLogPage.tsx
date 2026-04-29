@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateId } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { useAuth } from "@/features/auth/authHooks";
 
 interface AuditRow {
   id: string;
@@ -37,6 +38,7 @@ function profileName(profile: ProfileSummary | undefined): string {
 
 export function AuditLogPage() {
   const client = getSupabaseBrowserClient();
+  const { role } = useAuth();
 
   const [items, setItems] = useState<AuditRow[]>([]);
   const [profileMap, setProfileMap] = useState<Record<string, ProfileSummary>>({});
@@ -44,6 +46,7 @@ export function AuditLogPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionFilter, setActionFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
+  const isFinanceOnlyScope = role === "treasurer";
 
   const loadAuditLogs = useCallback(async () => {
     if (!client) {
@@ -127,6 +130,11 @@ export function AuditLogPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Security</p>
           <h1 className="text-2xl font-semibold text-slate-900">Audit Log</h1>
           <p className="text-sm text-slate-600">Riwayat aksi sensitif pengurus.</p>
+          <p className="text-xs text-slate-500">
+            {isFinanceOnlyScope
+              ? "Cakupan audit: Keuangan (billing, verifikasi, pembayaran, laporan)."
+              : "Cakupan audit: Operasional penuh untuk admin/super admin."}
+          </p>
         </div>
         <Button variant="secondary" onClick={() => loadAuditLogs()} disabled={loading}>
           <RefreshCw className="size-4" /> Refresh
@@ -138,7 +146,11 @@ export function AuditLogPage() {
           <CardTitle className="text-base">Filter Audit</CardTitle>
           <div className="grid gap-2 md:grid-cols-2">
             <Input
-              placeholder="Filter action (contoh: payment_submission)"
+              placeholder={
+                isFinanceOnlyScope
+                  ? "Filter action (contoh: payment, verification, billing, report)"
+                  : "Filter action (contoh: payment_submission)"
+              }
               value={actionFilter}
               onChange={(event) => setActionFilter(event.target.value)}
             />
