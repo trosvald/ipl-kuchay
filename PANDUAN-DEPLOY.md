@@ -124,8 +124,8 @@
 3. Refresh halaman — data harus tetap ada
 4. Buka di HP lain — data harus kelihatan
 
-### Share ke Group WA:
-Kirim pesan ini ke group Jatiloka:
+### Share ke Grup Telegram:
+Kirim pesan ini ke grup Jatiloka:
 
 ```
 🏘️ *IPL JATILOKA RESIDENCE - Tracker Digital*
@@ -143,19 +143,15 @@ Caranya:
 5. Submit ✅
 
 Dashboard langsung update otomatis.
-Tidak perlu kirim foto ke group lagi! 🙏
+Tidak perlu kirim foto ke grup lagi! 🙏
 ```
 
 ---
 
 ## Info Tambahan
 
-### Ganti PIN Admin
-Di file `src/App.jsx`, baris:
-```
-const ADMIN_PIN = "1234";
-```
-Ganti `1234` dengan PIN yang lo mau, lalu upload ulang file ke GitHub — Vercel otomatis deploy ulang.
+### Catatan Admin
+Versi lama memakai PIN di browser dan hanya cocok untuk prototipe. Implementasi baru akan memakai Supabase Auth, role admin, dan aturan RLS sesuai milestone berikutnya.
 
 ### Akses Admin Panel
 - Buka link app

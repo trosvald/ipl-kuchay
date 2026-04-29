@@ -21,7 +21,7 @@ const MONTHS = [
 ];
 
 const now = new Date();
-const ADMIN_PIN = "1234"; // Ganti sesuai keinginan pengurus
+const LEGACY_DEMO_PIN = "1234"; // Prototype-only, not used by active app.
 
 export default function App() {
   const [view, setView] = useState("dashboard");
@@ -310,7 +310,7 @@ export default function App() {
             placeholder="••••" />
           {pinError && <div style={{ color:"#ef4444", fontSize:13 }}>PIN salah</div>}
           <button style={s.btnPrimary} onClick={() => {
-            if (adminPin === ADMIN_PIN) { setAdminMode(true); setPinError(false); }
+            if (adminPin === LEGACY_DEMO_PIN) { setAdminMode(true); setPinError(false); }
             else setPinError(true);
           }}>Masuk</button>
         </div>
