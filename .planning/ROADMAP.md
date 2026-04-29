@@ -16,6 +16,7 @@ This roadmap assumes the existing Next.js + Supabase foundation already covers b
 - [ ] **Phase 4: Announcements, Events & Resident Home** - Add resident communication features and unify them into one home experience.
 - [ ] **Phase 5: Telegram Linking & Notifications** - Turn Telegram into a secure linked channel for reminders, alerts, and billing shortcuts.
 - [ ] **Phase 6: Imports, Optional QRIS & Launch Readiness** - Complete cutover workflows, feature-flagged QRIS support, and spreadsheet-free operations.
+- [ ] **Phase 7: Phase 1 Gap Closure & Milestone Verification** - Close unresolved Phase 1 human-verification gaps and convert Phase 1 requirements to auditable pass status.
 
 ## Phase Details
 
@@ -99,6 +100,18 @@ Plans:
   4. When the payment gateway feature flag is enabled, eligible residents can initiate QRIS payment and the system reconciles gateway notifications to the correct invoice without duplicate or inconsistent state.
 **Plans**: TBD
 
+### Phase 7: Phase 1 Gap Closure & Milestone Verification
+**Goal**: Resolve all outstanding Phase 1 human-verification blockers so access/privacy/identity requirements are fully auditable and milestone closure is unblocked.
+**Depends on**: Phase 1
+**Requirements**: PUBL-01, PUBL-02, AUTH-01, AUTH-02, AUTH-03, AUTH-04, AUTH-05, PROF-01, PROF-02, PROF-03, KAVL-01, KAVL-02
+**Success Criteria** (what must be TRUE):
+  1. Public dashboard anonymous-access checks are executed and recorded as pass/fail with evidence.
+  2. Role route-protection journeys for resident/treasurer/admin/super_admin are executed and recorded with evidence.
+  3. Former-resident history/read-only behavior is executed and recorded with evidence.
+  4. Phase 1 verification status is updated from `human_needed` to `passed` after all human checks pass.
+  5. Milestone audit no longer reports partial status for Phase 1 requirement IDs.
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -109,3 +122,4 @@ Plans:
 | 4. Announcements, Events & Resident Home | 0/TBD | Not started | - |
 | 5. Telegram Linking & Notifications | 0/TBD | Not started | - |
 | 6. Imports, Optional QRIS & Launch Readiness | 0/TBD | Not started | - |
+| 7. Phase 1 Gap Closure & Milestone Verification | 0/TBD | Not started | - |
