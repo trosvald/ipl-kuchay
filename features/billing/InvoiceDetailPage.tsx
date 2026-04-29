@@ -18,6 +18,7 @@ import {
   statusToBadgeVariant,
 } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { useAuth } from "@/features/auth/authHooks";
 
 interface InvoiceDetail {
   id: string;
@@ -76,6 +77,7 @@ interface InvoiceDetailPageProps {
 }
 
 export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backLabel = "Kembali" }: Readonly<InvoiceDetailPageProps>) {
+  const { profile } = useAuth();
   const client = getSupabaseBrowserClient();
 
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
@@ -85,6 +87,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [submissionReloadToken, setSubmissionReloadToken] = useState(0);
+  const [hasActiveKavlingAccess, setHasActiveKavlingAccess] = useState(true);
 
   const loadInvoice = useCallback(async () => {
     if (!client) {
@@ -120,8 +123,31 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
 
     setInvoice((invoiceRes.data ?? null) as InvoiceDetail | null);
     setItems((itemsRes.data ?? []) as InvoiceItemRow[]);
+
+    const invoiceData = invoiceRes.data as InvoiceDetail | null;
+    if (!profile || !invoiceData?.kavling_id) {
+      setHasActiveKavlingAccess(true);
+      setLoading(false);
+      return;
+    }
+
+    const { count, error: mappingError } = await client
+      .from("kavling_residents")
+      .select("id", { head: true, count: "exact" })
+      .eq("profile_id", profile.id)
+      .eq("kavling_id", invoiceData.kavling_id)
+      .eq("active", true)
+      .limit(1);
+
+    if (mappingError) {
+      setErrorMessage(mappingError.message);
+      setLoading(false);
+      return;
+    }
+
+    setHasActiveKavlingAccess((count ?? 0) > 0);
     setLoading(false);
-  }, [client, invoiceId]);
+  }, [client, invoiceId, profile]);
 
   useEffect(() => {
     loadInvoice().catch(() => {
@@ -246,7 +272,15 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
         </Card>
       </div>
 
-      {invoice ? (
+      {!hasActiveKavlingAccess ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-3 text-sm text-amber-800">
+            Invoice ini berasal dari riwayat kavling yang sudah tidak aktif di akun Anda. Detail tetap bisa dibaca, tetapi pengiriman pembayaran baru dinonaktifkan.
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {invoice && hasActiveKavlingAccess ? (
         <PaymentSubmissionForm
           invoiceId={invoice.id}
           invoiceStatus={invoice.status}

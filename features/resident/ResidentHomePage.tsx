@@ -41,13 +41,35 @@ export function ResidentHomePage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [linkedKavlings, setLinkedKavlings] = useState<ResidentKavlingMapping[]>([]);
+  const [historicalInvoiceCount, setHistoricalInvoiceCount] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
-  const totalRows = linkedKavlings.length;
+  const groupedKavlings = useMemo(() => {
+    const map = new Map<string, { kavlingCode: string; block: string | null; isActive: boolean; mappings: ResidentKavlingMapping[] }>();
+    for (const mapping of linkedKavlings) {
+      const kavlingId = mapping.kavlings?.id ?? `unknown-${mapping.id}`;
+      const existing = map.get(kavlingId);
+      if (existing) {
+        existing.mappings.push(mapping);
+        continue;
+      }
+
+      map.set(kavlingId, {
+        kavlingCode: mapping.kavlings?.code ?? "-",
+        block: mapping.kavlings?.block ?? null,
+        isActive: Boolean(mapping.kavlings?.active),
+        mappings: [mapping],
+      });
+    }
+
+    return Array.from(map.values());
+  }, [linkedKavlings]);
+
+  const totalRows = groupedKavlings.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const pagedKavlings = useMemo(
-    () => linkedKavlings.slice((page - 1) * pageSize, page * pageSize),
-    [linkedKavlings, page, pageSize],
+    () => groupedKavlings.slice((page - 1) * pageSize, page * pageSize),
+    [groupedKavlings, page, pageSize],
   );
   const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageEnd = Math.min(page * pageSize, totalRows);
@@ -67,21 +89,27 @@ export function ResidentHomePage() {
     setLoading(true);
     setErrorMessage(null);
 
-    const { data, error } = await client
+    const [mappingRes, historicalRes] = await Promise.all([
+      client
       .from("kavling_residents")
       .select("id, relation, is_primary, active, kavlings(id, code, block, active)")
       .eq("profile_id", profile.id)
       .eq("active", true)
       .order("is_primary", { ascending: false })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }),
+      client
+        .from("invoices")
+        .select("id", { head: true, count: "exact" })
+        .limit(1),
+    ]);
 
-    if (error) {
-      setErrorMessage(error.message);
+    if (mappingRes.error || historicalRes.error) {
+      setErrorMessage(mappingRes.error?.message ?? historicalRes.error?.message ?? "Gagal memuat data portal.");
       setLoading(false);
       return;
     }
 
-    const normalized = ((data ?? []) as Array<
+    const normalized = ((mappingRes.data ?? []) as Array<
       ResidentKavlingMapping & {
         kavlings:
           | ResidentKavlingMapping["kavlings"]
@@ -92,6 +120,7 @@ export function ResidentHomePage() {
       kavlings: normalizeJoinedKavling(item.kavlings),
     }));
 
+    setHistoricalInvoiceCount(historicalRes.count ?? 0);
     setLinkedKavlings(normalized);
     setLoading(false);
   }, [client, profile]);
@@ -108,11 +137,21 @@ export function ResidentHomePage() {
     kavlingWorkspace = <p className="px-4 py-5 text-sm text-muted-foreground">Memuat kavling...</p>;
   } else if (errorMessage) {
     kavlingWorkspace = <p className="px-4 py-5 text-sm text-red-600">{errorMessage}</p>;
-  } else if (linkedKavlings.length === 0) {
+  } else if (groupedKavlings.length === 0) {
     kavlingWorkspace = (
-      <p className="px-4 py-5 text-sm text-muted-foreground">
-        Belum ada kavling terhubung. Hubungi admin untuk sinkronisasi data.
-      </p>
+      <div className="space-y-3 px-4 py-5 text-sm">
+        <p className="font-medium text-foreground">Data kavling aktif belum terhubung.</p>
+        {historicalInvoiceCount > 0 ? (
+          <p className="text-muted-foreground">
+            Anda tetap dapat membuka riwayat tagihan lama (read-only) tanpa melihat data penghuni baru untuk kavling yang sudah tidak aktif.
+          </p>
+        ) : (
+          <p className="text-muted-foreground">Hubungi pengurus untuk sinkronisasi pemetaan kavling akun Anda.</p>
+        )}
+        <Button asChild size="sm" variant="outline">
+          <Link href="/app/invoices">Buka Riwayat Tagihan</Link>
+        </Button>
+      </div>
     );
   } else {
     kavlingWorkspace = (
@@ -121,29 +160,36 @@ export function ResidentHomePage() {
           <TableRow className="text-xs uppercase tracking-wide text-muted-foreground">
             <TableHead>Kavling</TableHead>
             <TableHead>Blok</TableHead>
-            <TableHead>Relasi</TableHead>
+            <TableHead>Relasi Terdaftar</TableHead>
             <TableHead>Primary</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {pagedKavlings.map((mapping) => (
-            <TableRow key={mapping.id}>
-              <TableCell className="font-medium text-foreground">{mapping.kavlings?.code ?? "-"}</TableCell>
-              <TableCell className="text-muted-foreground">{mapping.kavlings?.block ?? "-"}</TableCell>
-              <TableCell className="text-muted-foreground">{mapping.relation}</TableCell>
-              <TableCell>
-                <Badge variant={mapping.is_primary ? "success" : "secondary"}>
-                  {mapping.is_primary ? "Primary" : "Tambahan"}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant={mapping.kavlings?.active ? "success" : "secondary"}>
-                  {mapping.kavlings?.active ? "Aktif" : "Nonaktif"}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          ))}
+          {pagedKavlings.map((group, index) => {
+            const primaryMapping = group.mappings.find((mapping) => mapping.is_primary);
+            return (
+              <TableRow key={`${group.kavlingCode}-${index}`}>
+                <TableCell className="font-medium text-foreground">{group.kavlingCode}</TableCell>
+                <TableCell className="text-muted-foreground">{group.block ?? "-"}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1.5">
+                    {group.mappings.map((mapping) => (
+                      <Badge key={mapping.id} variant="outline">
+                        {mapping.relation}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={primaryMapping ? "success" : "secondary"}>{primaryMapping ? "Primary" : "Tambahan"}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={group.isActive ? "success" : "secondary"}>{group.isActive ? "Aktif" : "Nonaktif"}</Badge>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     );
@@ -181,7 +227,7 @@ export function ResidentHomePage() {
         <section className="overflow-hidden rounded-lg border border-border bg-background">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <p className="text-sm font-semibold text-foreground">Kavling Terdaftar</p>
-            <Badge variant="outline">{linkedKavlings.length} data</Badge>
+            <Badge variant="outline">{groupedKavlings.length} kavling</Badge>
           </div>
           <div>{kavlingWorkspace}</div>
           {loading ? null : (

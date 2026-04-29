@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateId, formatInvoiceStatusLabel, formatMonthYearId, formatRupiah, statusToBadgeVariant } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { useAuth } from "@/features/auth/authHooks";
 
 interface ResidentInvoiceRow {
   id: string;
@@ -49,6 +50,7 @@ function normalizeOne<T>(value: T | T[] | null): T | null {
 }
 
 export function ResidentInvoicesPage() {
+  const { hasActiveKavlingMapping } = useAuth();
   const client = getSupabaseBrowserClient();
 
   const [items, setItems] = useState<ResidentInvoiceRow[]>([]);
@@ -164,7 +166,7 @@ export function ResidentInvoicesPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">User Portal</p>
           <h1 className="text-2xl font-semibold text-slate-900">Daftar Invoice</h1>
-          <p className="text-sm text-slate-600">Tampilkan hanya invoice kavling yang terhubung ke akun Anda.</p>
+          <p className="text-sm text-slate-600">Tampilkan invoice sesuai kavling yang diizinkan akun Anda, termasuk histori lama yang masih boleh dibaca.</p>
         </div>
         <Button variant="secondary" onClick={() => loadInvoices()} disabled={loading}>
           <RefreshCw className="size-4" /> Refresh
@@ -174,6 +176,14 @@ export function ResidentInvoicesPage() {
       {errorMessage ? (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="py-3 text-sm text-red-700">{errorMessage}</CardContent>
+        </Card>
+      ) : null}
+
+      {!hasActiveKavlingMapping ? (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-3 text-sm text-amber-800">
+            Anda tidak punya kavling aktif saat ini. Halaman ini tetap menampilkan histori tagihan Anda (read-only) sesuai periode hunian sebelumnya.
+          </CardContent>
         </Card>
       ) : null}
 
@@ -265,7 +275,7 @@ export function ResidentInvoicesPage() {
                         <TableCell className="text-slate-700">
                           {period ? `${formatMonthYearId(period.year, period.month)} (${period.label})` : "-"}
                         </TableCell>
-                        <TableCell className="text-slate-700">{kavling?.code ?? "-"}</TableCell>
+                        <TableCell className="text-slate-700">{kavling?.code ? `Kavling ${kavling.code}` : "-"}</TableCell>
                         <TableCell className="text-slate-700">{formatDateId(item.due_date)}</TableCell>
                         <TableCell>
                           <Badge variant={statusToBadgeVariant(item.status)}>{formatInvoiceStatusLabel(item.status)}</Badge>
