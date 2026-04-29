@@ -97,7 +97,7 @@ export function PublicDashboardPage() {
               Portal Warga Publik
             </Badge>
             <h1 className="max-w-2xl text-4xl font-semibold leading-tight tracking-tight md:text-6xl">
-              Ringkasan pembayaran IPL yang lebih transparan
+              Ringkasan pembayaran IPL publik berbasis data agregat aman
             </h1>
             <p className="mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
               {APP_NAME} menampilkan ringkasan agregat periode billing yang aman untuk publik tanpa membuka data private warga.
@@ -115,7 +115,7 @@ export function PublicDashboardPage() {
           </div>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
-            <p className="mb-4 text-sm font-semibold text-foreground">Periode Terbaru</p>
+              <p className="mb-4 text-sm font-semibold text-foreground">Periode Publik Aktif</p>
             {loading ? <p className="text-sm text-muted-foreground">Memuat ringkasan...</p> : null}
             {!loading && latest ? (
               <div className="space-y-3">
@@ -257,7 +257,7 @@ export function PublicDashboardPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border bg-background p-4">
               <p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold"><Clock3 className="size-4" /> Catatan Privasi</p>
-              <p className="text-sm text-muted-foreground">Dashboard publik hanya memakai fungsi agregat aman. Data identitas warga, invoice detail, dan bukti pembayaran tidak ditampilkan di sini.</p>
+              <p className="text-sm text-muted-foreground">Dashboard publik hanya memakai fungsi agregat aman. Nama warga, saldo per rumah, bukti pembayaran, dan detail pembayaran per kavling tidak ditampilkan di sini.</p>
             </div>
             <div className="rounded-xl border bg-background p-4">
               <p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold"><Wallet className="size-4" /> Akses Lengkap</p>
