@@ -22,12 +22,35 @@ interface MappingRow {
   kavling_id: string;
   profile_id: string;
   relation: string;
+  relation_type: "owner" | "spouse" | "child" | "parent" | "tenant" | "family_other" | "staff" | "other";
+  relation_label: string | null;
   is_primary: boolean;
   active: boolean;
+  started_at: string;
+  ended_at: string | null;
   kavlings: {
     code: string;
     active: boolean;
   } | null;
+}
+
+const relationOptions: Array<{ value: MappingRow["relation_type"]; label: string }> = [
+  { value: "owner", label: "Pemilik" },
+  { value: "spouse", label: "Pasangan" },
+  { value: "child", label: "Anak" },
+  { value: "parent", label: "Orang Tua" },
+  { value: "tenant", label: "Penyewa" },
+  { value: "family_other", label: "Keluarga Lain" },
+  { value: "staff", label: "Staf" },
+  { value: "other", label: "Lainnya" },
+];
+
+function formatRelationLabel(mapping: MappingRow) {
+  if (mapping.relation_type === "other" && mapping.relation_label) {
+    return `Lainnya: ${mapping.relation_label}`;
+  }
+  const matched = relationOptions.find((option) => option.value === mapping.relation_type);
+  return matched?.label ?? mapping.relation;
 }
 
 function normalizeJoinedKavling(
@@ -71,7 +94,8 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
   const [pageSize, setPageSize] = useState(5);
 
   const [kavlingId, setKavlingId] = useState("");
-  const [relation, setRelation] = useState("owner");
+  const [relationType, setRelationType] = useState<MappingRow["relation_type"]>("owner");
+  const [relationLabel, setRelationLabel] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
   const totalRows = mappings.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -81,6 +105,10 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
   );
   const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
   const pageEnd = Math.min(page * pageSize, totalRows);
+  const selectedKavlingPrimary = useMemo(
+    () => mappings.find((item) => item.kavling_id === kavlingId && item.active && item.is_primary),
+    [kavlingId, mappings],
+  );
 
   useEffect(() => {
     if (page > totalPages) {
@@ -107,7 +135,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
           .order("code", { ascending: true }),
         client
           .from("kavling_residents")
-          .select("id, kavling_id, profile_id, relation, is_primary, active, kavlings(code, active)")
+          .select("id, kavling_id, profile_id, relation, relation_type, relation_label, is_primary, active, started_at, ended_at, kavlings(code, active)")
           .eq("profile_id", residentId)
           .order("created_at", { ascending: false }),
       ]);
@@ -148,13 +176,23 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
     const parsed = kavlingResidentMappingSchema.safeParse({
       kavling_id: kavlingId,
       profile_id: residentId,
-      relation,
+      relation: relationType === "other" ? relationLabel : relationType,
       is_primary: isPrimary,
       active: true,
     });
 
     if (!parsed.success) {
       setErrorMessage(parsed.error.issues[0]?.message ?? "Data mapping tidak valid.");
+      return;
+    }
+
+    if (relationType === "other" && relationLabel.trim().length < 2) {
+      setErrorMessage("Detail relasi untuk opsi lainnya minimal 2 karakter.");
+      return;
+    }
+
+    if (isPrimary && selectedKavlingPrimary && selectedKavlingPrimary.profile_id !== residentId) {
+      setErrorMessage("Kavling ini sudah memiliki resident primary aktif. Lakukan handoff eksplisit dengan menonaktifkan mapping primary lama terlebih dahulu.");
       return;
     }
 
@@ -170,12 +208,16 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
           kavling_id: parsed.data.kavling_id,
           profile_id: parsed.data.profile_id,
           relation: parsed.data.relation,
+          relation_type: relationType,
+          relation_label: relationType === "other" ? relationLabel.trim() : null,
           is_primary: parsed.data.is_primary,
           active: true,
+          started_at: existing?.started_at ?? new Date().toISOString().slice(0, 10),
+          ended_at: null,
         },
         { onConflict: "kavling_id,profile_id" },
       )
-      .select("id, kavling_id, profile_id, relation, is_primary, active, kavlings(code, active)")
+      .select("id, kavling_id, profile_id, relation, relation_type, relation_label, is_primary, active, started_at, ended_at, kavlings(code, active)")
       .single();
 
     if (error || !data) {
@@ -213,9 +255,9 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
 
     const { data, error } = await client
       .from("kavling_residents")
-      .update({ active: false, is_primary: false })
+      .update({ active: false, is_primary: false, ended_at: new Date().toISOString().slice(0, 10) })
       .eq("id", mapping.id)
-      .select("id, kavling_id, profile_id, relation, is_primary, active, kavlings(code, active)")
+      .select("id, kavling_id, profile_id, relation, relation_type, relation_label, is_primary, active, started_at, ended_at, kavlings(code, active)")
       .single();
 
     if (error || !data) {
@@ -261,7 +303,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
           {pagedMappings.map((mapping) => (
             <TableRow key={mapping.id}>
               <TableCell className="font-medium text-slate-900">{mapping.kavlings?.code ?? "-"}</TableCell>
-              <TableCell className="text-slate-700">{mapping.relation}</TableCell>
+              <TableCell className="text-slate-700">{formatRelationLabel(mapping)}</TableCell>
               <TableCell className="text-slate-700">{mapping.is_primary ? "Ya" : "Tidak"}</TableCell>
               <TableCell>
                 <Badge variant={mapping.active ? "success" : "default"}>
@@ -294,7 +336,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
 
       {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto]">
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto_auto]">
         <label className="space-y-1 text-xs text-slate-600">
           <span>Kavling</span>
           <select
@@ -312,7 +354,27 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
 
         <label className="space-y-1 text-xs text-slate-600">
           <span>Relasi</span>
-          <Input value={relation} onChange={(event) => setRelation(event.target.value)} placeholder="owner / tenant" />
+          <select
+            className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
+            value={relationType}
+            onChange={(event) => setRelationType(event.target.value as MappingRow["relation_type"])}
+          >
+            {relationOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="space-y-1 text-xs text-slate-600">
+          <span>Detail relasi</span>
+          <Input
+            value={relationLabel}
+            onChange={(event) => setRelationLabel(event.target.value)}
+            placeholder={relationType === "other" ? "Contoh: Kerabat" : "Opsional"}
+            disabled={relationType !== "other"}
+          />
         </label>
 
         <label className="flex items-center gap-2 text-xs text-slate-700">
