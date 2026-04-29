@@ -82,7 +82,11 @@ Plans:
   3. Admin can create, publish, unpublish, update, archive, and prioritize announcements for residents.
   4. Resident can view upcoming and past event details and RSVP or update their attendance choice.
   5. Admin can create, update, cancel, and manage events while viewing RSVP summaries for each event.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 04-01-PLAN.md — Add announcements/events schema, RLS, and validation contracts with SQL regression coverage.
+- [ ] 04-02-PLAN.md — Build admin announcements and events management including urgent/publish lifecycle and RSVP summary.
+- [ ] 04-03-PLAN.md — Deliver unified resident home plus resident announcements/events pages with RSVP updates.
 **UI hint**: yes
 
 ### Phase 5: Telegram Linking & Notifications
@@ -94,7 +98,11 @@ Plans:
   2. Resident can receive Telegram notifications for billing reminders, payment review outcomes, and new or urgent announcements according to stored notification preferences.
   3. Resident can use approved Telegram commands or deep-link flows to check only their own billing status and history.
   4. Admin-like users can receive Telegram summaries or alerts relevant to payment verification and neighborhood operations.
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 05-01-PLAN.md — Build secure one-time Telegram account linking contracts (DB + edge consume flow).
+- [ ] 05-02-PLAN.md — Implement preference-aware Telegram notification dispatch and wire payment/announcement events.
+- [ ] 05-03-PLAN.md — Deliver Telegram command/deep-link utility flows and resident settings link-state management.
 **UI hint**: yes
 
 ### Phase 6: Imports, Optional QRIS & Launch Readiness
