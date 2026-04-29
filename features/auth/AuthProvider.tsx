@@ -35,6 +35,8 @@ export interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
   role: AppRole | null;
+  accessState: "anonymous" | "missing-profile" | "inactive" | "active-mapped" | "active-unmapped";
+  hasActiveKavlingMapping: boolean;
   loading: boolean;
   signIn: (input: SignInInput) => Promise<void>;
   signOut: () => Promise<void>;
@@ -81,22 +83,50 @@ async function fetchProfile(
   return data;
 }
 
+async function fetchHasActiveKavlingMapping(
+  client: SupabaseClient,
+  profileId: string,
+): Promise<boolean> {
+  const { count, error } = await client
+    .from("kavling_residents")
+    .select("id", { head: true, count: "exact" })
+    .eq("profile_id", profileId)
+    .eq("active", true)
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  return (count ?? 0) > 0;
+}
+
 export function AuthProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const client = getSupabaseBrowserClient();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [hasActiveKavlingMapping, setHasActiveKavlingMapping] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refreshProfile = useCallback(async () => {
     if (!client || !session?.user) {
       setProfile(null);
+      setHasActiveKavlingMapping(false);
       return;
     }
 
     const nextProfile = await fetchProfile(client, session.user.id);
     setProfile(nextProfile);
+
+    if (!nextProfile) {
+      setHasActiveKavlingMapping(false);
+      return;
+    }
+
+    const nextHasActiveMapping = await fetchHasActiveKavlingMapping(client, nextProfile.id);
+    setHasActiveKavlingMapping(nextHasActiveMapping);
   }, [client, session?.user]);
 
   const signIn = useCallback(
@@ -138,6 +168,7 @@ export function AuthProvider({
     if (!client) {
       setSession(null);
       setProfile(null);
+      setHasActiveKavlingMapping(false);
       return;
     }
 
@@ -148,6 +179,7 @@ export function AuthProvider({
 
     setSession(null);
     setProfile(null);
+    setHasActiveKavlingMapping(false);
   }, [client]);
 
   useEffect(() => {
@@ -168,6 +200,7 @@ export function AuthProvider({
       if (error) {
         setSession(null);
         setProfile(null);
+        setHasActiveKavlingMapping(false);
         setLoading(false);
         return;
       }
@@ -177,6 +210,7 @@ export function AuthProvider({
 
       if (!nextSession?.user) {
         setProfile(null);
+        setHasActiveKavlingMapping(false);
         setLoading(false);
         return;
       }
@@ -188,6 +222,18 @@ export function AuthProvider({
         }
 
         setProfile(nextProfile);
+
+        if (!nextProfile) {
+          setHasActiveKavlingMapping(false);
+          return;
+        }
+
+        const nextHasActiveMapping = await fetchHasActiveKavlingMapping(client, nextProfile.id);
+        if (!isMounted) {
+          return;
+        }
+
+        setHasActiveKavlingMapping(nextHasActiveMapping);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -208,18 +254,34 @@ export function AuthProvider({
 
       if (!nextSession?.user) {
         setProfile(null);
+        setHasActiveKavlingMapping(false);
         setLoading(false);
         return;
       }
 
       setLoading(true);
       fetchProfile(client, nextSession.user.id)
-        .then((nextProfile) => {
+        .then(async (nextProfile) => {
           if (!isMounted) {
             return;
           }
 
           setProfile(nextProfile);
+
+          if (!nextProfile) {
+            setHasActiveKavlingMapping(false);
+            return;
+          }
+
+          const nextHasActiveMapping = await fetchHasActiveKavlingMapping(
+            client,
+            nextProfile.id,
+          );
+          if (!isMounted) {
+            return;
+          }
+
+          setHasActiveKavlingMapping(nextHasActiveMapping);
         })
         .finally(() => {
           if (isMounted) {
@@ -239,12 +301,23 @@ export function AuthProvider({
       session,
       profile,
       role: profile?.role ?? null,
+      accessState:
+        !session
+          ? "anonymous"
+          : !profile
+            ? "missing-profile"
+            : !profile.is_active
+              ? "inactive"
+              : hasActiveKavlingMapping
+                ? "active-mapped"
+                : "active-unmapped",
+      hasActiveKavlingMapping,
       loading,
       signIn,
       signOut,
       refreshProfile,
     }),
-    [loading, profile, refreshProfile, session, signIn, signOut],
+    [hasActiveKavlingMapping, loading, profile, refreshProfile, session, signIn, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
