@@ -23,7 +23,7 @@ created: 2026-04-30
 | Preset | `style=new-york`, `baseColor=neutral`, `cssVariables=true` |
 | Component library | Radix primitives via shadcn |
 | Icon library | lucide-react |
-| Font | Plus Jakarta Sans (weight 400, 500, 600, 700) |
+| Font | Plus Jakarta Sans (weight 400, 600) |
 
 Source notes:
 - `components.json` + `npx shadcn info` confirm shadcn initialized with New York + neutral.
@@ -57,17 +57,18 @@ Exceptions:
 
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
-| Display | 36px | 700 | 1.15 | Arrears total amount, hero metrics |
+| Display | 36px | 600 | 1.15 | Arrears total amount, hero metrics |
 | Heading | 20px | 600 | 1.25 | Section titles, kavling tab labels, invoice card period titles |
 | Body | 16px | 400 | 1.5 | Paragraph text, invoice item descriptions, admin form labels |
-| Label | 14px | 500 | 1.4 | Status badges, secondary metadata, filter labels, table column headers |
+| Label | 14px | 400 | 1.4 | Status badges, secondary metadata, filter labels, table column headers |
 
 Rules:
-- Use only weights 400, 500, 600, 700 in this phase (weight 500 introduced for label/secondary emphasis).
-- Currency totals in summary cards use Display size at weight 700 for maximum visual hierarchy.
-- Uppercase labels stay at 14px weight 500 with `tracking-wide`; never compete with section headings.
-- Invoice item rows use Body size with amount columns at weight 600 for scanability.
-- Negative/overdue amounts use weight 600 at Display size to draw immediate attention.
+- Use only weights 400 (regular) and 600 (semibold) in this phase.
+- Display and Heading roles use weight 600 for emphasis; Body and Label roles use weight 400.
+- Currency totals in summary cards use Display size at weight 600; overdue amounts rely on `destructive` semantic color rather than an additional weight.
+- Uppercase labels stay at 14px weight 400 with `tracking-wide`; never compete with section headings.
+- Invoice amount columns use `font-variant-numeric: tabular-nums` and color contrast for scanability instead of a separate weight.
+- Overdue arrears amounts rely on the `destructive-red` semantic color at Display size for visual emphasis, not an additional weight.
 
 ---
 
