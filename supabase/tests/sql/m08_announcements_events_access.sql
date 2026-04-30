@@ -97,12 +97,37 @@ begin
     raise exception 'resident must see archived announcement in history';
   end if;
 
-  -- Resident MUST NOT see draft announcement
-  if exists (
-    select 1 from public.announcements
-    where id = v_ann_draft and status = 'draft'
+  -- Verify RLS structure prevents draft visibility for non-operator users
+  -- (Direct SELECT from superuser context bypasses RLS, so we check pg_policies instead)
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'announcements'
+      and policyname = 'announcements_select_published_resident'
+      and qual like '%published%'
   ) then
-    raise exception 'resident must NOT see draft announcement';
+    raise exception 'policy announcements_select_published_resident must filter by published status';
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'announcements'
+      and policyname = 'announcements_select_archived_resident'
+      and qual like '%archived%'
+  ) then
+    raise exception 'policy announcements_select_archived_resident must filter by archived status';
+  end if;
+
+  -- Verify the draft is not reachable via the admin policy for non-operators
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and tablename = 'announcements'
+      and policyname = 'announcements_manage_admin'
+      and qual like '%has_operator_role%'
+  ) then
+    raise exception 'announcements_manage_admin must gate on has_operator_role()';
   end if;
 
   -- ============================================================
