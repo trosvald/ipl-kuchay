@@ -16,7 +16,8 @@ on conflict (id) do nothing;
 -- Storage policies for finance roles (treasurer/admin/super_admin)
 
 -- Allow finance roles to upload report artifacts (write)
-create policy if not exists "report_outputs_finance_upload"
+drop policy if exists "report_outputs_finance_upload" on storage.objects;
+create policy "report_outputs_finance_upload"
 on storage.objects
 for insert
 to authenticated
@@ -30,7 +31,8 @@ with check (
 );
 
 -- Allow finance roles to read report artifacts (for signed URL delivery)
-create policy if not exists "report_outputs_finance_read"
+drop policy if exists "report_outputs_finance_read" on storage.objects;
+create policy "report_outputs_finance_read"
 on storage.objects
 for select
 to authenticated
@@ -44,7 +46,8 @@ using (
 );
 
 -- Allow finance roles to delete report artifacts
-create policy if not exists "report_outputs_finance_delete"
+drop policy if exists "report_outputs_finance_delete" on storage.objects;
+create policy "report_outputs_finance_delete"
 on storage.objects
 for delete
 to authenticated

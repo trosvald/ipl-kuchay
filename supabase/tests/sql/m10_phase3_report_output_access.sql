@@ -136,7 +136,47 @@ from (
 ) as checks(test_name, passed, detail)
 where not passed;
 
--- Check 5: RLS policies on reports table
+-- Check 4b: Receipt report rows include kavling_id linkage for resident RLS (T-03-24)
+select
+  test_name,
+  passed,
+  detail
+from (
+  values (
+    'receipt reports can have kavling_id set (foreign key relationship)',
+    exists (
+      select 1 from information_schema.columns
+      where table_name = 'reports'
+        and column_name = 'kavling_id'
+        and table_schema = 'public'
+    ),
+    'public.reports.kavling_id must exist for resident RLS linkage per T-03-24'
+  )
+) as checks(test_name, passed, detail)
+where not passed;
+
+-- Check 4c: payment_id is tracked in reports metadata for receipt-linkage audit trail (T-03-24)
+-- This is validated via the generate-report-output edge function writing payment_id into metadata,
+-- and the test suite checking that loadResidentReceiptData uses the payments row.
+-- We validate the column contract here; runtime linkage is tested via the edge function tests.
+select
+  test_name,
+  passed,
+  detail
+from (
+  values (
+    'reports metadata is jsonb and can store payment_id key',
+    exists (
+      select 1 from information_schema.columns
+      where table_name = 'reports'
+        and column_name = 'metadata'
+        and data_type = 'jsonb'
+        and table_schema = 'public'
+    ),
+    'public.reports.metadata must be jsonb to store payment_id per T-03-24'
+  )
+) as checks(test_name, passed, detail)
+where not passed;
 select
   test_name,
   passed,
