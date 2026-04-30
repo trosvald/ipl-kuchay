@@ -70,3 +70,45 @@ export function statusToBadgeVariant(status: string): "secondary" | "success" | 
 
   return "secondary";
 }
+
+export function formatPaymentSubmissionStatus(status: string): string {
+  if (status === "submitted") {
+    return "Menunggu verifikasi";
+  }
+  if (status === "verified") {
+    return "Terverifikasi";
+  }
+  if (status === "rejected") {
+    return "Ditolak";
+  }
+  if (status === "cancelled") {
+    return "Dibatalkan";
+  }
+  return status;
+}
+
+export function buildRejectionGuidance(status: string, reason: string): string | null {
+  if (status !== "rejected") {
+    return null;
+  }
+  if (reason && reason.trim().length > 0) {
+    return `Submission ditolak: ${reason.trim()}. Silakan kirim submission baru dengan bukti yang benar.`;
+  }
+  return "Submission ditolak. Silakan kirim submission baru dengan bukti yang benar.";
+}
+
+export function formatSubmissionNextStep(status: string): string | null {
+  if (status === "submitted") {
+    return "Menunggu verifikasi oleh tim kami.";
+  }
+  if (status === "verified") {
+    return "Pembayaran sudah diverifikasi. Invoice telah dilunasi.";
+  }
+  if (status === "rejected") {
+    return "Silakan kirim submission baru dengan bukti yang benar.";
+  }
+  if (status === "cancelled") {
+    return null;
+  }
+  return null;
+}

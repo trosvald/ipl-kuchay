@@ -6,7 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateId, formatRupiah, statusToBadgeVariant } from "@/lib/format";
+import {
+  buildRejectionGuidance,
+  formatDateId,
+  formatPaymentSubmissionStatus,
+  formatRupiah,
+  formatSubmissionNextStep,
+  statusToBadgeVariant,
+} from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 interface SubmissionRow {
@@ -44,19 +51,7 @@ function normalizeOne<T>(value: T | T[] | null): T | null {
 }
 
 function formatSubmissionStatus(status: SubmissionRow["status"]): string {
-  if (status === "submitted") {
-    return "Menunggu verifikasi";
-  }
-  if (status === "verified") {
-    return "Terverifikasi";
-  }
-  if (status === "rejected") {
-    return "Ditolak";
-  }
-  if (status === "cancelled") {
-    return "Dibatalkan";
-  }
-  return status;
+  return formatPaymentSubmissionStatus(status);
 }
 
 export function SubmissionHistory({ invoiceId, reloadToken = 0 }: Readonly<SubmissionHistoryProps>) {
@@ -112,13 +107,14 @@ export function SubmissionHistory({ invoiceId, reloadToken = 0 }: Readonly<Submi
       <div className="overflow-x-auto">
         <Table className="min-w-[860px]">
           <TableHeader>
-            <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+              <TableRow className="text-xs uppercase tracking-wide text-slate-500">
               <TableHead>Tanggal</TableHead>
               <TableHead>Nominal</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Rekening Tujuan</TableHead>
               <TableHead>Catatan</TableHead>
               <TableHead>Bukti</TableHead>
+              <TableHead>Langkah</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -137,10 +133,23 @@ export function SubmissionHistory({ invoiceId, reloadToken = 0 }: Readonly<Submi
                     {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}
                   </TableCell>
                   <TableCell className="text-slate-700">
-                    {item.status === "rejected" ? item.rejection_reason ?? item.note ?? "-" : item.note ?? "-"}
+                    {item.status === "rejected"
+                      ? item.rejection_reason ?? item.note ?? "-"
+                      : item.note ?? "-"}
                   </TableCell>
                   <TableCell className="text-xs text-slate-600">
-                    {item.proof_path ? "Tersimpan privat" : "Belum ada"}
+                    {item.proof_path
+                      ? "Tersimpan privat"
+                      : "Belum ada"}
+                  </TableCell>
+                  <TableCell className="text-xs text-slate-600">
+                    {item.status === "rejected"
+                      ? buildRejectionGuidance(item.status, item.rejection_reason ?? "") ??
+                        formatSubmissionNextStep(item.status) ??
+                        "-"
+                      : item.status === "submitted"
+                        ? formatSubmissionNextStep(item.status) ?? "-"
+                        : "-"}
                   </TableCell>
                 </TableRow>
               );
