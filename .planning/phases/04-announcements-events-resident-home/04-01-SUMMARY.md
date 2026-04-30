@@ -36,7 +36,7 @@ tech-stack:
 
 key-files:
   created:
-    - supabase/migrations/0013_m08_announcements_events.sql - Full schema + RLS + storage
+    - supabase/migrations/0019_m08_announcements_events.sql - Full schema + RLS + storage
     - supabase/tests/sql/m08_announcements_events_access.sql - SQL regression suite
     - lib/__tests__/validation.test.ts - 16 new TDD tests for Phase 4 schemas
   modified:
@@ -94,7 +94,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `supabase/migrations/0013_m08_announcements_events.sql` — Creates all 4 tables, enums, indexes, triggers, RLS policies, storage bucket + policies
+- `supabase/migrations/0019_m08_announcements_events.sql` — Creates all 4 tables, enums, indexes, triggers, RLS policies, storage bucket + policies
 - `supabase/tests/sql/m08_announcements_events_access.sql` — SQL regression: resident draft denial, RSVP ownership, event-start cutoff, admin lifecycle, treasurer denial
 - `lib/__tests__/validation.test.ts` — 16 new TDD tests for announcement/event/RSVP/attachment Zod contracts
 - `lib/validation.ts` — Added 4 schemas (announcementFormSchema, eventFormSchema, rsvpUpsertSchema, announcementAttachmentSchema), 3 enums, 5 type exports
@@ -139,10 +139,10 @@ None - plan executed exactly as written. Three issues were resolved as part of n
 
 | Flag | File | Description |
 |------|------|-------------|
-| threat_flag: T-04-01 | supabase/migrations/0013_m08_announcements_events.sql | Announcement/event write path restricted to has_operator_role(); treasurer excluded |
-| threat_flag: T-04-02 | supabase/migrations/0013_m08_announcements_events.sql | Resident announcement SELECT requires status = 'published' or 'archived'; no draft exposure |
-| threat_flag: T-04-03 | supabase/migrations/0013_m08_announcements_events.sql | RSVP mutation path: unique(event_id, profile_id) + WITH CHECK auth.uid() = profile_id + event-start cutoff |
-| threat_flag: T-04-04 | supabase/migrations/0013_m08_announcements_events.sql | Storage: announcement-assets not public; resident read policy joins to parent announcement visibility |
+| threat_flag: T-04-01 | supabase/migrations/0019_m08_announcements_events.sql | Announcement/event write path restricted to has_operator_role(); treasurer excluded |
+| threat_flag: T-04-02 | supabase/migrations/0019_m08_announcements_events.sql | Resident announcement SELECT requires status = 'published' or 'archived'; no draft exposure |
+| threat_flag: T-04-03 | supabase/migrations/0019_m08_announcements_events.sql | RSVP mutation path: unique(event_id, profile_id) + WITH CHECK auth.uid() = profile_id + event-start cutoff |
+| threat_flag: T-04-04 | supabase/migrations/0019_m08_announcements_events.sql | Storage: announcement-assets not public; resident read policy joins to parent announcement visibility |
 
 ## Next Phase Readiness
 
