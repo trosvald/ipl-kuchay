@@ -94,6 +94,7 @@ export function BillingPeriodsPage() {
   const [previewInvoices, setPreviewInvoices] = useState<PreviewInvoiceRow[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewPage, setPreviewPage] = useState(1);
 
   // Penalty preview dialog
   const [penaltyPeriod, setPenaltyPeriod] = useState<BillingPeriodRow | null>(null);
@@ -107,6 +108,24 @@ export function BillingPeriodsPage() {
   const [confirmGenerate, setConfirmGenerate] = useState(false);
 
   const canReopenClosed = profile?.role === "admin" || profile?.role === "super_admin";
+  const PREVIEW_PAGE_SIZE = 10;
+  const previewGroups = useMemo(() => {
+    const grouped = new Map<string, { code: string; total: number; items: PreviewInvoiceRow[] }>();
+    for (const row of previewInvoices) {
+      if (!grouped.has(row.kavling_code)) {
+        grouped.set(row.kavling_code, { code: row.kavling_code, total: 0, items: [] });
+      }
+      const g = grouped.get(row.kavling_code)!;
+      g.items.push(row);
+      g.total = row.period_total;
+    }
+    return Array.from(grouped.values());
+  }, [previewInvoices]);
+  const previewTotalPages = Math.max(1, Math.ceil(previewGroups.length / PREVIEW_PAGE_SIZE));
+  const pagedPreviewGroups = useMemo(
+    () => previewGroups.slice((previewPage - 1) * PREVIEW_PAGE_SIZE, previewPage * PREVIEW_PAGE_SIZE),
+    [previewGroups, previewPage],
+  );
   const PENALTY_PAGE_SIZE = 10;
   const penaltyTotalPages = Math.max(1, Math.ceil(penaltyPreview.length / PENALTY_PAGE_SIZE));
   const pagedPenalties = useMemo(
@@ -334,6 +353,7 @@ export function BillingPeriodsPage() {
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewInvoices([]);
+    setPreviewPage(1);
 
     const { data, error } = await client.rpc("preview_invoices_for_period", {
       target_period_id: row.id,
@@ -659,62 +679,67 @@ export function BillingPeriodsPage() {
           ) : previewInvoices.length === 0 ? (
             <p className="text-sm text-slate-600 py-4">Tidak ada kavling aktif untuk periode ini.</p>
           ) : (
-            (() => {
-              const grouped = new Map<string, { code: string; total: number; items: PreviewInvoiceRow[] }>();
-              for (const row of previewInvoices) {
-                if (!grouped.has(row.kavling_code)) {
-                  grouped.set(row.kavling_code, { code: row.kavling_code, total: 0, items: [] });
-                }
-                const g = grouped.get(row.kavling_code)!;
-                g.items.push(row);
-                g.total = row.period_total;
-              }
-              return (
-                <div className="space-y-4">
-                  {Array.from(grouped.values()).map((group) => (
-                    <Card key={group.code} className="rounded-lg">
-                      <CardContent className="p-3 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold text-slate-900">{group.code}</p>
-                          <p className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
-                            {formatRupiah(group.total)}
-                          </p>
+            <div className="space-y-4">
+              {pagedPreviewGroups.map((group) => (
+                <Card key={group.code} className="rounded-lg">
+                  <CardContent className="p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-slate-900">{group.code}</p>
+                      <p className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
+                        {formatRupiah(group.total)}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      {group.items.map((item) => (
+                        <div key={`${item.fee_type_id}`} className="flex items-center justify-between text-sm">
+                          <span className="text-slate-600">{item.fee_name}</span>
+                          <span className="flex items-center gap-2 text-slate-700">
+                            {item.amount_source === "override" ? (
+                              <>
+                                <span className="text-xs text-slate-400 line-through">{formatRupiah(item.default_amount)}</span>
+                                <span>{formatRupiah(item.resolved_amount)}</span>
+                                <Badge variant="warning">Override</Badge>
+                              </>
+                            ) : (
+                              <span>{formatRupiah(item.resolved_amount)}</span>
+                            )}
+                          </span>
                         </div>
-                        <div className="space-y-1">
-                          {group.items.map((item) => (
-                            <div key={`${item.fee_type_id}`} className="flex items-center justify-between text-sm">
-                              <span className="text-slate-600">{item.fee_name}</span>
-                              <span className="flex items-center gap-2 text-slate-700">
-                                {item.amount_source === "override" ? (
-                                  <>
-                                    <span className="text-xs text-slate-400 line-through">{formatRupiah(item.default_amount)}</span>
-                                    <span>{formatRupiah(item.resolved_amount)}</span>
-                                    <Badge variant="warning">Override</Badge>
-                                  </>
-                                ) : (
-                                  <span>{formatRupiah(item.resolved_amount)}</span>
-                                )}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  <div className="flex justify-end gap-2">
-                    <Button variant="secondary" onClick={() => setPreviewPeriod(null)}>
-                      Batal
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {previewGroups.length > PREVIEW_PAGE_SIZE ? (
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <p className="text-xs">
+                    {PREVIEW_PAGE_SIZE * (previewPage - 1) + 1}&ndash;{Math.min(PREVIEW_PAGE_SIZE * previewPage, previewGroups.length)} dari {previewGroups.length}
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setPreviewPage((v) => Math.max(1, v - 1))} disabled={previewPage <= 1}>
+                      Prev
                     </Button>
-                    <Button
-                      onClick={() => setConfirmGenerate(true)}
-                      disabled={saving}
-                    >
-                      Buat Tagihan
+                    <span className="text-xs tabular-nums">{previewPage}/{previewTotalPages}</span>
+                    <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setPreviewPage((v) => Math.min(previewTotalPages, v + 1))} disabled={previewPage >= previewTotalPages}>
+                      Next
                     </Button>
                   </div>
                 </div>
-              );
-            })()
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setPreviewPeriod(null)}>
+                  Batal
+                </Button>
+                <Button
+                  onClick={() => setConfirmGenerate(true)}
+                  disabled={saving}
+                >
+                  Buat Tagihan
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
