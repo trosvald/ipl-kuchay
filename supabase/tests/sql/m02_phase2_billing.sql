@@ -18,12 +18,17 @@ declare
   v_preview_default_rows integer;
   v_created_first integer;
   v_created_second integer;
+  v_expected_new_invoices integer;
   v_invoice_count_before integer;
   v_invoice_count_after integer;
   v_resident_visible_draft integer;
   v_resident_visible_open integer;
   v_resident_visible_closed integer;
   v_resident_visible_archived integer;
+  v_invoice_draft uuid;
+  v_invoice_open uuid;
+  v_invoice_closed uuid;
+  v_invoice_archived uuid;
   v_penalty_preview_count integer;
   v_penalty_apply_first integer;
   v_penalty_apply_second integer;
@@ -161,14 +166,25 @@ begin
 
   -- Test 2: generation is additive/idempotent and skips inactive kavlings.
   select count(*) into v_invoice_count_before from public.invoices where billing_period_id = v_period_draft;
+  select count(*)
+  into v_expected_new_invoices
+  from public.kavlings k
+  where k.active = true
+    and not exists (
+      select 1
+      from public.invoices i
+      where i.billing_period_id = v_period_draft
+        and i.kavling_id = k.id
+    );
+
   select public.generate_invoices_for_period(v_period_draft) into v_created_first;
   select count(*) into v_invoice_count_after from public.invoices where billing_period_id = v_period_draft;
 
-  if v_created_first <> 2 then
-    raise exception 'expected first generation to create 2 invoices for active kavlings, got %', v_created_first;
+  if v_created_first <> v_expected_new_invoices then
+    raise exception 'expected first generation to create % invoices, got %', v_expected_new_invoices, v_created_first;
   end if;
 
-  if (v_invoice_count_after - v_invoice_count_before) <> 2 then
+  if (v_invoice_count_after - v_invoice_count_before) <> v_expected_new_invoices then
     raise exception 'invoice count delta mismatch after first generation';
   end if;
 
@@ -195,33 +211,15 @@ begin
   perform set_config('request.jwt.claim.sub', v_resident::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
-  select count(*)
-  into v_resident_visible_draft
-  from public.invoices i
-  join public.billing_periods bp on bp.id = i.billing_period_id
-  where i.kavling_id = v_kavling_a
-    and bp.id = v_period_draft;
+  select id into v_invoice_draft from public.invoices where billing_period_id = v_period_draft and kavling_id = v_kavling_a limit 1;
+  select id into v_invoice_open from public.invoices where billing_period_id = v_period_open and kavling_id = v_kavling_a limit 1;
+  select id into v_invoice_closed from public.invoices where billing_period_id = v_period_closed and kavling_id = v_kavling_a limit 1;
+  select id into v_invoice_archived from public.invoices where billing_period_id = v_period_archived and kavling_id = v_kavling_a limit 1;
 
-  select count(*)
-  into v_resident_visible_open
-  from public.invoices i
-  join public.billing_periods bp on bp.id = i.billing_period_id
-  where i.kavling_id = v_kavling_a
-    and bp.id = v_period_open;
-
-  select count(*)
-  into v_resident_visible_closed
-  from public.invoices i
-  join public.billing_periods bp on bp.id = i.billing_period_id
-  where i.kavling_id = v_kavling_a
-    and bp.id = v_period_closed;
-
-  select count(*)
-  into v_resident_visible_archived
-  from public.invoices i
-  join public.billing_periods bp on bp.id = i.billing_period_id
-  where i.kavling_id = v_kavling_a
-    and bp.id = v_period_archived;
+  select case when public.can_access_invoice_history(v_invoice_draft) then 1 else 0 end into v_resident_visible_draft;
+  select case when public.can_access_invoice_history(v_invoice_open) then 1 else 0 end into v_resident_visible_open;
+  select case when public.can_access_invoice_history(v_invoice_closed) then 1 else 0 end into v_resident_visible_closed;
+  select case when public.can_access_invoice_history(v_invoice_archived) then 1 else 0 end into v_resident_visible_archived;
 
   if v_resident_visible_draft <> 0 then
     raise exception 'resident should not see draft period invoices';

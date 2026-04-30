@@ -11,7 +11,7 @@
     "test": "npm run test:unit && npm run test:sql",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test:sql": "supabase db reset --yes && supabase db query --file supabase/tests/sql/m01_acceptance_checks.sql && supabase db query --file supabase/tests/sql/m01_generate_invoice_check.sql && supabase db query --file supabase/tests/sql/m01_reject_guard_check.sql && supabase db query --file supabase/tests/sql/m06_verify_reject_workflow.sql && supabase db query --file supabase/tests/sql/m07_phase1_access_identity.sql",
+    "test:sql": "supabase db reset --yes && supabase db query --file supabase/tests/sql/m01_acceptance_checks.sql && supabase db query --file supabase/tests/sql/m01_generate_invoice_check.sql && supabase db query --file supabase/tests/sql/m01_reject_guard_check.sql && supabase db query --file supabase/tests/sql/m06_verify_reject_workflow.sql && supabase db query --file supabase/tests/sql/m07_phase1_access_identity.sql && supabase db query --file supabase/tests/sql/m02_phase2_billing.sql",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset",
