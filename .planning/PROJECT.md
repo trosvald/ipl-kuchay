@@ -19,6 +19,9 @@ Residents can reliably check what they owe, submit payment, track status, and re
 - ✓ Supabase-backed schema, RLS, RPCs, and audit-oriented billing workflows are established — existing
 - ✓ Manual payment proof submission flow exists with private storage and admin review baseline — existing
 - ✓ Billing periods, invoices, kavlings, residents, and payment review foundations exist in the current app — existing
+- ✓ Admin billing configuration with preview-before-confirm workflow, explicit lifecycle controls, and auditable fee/override management — Validated in Phase 02: Billing Configuration & Resident Billing View
+- ✓ Resident billing experience with arrears focal point (`Ringkasan Tunggakan`), kavling grouping, and Indonesian billing language — Validated in Phase 02
+- ✓ Dynamic fee definitions (recurring/yearly/penalty) and per-kavling overrides with date-window controls — Validated in Phase 02
 
 ### Active
 
@@ -94,4 +97,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-29 after initialization*
+*Last updated: 2026-04-30 after Phase 02 completion*
