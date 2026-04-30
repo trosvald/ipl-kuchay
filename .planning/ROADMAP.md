@@ -87,11 +87,13 @@ Plans:
   3. Admin can create, publish, unpublish, update, archive, and prioritize announcements for residents.
   4. Resident can view upcoming and past event details and RSVP or update their attendance choice.
   5. Admin can create, update, cancel, and manage events while viewing RSVP summaries for each event.
-**Plans**: 3 plans
+**Plans**: 5 plans
 Plans:
-- [ ] 04-01-PLAN.md — Add announcements/events schema, RLS, and validation contracts with SQL regression coverage.
-- [ ] 04-02-PLAN.md — Build admin announcements and events management including urgent/publish lifecycle and RSVP summary.
-- [ ] 04-03-PLAN.md — Deliver unified resident home plus resident announcements/events pages with RSVP updates.
+- [x] 04-01-PLAN.md — Add announcements/events schema, RLS, and validation contracts with SQL regression coverage.
+- [x] 04-02-PLAN.md — Build admin announcements and events management including urgent/publish lifecycle and RSVP summary.
+- [x] 04-03-PLAN.md — Deliver unified resident home plus resident announcements/events pages with RSVP updates.
+- [x] 04-04-PLAN.md — Close Phase 4 announcement attachment flow and enforce admin/super_admin-only communication routes.
+- [x] 04-05-PLAN.md — Fix resident RSVP runtime/schema alignment and restore migration artifact traceability.
 **UI hint**: yes
 
 ### Phase 5: Telegram Linking & Notifications
