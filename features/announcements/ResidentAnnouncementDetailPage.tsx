@@ -2,13 +2,14 @@
 
 import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Paperclip, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink, Paperclip, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateId } from "@/lib/format";
+import { openSignedArtifactUrl } from "@/lib/privateArtifact";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 interface AttachmentRow {
@@ -32,6 +33,10 @@ interface AnnouncementDetailRow {
   created_at: string;
 }
 
+function isImageMime(mime: string): boolean {
+  return mime.startsWith("image/");
+}
+
 export function ResidentAnnouncementDetailPage({
   params,
 }: {
@@ -44,6 +49,7 @@ export function ResidentAnnouncementDetailPage({
   const [attachments, setAttachments] = useState<AttachmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const loadAnnouncement = useCallback(async () => {
     if (!client || !id) return;
@@ -84,6 +90,25 @@ export function ResidentAnnouncementDetailPage({
       setLoading(false);
     });
   }, [loadAnnouncement]);
+
+  const handleOpenAttachment = async (att: AttachmentRow) => {
+    if (!client || openingId) return;
+    setOpeningId(att.id);
+    try {
+      const { data, error } = await client.storage
+        .from("announcement-assets")
+        .createSignedUrl(att.storage_path, 60);
+      if (error || !data?.signedUrl) {
+        setErrorMessage("Gagal menghasilkan tautan lampiran.");
+        return;
+      }
+      await openSignedArtifactUrl(data.signedUrl);
+    } catch {
+      setErrorMessage("Gagal membuka lampiran.");
+    } finally {
+      setOpeningId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -156,16 +181,48 @@ export function ResidentAnnouncementDetailPage({
 
           {/* Attachments */}
           {attachments.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-sm font-medium text-foreground flex items-center gap-1">
                 <Paperclip className="size-4" /> Lampiran
               </p>
-              <div className="flex flex-wrap gap-2">
-                {attachments.map((att) => (
-                  <Badge key={att.id} variant="outline" className="text-xs">
-                    {att.label}
-                  </Badge>
-                ))}
+              <div className="flex flex-wrap gap-3">
+                {attachments.map((att) => {
+                  const isOpening = openingId === att.id;
+                  if (isImageMime(att.mime_type)) {
+                    return (
+                      <button
+                        key={att.id}
+                        onClick={() => handleOpenAttachment(att)}
+                        disabled={isOpening}
+                        className="group relative flex flex-col items-center gap-1 rounded-md border p-2 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400"
+                        title={`Buka Gambar`}
+                      >
+                        <div className="h-12 w-12 rounded bg-slate-100 flex items-center justify-center overflow-hidden">
+                          <ExternalLink className="size-5 text-slate-400" />
+                        </div>
+                        <span className="max-w-[80px] truncate text-xs text-slate-600">{att.label}</span>
+                        <span className="text-xs text-slate-400">
+                          {isOpening ? "Membuka..." : "Buka Gambar"}
+                        </span>
+                      </button>
+                    );
+                  }
+                  return (
+                    <Button
+                      key={att.id}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenAttachment(att)}
+                      disabled={isOpening}
+                      title={`Unduh Lampiran: ${att.label}`}
+                    >
+                      <Download className="size-4" />
+                      <span className="truncate max-w-[120px]">
+                        {isOpening ? "Membuka..." : "Unduh Lampiran"}
+                      </span>
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           )}

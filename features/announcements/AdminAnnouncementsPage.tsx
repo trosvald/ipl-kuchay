@@ -312,9 +312,15 @@ export function AdminAnnouncementsPage() {
     setConfirmUnpublish(null);
   };
 
-  const handleDeleteAttachment = async (attachmentId: string) => {
+  const handleDeleteAttachment = async (attachmentId: string, storagePath: string) => {
     if (!client) return;
     setErrorMessage(null);
+    // Remove storage object first, then the attachment row
+    const { error: storageError } = await client.storage.from("announcement-assets").remove([storagePath]);
+    if (storageError) {
+      setErrorMessage("Gagal menghapus file dari penyimpanan.");
+      return;
+    }
     const { error } = await client.from("announcement_attachments").delete().eq("id", attachmentId);
     if (error) {
       setErrorMessage("Gagal menghapus lampiran.");
@@ -324,6 +330,49 @@ export function AdminAnnouncementsPage() {
       ...prev,
       attachments: prev.attachments.filter((a) => a.id !== attachmentId),
     }));
+  };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!client || !editor.id || !files || files.length === 0) return;
+    setErrorMessage(null);
+    for (const file of Array.from(files)) {
+      const uuid = crypto.randomUUID();
+      const storagePath = `announcements/${editor.id}/${uuid}-${file.name}`;
+      const { error: uploadError } = await client.storage.from("announcement-assets").upload(storagePath, file, {
+        contentType: file.type,
+        upsert: false,
+      });
+      if (uploadError) {
+        setErrorMessage(`Gagal mengunggah ${file.name}.`);
+        return;
+      }
+      const { error: insertError } = await client.from("announcement_attachments").insert({
+        announcement_id: editor.id,
+        label: file.name,
+        storage_path: storagePath,
+        mime_type: file.type,
+        size_bytes: file.size,
+      });
+      if (insertError) {
+        setErrorMessage(`Gagal menyimpan data lampiran ${file.name}.`);
+        return;
+      }
+      setEditor((prev) => ({
+        ...prev,
+        attachments: [
+          ...prev.attachments,
+          {
+            id: crypto.randomUUID(),
+            announcement_id: editor.id!,
+            label: file.name,
+            storage_path: storagePath,
+            mime_type: file.type,
+            size_bytes: file.size,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      }));
+    }
   };
 
   return (
@@ -555,7 +604,7 @@ export function AdminAnnouncementsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDeleteAttachment(att.id)}
+                        onClick={() => handleDeleteAttachment(att.id, att.storage_path)}
                         disabled={saving}
                       >
                         <Trash2 className="size-4 text-red-500" />
@@ -566,9 +615,23 @@ export function AdminAnnouncementsPage() {
               ) : (
                 <p className="text-xs text-slate-400">Belum ada lampiran.</p>
               )}
-              <p className="text-xs text-slate-400">
-                Upload lampiran akan tersedia di versi selanjutnya.
-              </p>
+              {editor.id ? (
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 px-3 py-2 hover:border-slate-400">
+                  <Paperclip className="size-4 text-slate-400" />
+                  <span className="text-sm text-slate-600">Tambah lampiran</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,application/pdf"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                  />
+                </label>
+              ) : (
+                <p className="text-xs text-slate-400">
+                  Simpan draft terlebih dahulu untuk menambahkan lampiran.
+                </p>
+              )}
             </div>
           </div>
 
