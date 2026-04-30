@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ProofPreviewButton } from "@/features/payments/ProofPreviewButton";
 import { SubmissionReviewModal, type SubmissionReviewTarget } from "@/features/payments/SubmissionReviewModal";
 import { notifySubmissionReviewed } from "@/features/payments/submissionNotificationPlaceholder";
-import { formatDateId, formatInvoiceStatusLabel, formatRupiah, statusToBadgeVariant } from "@/lib/format";
+import { formatDateId, formatInvoiceStatusLabel, formatPaymentSubmissionStatus, formatRupiah, statusToBadgeVariant } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 type SubmissionTab = "pending" | "verified" | "rejected";
@@ -94,19 +94,7 @@ function tabLabel(tab: SubmissionTab): string {
 }
 
 function formatSubmissionStatus(status: SubmissionRow["status"]): string {
-  if (status === "submitted") {
-    return "Menunggu verifikasi";
-  }
-  if (status === "verified") {
-    return "Terverifikasi";
-  }
-  if (status === "rejected") {
-    return "Ditolak";
-  }
-  if (status === "cancelled") {
-    return "Dibatalkan";
-  }
-  return status;
+  return formatPaymentSubmissionStatus(status);
 }
 
 function profileDisplayName(profile: ProfileSummary | undefined): string {
