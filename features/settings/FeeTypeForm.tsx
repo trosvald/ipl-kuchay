@@ -199,7 +199,7 @@ export function FeeTypeForm({ initialValues, submitLabel, saving = false, onSubm
             onChange={(event) => setIsPenalty(event.target.checked)}
             className="size-4 rounded border-slate-300"
           />
-          <span>Penalty</span>
+          <span>Denda (flat per periode)</span>
         </label>
 
         <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -212,6 +212,13 @@ export function FeeTypeForm({ initialValues, submitLabel, saving = false, onSubm
           <span>Aktif</span>
         </label>
       </div>
+
+      {isPenalty ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-medium">Konfigurasi Denda</p>
+          <p className="mt-1 text-xs">Denda bersifat flat per periode keterlambatan. Nominal yang diisi akan langsung diterapkan ke invoice yang terlambat.</p>
+        </div>
+      ) : null}
 
       <Button type="submit" disabled={saving}>
         {saving ? "Menyimpan..." : submitLabel}
