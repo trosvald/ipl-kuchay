@@ -3,7 +3,7 @@ status: partial
 phase: 02-billing-configuration-resident-billing-view
 source: [02-VERIFICATION.md]
 started: 2026-04-30T00:15:00Z
-updated: 2026-04-30T10:15:00Z
+updated: 2026-04-30T10:40:00Z
 ---
 
 ## Current Test
@@ -26,7 +26,7 @@ result: passed (API/RPC validation) — `preview_penalties_for_period` returned 
 
 ### 4. Resident arrears summary rendering
 expected: Ringkasan Tunggakan card shows overdue total with appropriate messaging for both arrears and all-paid states
-result: partial — arrears state validated (resident data has outstanding balances). All-paid UI state not executed in browser session yet.
+result: passed (Playwright browser) — `Ringkasan Tunggakan` visible and all-paid message `Semua tagihan Anda sudah lunas.` rendered for test resident
 
 ### 5. Multi-kavling resident tab interaction
 expected: Tabs group invoices per kavling. Totals computed per kavling, not merged into one household total.
@@ -34,7 +34,7 @@ result: passed (data and query validation) — resident2 sees two kavlings (`Kav
 
 ### 6. Former-resident read-only behavior
 expected: Warning card displayed. Invoice history is read-only per existing RLS/history helpers.
-result: partial — RLS/history guard validated by `m07_phase1_access_identity.sql` (former resident can access historical invoice only, cannot access future invoice). Browser warning card check still pending.
+result: passed (Playwright browser) — warning text `Anda tidak punya kavling aktif saat ini...histori tagihan Anda (read-only)...` displayed when resident has no active mapping
 
 ### 7. Draft period resident invisibility (RLS gate)
 expected: Draft period invoices do not appear for residents. Only published/open periods visible.
@@ -43,10 +43,10 @@ result: passed (API validation) — resident invoice query returned 3 invoices, 
 ## Summary
 
 total: 7
-passed: 5
+passed: 7
 issues: 0
 pending: 0
 skipped: 0
-blocked: 2
+blocked: 0
 
 ## Gaps
