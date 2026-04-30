@@ -42,6 +42,7 @@ const ADMIN_DASHBOARDS_GROUP: NavGroup = {
     { title: "Settings", href: "/admin/settings", icon: Cog },
     { title: "Billing", href: "/admin/billing", icon: Wallet },
     { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
+    { title: "Laporan", href: "/admin/reports", icon: ReceiptText },
     { title: "Audit Log", href: "/admin/audit", icon: ShieldCheck },
   ],
 };
@@ -52,6 +53,7 @@ const TREASURER_DASHBOARDS_GROUP: NavGroup = {
     { title: "Default", href: "/admin", icon: LayoutDashboard },
     { title: "Billing", href: "/admin/billing", icon: Wallet },
     { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
+    { title: "Laporan", href: "/admin/reports", icon: ReceiptText },
     { title: "Audit Keuangan", href: "/admin/audit", icon: ShieldCheck },
   ],
 };
