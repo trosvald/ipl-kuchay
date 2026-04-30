@@ -3,7 +3,7 @@ status: partial
 phase: 02-billing-configuration-resident-billing-view
 source: [02-VERIFICATION.md]
 started: 2026-04-30T00:15:00Z
-updated: 2026-04-30T00:15:00Z
+updated: 2026-04-30T01:15:00Z
 ---
 
 ## Current Test
@@ -14,7 +14,7 @@ updated: 2026-04-30T00:15:00Z
 
 ### 1. SQL regression suite
 expected: `npm run test:sql` passes all 6 migration test files without errors
-result: [pending]
+result: passed
 
 ### 2. Admin preview → confirm invoice generation end-to-end
 expected: Preview flow shows kavling breakdown, fee items with amount_source, period total before Buat Tagihan confirmation. Generation is idempotent and only works on open periods.
@@ -43,9 +43,9 @@ result: [pending]
 ## Summary
 
 total: 7
-passed: 0
+passed: 1
 issues: 0
-pending: 7
+pending: 6
 skipped: 0
 blocked: 0
 
