@@ -366,8 +366,6 @@ export function ResidentInvoicesPage() {
   const [invoices, setInvoices] = useState<ResidentInvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeKavling, setActiveKavling] = useState<string | null>(null);
-
   const loadInvoices = useCallback(async () => {
     if (!client) {
       setLoading(false);
@@ -413,12 +411,7 @@ export function ResidentInvoicesPage() {
     [invoices],
   );
 
-  // Set default active kavling
-  useEffect(() => {
-    if (kavlingGroups.length > 0 && !activeKavling) {
-      setActiveKavling(kavlingGroups[0].code);
-    }
-  }, [kavlingGroups, activeKavling]);
+
 
   // Compute totals across all kavlings
   const totalOverdue = useMemo(
@@ -432,11 +425,6 @@ export function ResidentInvoicesPage() {
         0,
       ),
     [kavlingGroups],
-  );
-
-  const currentGroup = useMemo(
-    () => kavlingGroups.find((g) => g.code === activeKavling) ?? null,
-    [kavlingGroups, activeKavling],
   );
 
   return (
@@ -521,8 +509,8 @@ export function ResidentInvoicesPage() {
       ) : (
         /* Multi-kavling - show tabs */
         <Tabs
-          value={activeKavling ?? undefined}
-          onValueChange={(value) => setActiveKavling(value)}
+          defaultValue={kavlingGroups[0]?.code}
+          onValueChange={(value) => {}}
         >
           <TabsList className="h-11 w-full justify-start overflow-x-auto">
             {kavlingGroups.map((group) => (
