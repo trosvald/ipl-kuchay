@@ -68,7 +68,9 @@ export function ReportsPage() {
     }
   }, [client, selectedPeriodId]);
 
-  // Collection summary, arrears, output history, and receipt candidates for selected period
+  // Collection summary and arrears — primary report truth for RPRT-01/RPRT-02/RPRT-03.
+  // Loaded together; partial failure keeps whichever succeeded so summary/arrears/CSV
+  // remain usable even when output/candidate helpers have a temporary fault (T-03-30).
   const loadReportData = useCallback(async () => {
     if (!client || !selectedPeriodId) return;
 
@@ -78,20 +80,52 @@ export function ReportsPage() {
     setOutputError(null);
 
     try {
-      const [summary, arrears, outputs, candidates] = await Promise.all([
+      // Primary report data — kept independent of output/candidate loads per T-03-30
+      const [summaryResult, arrearsResult] = await Promise.allSettled([
         loadCollectionSummary(selectedPeriodId),
         loadArrearsList(selectedPeriodId),
+      ]);
+
+      const summary = summaryResult.status === "fulfilled" ? summaryResult.value : [];
+      const arrears = arrearsResult.status === "fulfilled" ? arrearsResult.value : [];
+      setSummaryRows(summary);
+      setArrearsRows(arrears);
+
+      // Keep lastRefreshed tied to primary data success so freshness indicator
+      // remains trustworthy (T-03-29 / D-12). Only update if summary or arrears
+      // at least partially loaded.
+      if (summary.length > 0 || arrears.length > 0) {
+        setLastRefreshed(new Date().toISOString());
+      }
+
+      // Reconcile primary load issues
+      if (summaryResult.status === "rejected") {
+        setErrorMessage("Gagal memuat ringkasan tagihan. Coba refresh lagi.");
+      }
+      if (arrearsResult.status === "rejected") {
+        setErrorMessage((prev) =>
+          prev ? `${prev} Gagal memuat daftar tunggakan.` : "Gagal memuat daftar tunggakan.",
+        );
+      }
+
+      // Secondary data — output history and receipt candidates.
+      // Loaded independently; failures surface via outputError (D-13) rather
+      // than blanking the primary reporting tables.
+      const [outputsResult, candidatesResult] = await Promise.allSettled([
         loadGeneratedReportOutputs(selectedPeriodId),
         loadReceiptCandidates(selectedPeriodId),
       ]);
-      setSummaryRows(summary);
-      setArrearsRows(arrears);
-      setOutputRows(outputs);
-      setReceiptCandidates(candidates);
-      setLastRefreshed(new Date().toISOString());
+
+      setOutputRows(outputsResult.status === "fulfilled" ? outputsResult.value : []);
+      setReceiptCandidates(candidatesResult.status === "fulfilled" ? candidatesResult.value : []);
+
+      if (outputsResult.status === "rejected" || candidatesResult.status === "rejected") {
+        setOutputError(
+          "Data output atau kandidat bukti bayar belum berhasil dimuat. Ringkasan dan ekspor CSV tetap dapat digunakan. Coba refresh untuk memperbarui data yang hilang.",
+        );
+      }
     } catch (err) {
       setErrorMessage("Gagal memuat data laporan.");
-      setOutputError("Data output belum berhasil dimuat. Coba refresh lagi.");
     } finally {
       setLoading(false);
     }
@@ -188,38 +222,6 @@ export function ReportsPage() {
     }
   }, [selectedPeriodId, selectedPeriod, totalInvoiced, totalCollected, totalRemaining, summaryRows, loadReportData]);
 
-  const handleGenerateReceiptReport = useCallback(async () => {
-    if (!selectedPeriodId) return;
-
-    setActionLoading("receipt");
-    try {
-      const period = selectedPeriod;
-      // Period-wide receipt artifact: use a placeholder invoiceId since this generates
-      // a period-level receipt listing. Resident-specific receipt generation is done
-      // via the receipt candidate rows in the output history section.
-      await generateReportOutputArtifact({
-        reportType: "receipt",
-        billingPeriodId: selectedPeriodId,
-        invoiceId: "00000000-0000-0000-0000-000000000000",
-        title: `Bukti Bayar ${period?.label ?? ""}`,
-        metadata: {
-          invoiceNumber: "",
-          kavlingCode: "",
-          residentName: "",
-          amountPaid: 0,
-          paymentDate: "",
-          periodLabel: period?.label ?? "",
-        },
-      });
-      await loadReportData();
-      setActionSuccess("Laporan bukti bayar berhasil dibuat.");
-    } catch (err) {
-      setErrorMessage("Gagal membuat laporan bukti bayar.");
-    } finally {
-      setActionLoading(null);
-    }
-  }, [selectedPeriodId, selectedPeriod, loadReportData]);
-
   const handleDownloadOutput = useCallback(async (reportId: string) => {
     if (!client) return;
     try {
@@ -238,6 +240,7 @@ export function ReportsPage() {
         reportType: "receipt",
         billingPeriodId: selectedPeriodId,
         invoiceId: candidate.invoice_id,
+        paymentId: candidate.payment_id,
         title: `Bukti Bayar ${candidate.kavling_code} - ${period?.label ?? ""}`,
         metadata: {
           invoiceNumber: candidate.invoice_number,
@@ -376,14 +379,6 @@ export function ReportsPage() {
         >
           <FileText className="size-4" />
           {actionLoading === "monthly" ? "Membuat..." : "Buat Laporan Bulanan"}
-        </Button>
-        <Button
-          variant="default"
-          onClick={handleGenerateReceiptReport}
-          disabled={actionLoading !== null || !selectedPeriodId}
-        >
-          <Receipt className="size-4" />
-          {actionLoading === "receipt" ? "Membuat..." : "Buat Laporan Bukti Bayar"}
         </Button>
         <Button
           variant="outline"
