@@ -52,8 +52,8 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 02-01-PLAN.md — Finalize SQL contract for invoice generation, override resolution, and overdue penalty application.
-- [ ] 02-02-PLAN.md — Add admin preview/publish billing flows and finish auditable fee + override configuration.
-- [ ] 02-03-PLAN.md — Rebuild the resident billing experience around arrears focus, kavling grouping, and invoice breakdown clarity.
+- [x] 02-02-PLAN.md — Add admin preview/publish billing flows and finish auditable fee + override configuration.
+- [x] 02-03-PLAN.md — Rebuild the resident billing experience around arrears focus, kavling grouping, and invoice breakdown clarity.
 **UI hint**: yes
 
 ### Phase 3: Manual Payments, Reporting & Audit
