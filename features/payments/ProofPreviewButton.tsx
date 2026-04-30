@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { openSignedArtifactUrl } from "@/lib/privateArtifact";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 interface SignedUrlResponse {
@@ -44,7 +45,14 @@ export function ProofPreviewButton({
       return;
     }
 
-    globalThis.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    try {
+      await openSignedArtifactUrl(data.signedUrl);
+    } catch {
+      setErrorMessage("Gagal membuka bukti pembayaran.");
+      setOpening(false);
+      return;
+    }
+
     setOpening(false);
   };
 

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDateId } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { loadResidentReceiptHistory } from "@/features/reports/reportQueries";
-import { getReportOutputSignedUrl } from "@/features/reports/reportOutputClient";
+import { openReportOutputArtifact } from "@/features/reports/reportOutputClient";
 import type { ResidentReceiptHistoryRow } from "@/features/reports/reportQueries";
 
 interface ResidentReceiptHistoryProps {
@@ -58,8 +58,7 @@ export function ResidentReceiptHistory({ invoiceId, reloadToken = 0 }: Readonly<
 
     setOpeningId(reportId);
     try {
-      const result = await getReportOutputSignedUrl({ reportId });
-      window.open(result.signedUrl, "_blank", "noopener,noreferrer");
+      await openReportOutputArtifact({ reportId });
     } catch (err) {
       setErrorMessage("Gagal membuka bukti bayar. Coba lagi beberapa saat.");
     } finally {

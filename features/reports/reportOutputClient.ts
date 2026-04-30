@@ -3,6 +3,7 @@
 // and get-report-output-signed-url without re-deciding payload shapes.
 
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { openSignedArtifactUrl } from "@/lib/privateArtifact";
 
 /**
  * Invoke the generate-report-output Edge Function.
@@ -24,8 +25,8 @@ export async function generateReportOutputArtifact(
     { body: payload },
   );
 
-  if (error) {
-    throw new Error(`Failed to generate report output: ${error.message}`);
+  if (error || !data) {
+    throw new Error(`Failed to generate report output: ${error?.message ?? "unknown"}`);
   }
 
   return data;
@@ -51,11 +52,18 @@ export async function getReportOutputSignedUrl(
     { body: payload },
   );
 
-  if (error) {
-    throw new Error(`Failed to get report output signed URL: ${error.message}`);
+  if (error || !data) {
+    throw new Error(`Failed to get report output signed URL: ${error?.message ?? "unknown"}`);
   }
 
   return data;
+}
+
+export async function openReportOutputArtifact(
+  payload: GetReportOutputSignedUrlPayload,
+): Promise<void> {
+  const result = await getReportOutputSignedUrl(payload);
+  await openSignedArtifactUrl(result.signedUrl);
 }
 
 // --- Payload and response types ---

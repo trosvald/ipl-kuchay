@@ -6,7 +6,7 @@ import {
   buildMonthlySummaryHtml,
   buildResidentReceiptHtml,
   buildReportOutputPath,
-} from "@/features/reports/reportOutputBuilders.ts";
+} from "../../../features/reports/reportOutputBuilders.ts";
 
 // --- Kavling lookup for Edge Function report-row insertion ---
 

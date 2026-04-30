@@ -25,7 +25,7 @@ import {
   type GeneratedReportOutputRow,
   type ReceiptCandidateRow,
 } from "@/features/reports/reportQueries";
-import { generateReportOutputArtifact, getReportOutputSignedUrl } from "@/features/reports/reportOutputClient";
+import { generateReportOutputArtifact, openReportOutputArtifact } from "@/features/reports/reportOutputClient";
 import { toCsvRows, toArrearsCsvRows, serializeCsv, downloadCsv } from "@/features/reports/reportCsv";
 import type {
   CollectionSummaryRow,
@@ -225,8 +225,7 @@ export function ReportsPage() {
   const handleDownloadOutput = useCallback(async (reportId: string) => {
     if (!client) return;
     try {
-      const result = await getReportOutputSignedUrl({ reportId });
-      window.open(result.signedUrl, "_blank", "noopener,noreferrer");
+      await openReportOutputArtifact({ reportId });
     } catch {
       setErrorMessage("Gagal mengunduh output. Coba lagi beberapa saat.");
     }

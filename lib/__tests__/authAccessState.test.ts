@@ -3,6 +3,26 @@ import { describe, expect, it } from "vitest";
 import { deriveAccessState } from "@/features/auth/authHooks";
 
 describe("deriveAccessState", () => {
+  it("returns anonymous when session is missing", () => {
+    const state = deriveAccessState({
+      session: null,
+      profile: null,
+      hasActiveKavlingMapping: false,
+    });
+
+    expect(state).toBe("anonymous");
+  });
+
+  it("returns missing-profile when session exists without profile", () => {
+    const state = deriveAccessState({
+      session: { user: { id: "resident-1" } },
+      profile: null,
+      hasActiveKavlingMapping: false,
+    });
+
+    expect(state).toBe("missing-profile");
+  });
+
   it("returns active-mapped for active resident with kavling mappings", () => {
     const state = deriveAccessState({
       session: { user: { id: "resident-1" } },

@@ -17,6 +17,37 @@ interface GetReportOutputSignedUrlRequest {
   reportId: string;
 }
 
+function normalizeSignedUrlForCaller(request: Request, signedUrl: string): string {
+  const parsed = new URL(signedUrl);
+  if (parsed.hostname !== "kong" && !parsed.hostname.startsWith("supabase_edge_runtime_")) {
+    return signedUrl;
+  }
+
+  const originHeader = request.headers.get("origin");
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "http";
+  const forwardedPort = request.headers.get("x-forwarded-port");
+
+  if (!forwardedHost) {
+    return signedUrl;
+  }
+
+  const fallbackHost = forwardedHost.split(":")[0] ?? forwardedHost;
+
+  let browserHost = fallbackHost;
+  if (originHeader) {
+    try {
+      browserHost = new URL(originHeader).hostname;
+    } catch {
+      browserHost = fallbackHost;
+    }
+  }
+
+  const hostWithPort = forwardedPort ? `${browserHost}:${forwardedPort}` : browserHost;
+
+  return `${forwardedProto}://${hostWithPort}${parsed.pathname}${parsed.search}`;
+}
+
 function isUuid(value: unknown): value is string {
   if (typeof value !== "string") {
     return false;
@@ -82,6 +113,8 @@ async function handleGetReportOutputSignedUrl(request: Request): Promise<Respons
     throw new HttpError(500, signedUrlError?.message ?? "Failed to create signed URL");
   }
 
+  const signedUrl = normalizeSignedUrlForCaller(request, signed.signedUrl);
+
   // Audit finance downloads (treasurer/admin/super_admin) per T-03-16
   if (caller.role === "treasurer" || caller.role === "admin" || caller.role === "super_admin") {
     const { error: auditError } = await serviceClient.from("audit_logs").insert({
@@ -106,7 +139,7 @@ async function handleGetReportOutputSignedUrl(request: Request): Promise<Respons
   }
 
   return jsonResponse(200, {
-    signedUrl: signed.signedUrl,
+    signedUrl,
     expiresInSeconds,
   });
 }

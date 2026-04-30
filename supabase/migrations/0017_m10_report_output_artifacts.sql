@@ -64,5 +64,4 @@ using (
 -- This is enforced by the generate-report-output Edge Function when inserting receipt rows.
 -- Add comment for documentation:
 comment on table public.reports is
-  'Report artifacts: monthly summaries and resident receipts stored privately in report-outputs bucket. ' ||
-  'Receipt rows (report_type = ''receipt'') must include kavling_id, invoice_id in metadata.';
+  'Report artifacts: monthly summaries and resident receipts stored privately in report-outputs bucket. Receipt rows (report_type = ''receipt'') must include kavling_id, invoice_id in metadata.';

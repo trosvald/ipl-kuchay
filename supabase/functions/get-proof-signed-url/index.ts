@@ -22,6 +22,41 @@ interface SubmissionRow {
   proof_path: string | null;
 }
 
+function normalizeProofPath(proofPath: string): string {
+  return proofPath.replace(/^payment-proofs\//, "");
+}
+
+function normalizeSignedUrlForCaller(request: Request, signedUrl: string): string {
+  const parsed = new URL(signedUrl);
+  if (parsed.hostname !== "kong" && !parsed.hostname.startsWith("supabase_edge_runtime_")) {
+    return signedUrl;
+  }
+
+  const originHeader = request.headers.get("origin");
+  const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") ?? "http";
+  const forwardedPort = request.headers.get("x-forwarded-port");
+
+  if (!forwardedHost) {
+    return signedUrl;
+  }
+
+  const fallbackHost = forwardedHost.split(":")[0] ?? forwardedHost;
+
+  let browserHost = fallbackHost;
+  if (originHeader) {
+    try {
+      browserHost = new URL(originHeader).hostname;
+    } catch {
+      browserHost = fallbackHost;
+    }
+  }
+
+  const hostWithPort = forwardedPort ? `${browserHost}:${forwardedPort}` : browserHost;
+
+  return `${forwardedProto}://${hostWithPort}${parsed.pathname}${parsed.search}`;
+}
+
 function isUuid(value: unknown): value is string {
   if (typeof value !== "string") {
     return false;
@@ -92,14 +127,21 @@ async function handleGetProofSignedUrl(request: Request): Promise<Response> {
     throw new HttpError(404, "Proof path is not attached");
   }
 
+  const normalizedProofPath = normalizeProofPath(row.proof_path);
+
   const expiresInSeconds = 300;
   const { data: signed, error: signedUrlError } = await serviceClient.storage
     .from("payment-proofs")
-    .createSignedUrl(row.proof_path, expiresInSeconds);
+    .createSignedUrl(normalizedProofPath, expiresInSeconds);
 
   if (signedUrlError || !signed?.signedUrl) {
+    if (signedUrlError?.message === "Object not found") {
+      throw new HttpError(404, signedUrlError.message);
+    }
     throw new HttpError(500, signedUrlError?.message ?? "Failed to create signed URL");
   }
+
+  const signedUrl = normalizeSignedUrlForCaller(request, signed.signedUrl);
 
   if (caller.role === "treasurer" || caller.role === "admin" || caller.role === "super_admin") {
     const { error: auditError } = await serviceClient.from("audit_logs").insert({
@@ -122,7 +164,7 @@ async function handleGetProofSignedUrl(request: Request): Promise<Response> {
   }
 
   return jsonResponse(200, {
-    signedUrl: signed.signedUrl,
+    signedUrl,
     expiresInSeconds,
   });
 }

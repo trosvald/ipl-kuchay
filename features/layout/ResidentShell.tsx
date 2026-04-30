@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, Home, ReceiptText, Settings, Shield } from "lucide-react";
+import { ArrowLeft, Home, LogOut, ReceiptText, Settings, Shield } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/authHooks";
 
 export function ResidentShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,6 +51,15 @@ export function ResidentShell({ children }: Readonly<{ children: React.ReactNode
                 </Link>
               </Button>
             ) : null}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                await signOut();
+              }}
+            >
+              <LogOut className="size-4" /> Keluar
+            </Button>
           </div>
         </div>
       </header>

@@ -82,12 +82,12 @@ export function ResidentSettingsPage() {
 
     if (!data || data.length === 0) {
       const defaults = buildDefaultPreferences(profile.id);
-      const { error: insertError } = await client
+      const { error: upsertDefaultsError } = await client
         .from("notification_preferences")
-        .insert(defaults);
+        .upsert(defaults, { onConflict: "profile_id,category" });
 
-      if (insertError) {
-        setErrorMessage(insertError.message);
+      if (upsertDefaultsError) {
+        setErrorMessage(upsertDefaultsError.message);
         setIsLoading(false);
         return;
       }

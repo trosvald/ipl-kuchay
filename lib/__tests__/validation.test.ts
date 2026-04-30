@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   billingPeriodFormSchema,
+  kavlingResidentMappingSchema,
   paymentSubmissionFormSchema,
   residentNotificationPreferencesSchema,
   residentSettingsProfileSchema,
@@ -85,5 +86,25 @@ describe("validation schemas", () => {
       enabled: true,
     });
     expect(invalid.success).toBe(false);
+  });
+
+  it("validates kavling-resident mapping payload for relation and identity fields", () => {
+    const valid = kavlingResidentMappingSchema.safeParse({
+      kavling_id: "11111111-1111-4111-8111-111111111111",
+      profile_id: "22222222-2222-4222-8222-222222222222",
+      relation: "owner",
+      is_primary: true,
+      active: true,
+    });
+    expect(valid.success).toBe(true);
+
+    const invalidRelation = kavlingResidentMappingSchema.safeParse({
+      kavling_id: "11111111-1111-4111-8111-111111111111",
+      profile_id: "22222222-2222-4222-8222-222222222222",
+      relation: "a",
+      is_primary: true,
+      active: true,
+    });
+    expect(invalidRelation.success).toBe(false);
   });
 });

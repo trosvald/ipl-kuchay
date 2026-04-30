@@ -1,7 +1,7 @@
 "use client";
 
-import { type ReactNode, useEffect } from "react";
-import { LoaderCircle, ShieldAlert } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { LoaderCircle, ShieldAlert, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,7 @@ export function RequireAuth({
   const { session, profile, accessState, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [showLimitedToast, setShowLimitedToast] = useState(true);
 
   useEffect(() => {
     if (loading) {
@@ -89,17 +90,28 @@ export function RequireAuth({
   if (accessState === "active-unmapped") {
     return (
       <>
-        <main className="mx-auto w-full max-w-5xl px-4 pt-6">
-          <Card className="border-amber-200 bg-amber-50/80 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base text-amber-900">Akses terbatas: data kavling belum terhubung</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-amber-900">
-              Akun Anda aktif, tetapi pemetaan kavling belum tersedia. Anda tetap bisa lanjut ke portal terbatas
-              (profil dan pengaturan) sambil menunggu pengurus menyelesaikan pemetaan.
-            </CardContent>
-          </Card>
-        </main>
+        {showLimitedToast ? (
+          <div className="pointer-events-none fixed right-4 top-20 z-50 w-[min(92vw,420px)]">
+            <div className="pointer-events-auto rounded-xl border border-amber-200 bg-amber-50/95 p-3 shadow-lg backdrop-blur">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-amber-950">Profil aktif, pemetaan kavling sedang diproses</p>
+                  <p className="mt-1 text-xs text-amber-900">
+                    Anda tetap bisa memakai portal terbatas (profil dan pengaturan) sambil menunggu pengurus.
+                  </p>
+                </div>
+                <button
+                  aria-label="Tutup notifikasi"
+                  className="rounded-md p-1 text-amber-900 transition hover:bg-amber-100"
+                  onClick={() => setShowLimitedToast(false)}
+                  type="button"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
         {children}
       </>
     );

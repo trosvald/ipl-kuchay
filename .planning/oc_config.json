@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "presets": {
+      "genius": {
+        "planning": "openai/gpt-5.4",
+        "execution": "opencode-go/glm-5.1",
+        "verification": "openai/gpt-5.3-codex"
+      }
+    }
+  },
+  "current_oc_profile": "genius"
+}
