@@ -109,22 +109,10 @@ export function BillingPeriodsPage() {
 
   const canReopenClosed = profile?.role === "admin" || profile?.role === "super_admin";
   const PREVIEW_PAGE_SIZE = 10;
-  const previewGroups = useMemo(() => {
-    const grouped = new Map<string, { code: string; total: number; items: PreviewInvoiceRow[] }>();
-    for (const row of previewInvoices) {
-      if (!grouped.has(row.kavling_code)) {
-        grouped.set(row.kavling_code, { code: row.kavling_code, total: 0, items: [] });
-      }
-      const g = grouped.get(row.kavling_code)!;
-      g.items.push(row);
-      g.total = row.period_total;
-    }
-    return Array.from(grouped.values());
-  }, [previewInvoices]);
-  const previewTotalPages = Math.max(1, Math.ceil(previewGroups.length / PREVIEW_PAGE_SIZE));
-  const pagedPreviewGroups = useMemo(
-    () => previewGroups.slice((previewPage - 1) * PREVIEW_PAGE_SIZE, previewPage * PREVIEW_PAGE_SIZE),
-    [previewGroups, previewPage],
+  const previewTotalPages = Math.max(1, Math.ceil(previewInvoices.length / PREVIEW_PAGE_SIZE));
+  const pagedPreviewInvoices = useMemo(
+    () => previewInvoices.slice((previewPage - 1) * PREVIEW_PAGE_SIZE, previewPage * PREVIEW_PAGE_SIZE),
+    [previewInvoices, previewPage],
   );
   const PENALTY_PAGE_SIZE = 10;
   const penaltyTotalPages = Math.max(1, Math.ceil(penaltyPreview.length / PENALTY_PAGE_SIZE));
@@ -680,41 +668,36 @@ export function BillingPeriodsPage() {
             <p className="text-sm text-slate-600 py-4">Tidak ada kavling aktif untuk periode ini.</p>
           ) : (
             <div className="space-y-4">
-              {pagedPreviewGroups.map((group) => (
-                <Card key={group.code} className="rounded-lg">
-                  <CardContent className="p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-slate-900">{group.code}</p>
-                      <p className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        {formatRupiah(group.total)}
-                      </p>
+              <div className="rounded-lg border divide-y">
+                {pagedPreviewInvoices.map((row, idx) => (
+                  <div key={`${row.kavling_id}-${row.fee_type_id}`} className="flex items-center justify-between gap-2 p-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 truncate">{row.kavling_code}</p>
+                      <p className="text-xs text-slate-500">{row.fee_name}</p>
                     </div>
-                    <div className="space-y-1">
-                      {group.items.map((item) => (
-                        <div key={`${item.fee_type_id}`} className="flex items-center justify-between text-sm">
-                          <span className="text-slate-600">{item.fee_name}</span>
-                          <span className="flex items-center gap-2 text-slate-700">
-                            {item.amount_source === "override" ? (
-                              <>
-                                <span className="text-xs text-slate-400 line-through">{formatRupiah(item.default_amount)}</span>
-                                <span>{formatRupiah(item.resolved_amount)}</span>
-                                <Badge variant="warning">Override</Badge>
-                              </>
-                            ) : (
-                              <span>{formatRupiah(item.resolved_amount)}</span>
-                            )}
+                    <div className="text-right shrink-0">
+                      <p className="text-sm text-slate-700">
+                        {row.amount_source === "override" ? (
+                          <span>
+                            <span className="text-xs text-slate-400 line-through mr-1">{formatRupiah(row.default_amount)}</span>
+                            {formatRupiah(row.resolved_amount)}
                           </span>
-                        </div>
-                      ))}
+                        ) : (
+                          formatRupiah(row.resolved_amount)
+                        )}
+                      </p>
+                      <Badge variant={row.amount_source === "override" ? "warning" : "secondary"} className="text-xs">
+                        {row.amount_source === "override" ? "Override" : "Default"}
+                      </Badge>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                  </div>
+                ))}
+              </div>
 
-              {previewGroups.length > PREVIEW_PAGE_SIZE ? (
+              {previewInvoices.length > PREVIEW_PAGE_SIZE ? (
                 <div className="flex items-center justify-between text-sm text-slate-600">
                   <p className="text-xs">
-                    {PREVIEW_PAGE_SIZE * (previewPage - 1) + 1}&ndash;{Math.min(PREVIEW_PAGE_SIZE * previewPage, previewGroups.length)} dari {previewGroups.length}
+                    {PREVIEW_PAGE_SIZE * (previewPage - 1) + 1}&ndash;{Math.min(PREVIEW_PAGE_SIZE * previewPage, previewInvoices.length)} dari {previewInvoices.length}
                   </p>
                   <div className="flex items-center gap-1">
                     <Button size="sm" variant="outline" className="h-8 px-2 text-xs" onClick={() => setPreviewPage((v) => Math.max(1, v - 1))} disabled={previewPage <= 1}>
