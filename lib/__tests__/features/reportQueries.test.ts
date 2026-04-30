@@ -6,19 +6,32 @@ import type {
 } from "@/features/reports/reportSchemas";
 
 // --- Pure mapping helpers being tested ---
-// These mirror the logic used in the actual loadResidentPaymentHistory,
-// loadResidentReceiptHistory, and loadGeneratedReportOutputs query helpers.
+// These mirror the logic used in the actual loadResidentPaymentHistory
+// and loadReceiptCandidates query helpers.
+// Uses REAL payments schema columns: method, paid_at, notes (not payment_method, verified_at, note)
 
 function mapResidentPaymentRows(rows: RawPaymentRow[]): MappedPaymentRow[] {
   return rows.map((row) => ({
     id: row.id,
     amount: row.amount,
-    payment_method: row.payment_method ?? null,
-    verified_at: row.verified_at ?? null,
-    verified_by_name: extractProfileName(row.verified_by_profile),
-    note: row.note ?? null,
+    payment_method: row.method ?? null,
+    verified_at: row.paid_at ?? null,
+    verified_by_name: null,  // name resolved separately via profiles lookup
+    note: row.notes ?? null,
     created_at: row.created_at,
   }));
+}
+
+// Map receipt candidates: one row per verified payment (not one per invoice)
+function mapReceiptCandidates(rows: RawCandidatePayment[]): MappedCandidateRow[] {
+  return rows
+    .filter((row) => row.paid_at != null)  // must have paid_at (verified)
+    .map((row) => ({
+      payment_id: row.id,
+      invoice_id: row.invoice_id,
+      amount_paid: row.amount,
+      payment_date: row.paid_at ?? row.created_at,
+    }));
 }
 
 function extractProfileName(
@@ -58,7 +71,8 @@ function mapOwnerByKavling(
   return result;
 }
 
-// --- Mock types mirror the actual query helper types ---
+// --- Mock types mirror the ACTUAL payments schema columns ---
+// Real columns: id, amount, method, paid_at, notes, verified_by, created_at
 
 interface RawProfile {
   full_name: string;
@@ -68,10 +82,10 @@ interface RawProfile {
 interface RawPaymentRow {
   id: string;
   amount: number;
-  payment_method: string | null;
-  verified_at: string | null;
+  method: string | null;   // real: method (not payment_method)
+  paid_at: string | null;  // real: paid_at (not verified_at)
   verified_by_profile: RawProfile | RawProfile[] | null;
-  note: string | null;
+  notes: string | null;    // real: notes (not note)
   created_at: string;
 }
 
@@ -83,6 +97,22 @@ interface MappedPaymentRow {
   verified_by_name: string | null;
   note: string | null;
   created_at: string;
+}
+
+// Receipt candidate types: one per verified payment
+interface RawCandidatePayment {
+  id: string;
+  amount: number;
+  paid_at: string | null;  // real: paid_at
+  created_at: string;
+  invoice_id: string;
+}
+
+interface MappedCandidateRow {
+  payment_id: string;
+  invoice_id: string;
+  amount_paid: number;
+  payment_date: string;
 }
 
 interface RawReportRow {
@@ -184,24 +214,24 @@ describe("reportQueries", () => {
   });
 
   describe("loadResidentPaymentHistory mapping", () => {
-    it("maps verified payment rows into deterministic labels and amounts", () => {
+    it("maps verified payment rows using real payments columns (method, paid_at, notes)", () => {
       const rawRows: RawPaymentRow[] = [
         {
           id: "pay-001",
           amount: 500000,
-          payment_method: "bank_transfer",
-          verified_at: "2026-04-15T10:00:00Z",
+          method: "bank_transfer",   // real column
+          paid_at: "2026-04-15T10:00:00Z",  // real column
           verified_by_profile: { full_name: "Budi Santoso", display_name: "Budi" },
-          note: "Transfer dari BCA",
+          notes: "Transfer dari BCA",  // real column
           created_at: "2026-04-14T08:00:00Z",
         },
         {
           id: "pay-002",
           amount: 250000,
-          payment_method: "cash",
-          verified_at: null,
+          method: "cash",           // real column
+          paid_at: "2026-04-16T09:00:00Z",  // real column
           verified_by_profile: null,
-          note: null,
+          notes: null,
           created_at: "2026-04-16T09:00:00Z",
         },
       ];
@@ -211,37 +241,115 @@ describe("reportQueries", () => {
       expect(mapped).toHaveLength(2);
       expect(mapped[0].id).toBe("pay-001");
       expect(mapped[0].amount).toBe(500000);
-      expect(mapped[0].payment_method).toBe("bank_transfer");
-      expect(mapped[0].verified_at).toBe("2026-04-15T10:00:00Z");
-      expect(mapped[0].verified_by_name).toBe("Budi");
-      expect(mapped[0].note).toBe("Transfer dari BCA");
-
-      // Unverified row has null verified_at and name
-      expect(mapped[1].id).toBe("pay-002");
-      expect(mapped[1].verified_at).toBeNull();
-      expect(mapped[1].verified_by_name).toBeNull();
-      expect(mapped[1].note).toBeNull();
+      expect(mapped[0].payment_method).toBe("bank_transfer");  // from method, not payment_method
+      expect(mapped[0].verified_at).toBe("2026-04-15T10:00:00Z");  // from paid_at, not verified_at
+      expect(mapped[0].note).toBe("Transfer dari BCA");  // from notes, not note
     });
 
-    it("handles profile with only full_name (no display_name)", () => {
+    it("handles null method and notes correctly", () => {
       const rawRows: RawPaymentRow[] = [
         {
           id: "pay-003",
           amount: 300000,
-          payment_method: "bank_transfer",
-          verified_at: "2026-04-20T11:00:00Z",
-          verified_by_profile: { full_name: "Siti Rahayu", display_name: null },
-          note: null,
+          method: null,
+          paid_at: null,
+          verified_by_profile: null,
+          notes: null,
           created_at: "2026-04-19T07:00:00Z",
         },
       ];
 
       const mapped = mapResidentPaymentRows(rawRows);
-      expect(mapped[0].verified_by_name).toBe("Siti Rahayu");
+      expect(mapped[0].payment_method).toBeNull();
+      expect(mapped[0].verified_at).toBeNull();
+      expect(mapped[0].note).toBeNull();
     });
 
     it("returns empty array for empty input", () => {
       const mapped = mapResidentPaymentRows([]);
+      expect(mapped).toHaveLength(0);
+    });
+  });
+
+  describe("loadReceiptCandidates mapping", () => {
+    it("returns one candidate per verified payment row (not per invoice)", () => {
+      // Two payments for the same invoice = two candidates
+      const rawPayments: RawCandidatePayment[] = [
+        {
+          id: "pay-001",
+          amount: 300000,
+          paid_at: "2026-04-10T08:00:00Z",
+          created_at: "2026-04-09T10:00:00Z",
+          invoice_id: "inv-001",
+        },
+        {
+          id: "pay-002",
+          amount: 200000,
+          paid_at: "2026-04-15T09:00:00Z",
+          created_at: "2026-04-15T08:00:00Z",
+          invoice_id: "inv-001",  // same invoice
+        },
+      ];
+
+      const mapped = mapReceiptCandidates(rawPayments);
+
+      // One candidate per payment, not deduplicated by invoice
+      expect(mapped).toHaveLength(2);
+      expect(mapped[0].payment_id).toBe("pay-001");
+      expect(mapped[1].payment_id).toBe("pay-002");
+    });
+
+    it("filters out payments without paid_at (unverified)", () => {
+      const rawPayments: RawCandidatePayment[] = [
+        {
+          id: "pay-001",
+          amount: 300000,
+          paid_at: "2026-04-10T08:00:00Z",
+          created_at: "2026-04-09T10:00:00Z",
+          invoice_id: "inv-001",
+        },
+        {
+          id: "pay-002",
+          amount: 200000,
+          paid_at: null,  // not verified
+          created_at: "2026-04-15T08:00:00Z",
+          invoice_id: "inv-001",
+        },
+      ];
+
+      const mapped = mapReceiptCandidates(rawPayments);
+      // Only rows with paid_at are included
+      expect(mapped).toHaveLength(1);
+      expect(mapped[0].payment_id).toBe("pay-001");
+    });
+
+    it("returns payment_date from paid_at", () => {
+      const rawPayments: RawCandidatePayment[] = [
+        {
+          id: "pay-001",
+          amount: 500000,
+          paid_at: "2026-04-20T14:30:00Z",
+          created_at: "2026-04-19T08:00:00Z",
+          invoice_id: "inv-001",
+        },
+      ];
+
+      const mapped = mapReceiptCandidates(rawPayments);
+      expect(mapped[0].payment_date).toBe("2026-04-20T14:30:00Z");
+    });
+
+    it("returns empty array when no verified payments", () => {
+      const rawPayments: RawCandidatePayment[] = [
+        {
+          id: "pay-001",
+          amount: 300000,
+          paid_at: null,
+          created_at: "2026-04-09T10:00:00Z",
+          invoice_id: "inv-001",
+        },
+      ];
+
+      const mapped = mapReceiptCandidates(rawPayments);
       expect(mapped).toHaveLength(0);
     });
   });

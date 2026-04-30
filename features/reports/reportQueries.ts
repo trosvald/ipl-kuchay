@@ -349,6 +349,7 @@ export async function loadBillingPeriodSummaries(): Promise<BillingPeriodSummary
 /**
  * Load resident visible verified payment history for one invoice.
  * Maps payments rows into deterministic labels, dates, and amounts (PAY-06).
+ * Uses real payments columns: id, amount, method, paid_at, notes, created_at.
  */
 export async function loadResidentPaymentHistory(
   invoiceId: string,
@@ -364,15 +365,15 @@ export async function loadResidentPaymentHistory(
       `
       id,
       amount,
-      payment_method,
-      verified_at,
-      verified_by_profile:profiles!verified_by(full_name, display_name),
-      note,
+      method,
+      paid_at,
+      notes,
+      verified_by,
       created_at
     `,
     )
     .eq("invoice_id", invoiceId)
-    .order("verified_at", { ascending: false });
+    .order("paid_at", { ascending: false });
 
   if (error) {
     throw new Error(`Failed to load resident payment history: ${error.message}`);
@@ -382,13 +383,34 @@ export async function loadResidentPaymentHistory(
     return [];
   }
 
+  // Load verifier profile names for each verified payment
+  const verifierIds = (data as unknown as ResidentPaymentRaw[])
+    .map((row) => row.verified_by)
+    .filter((vid): vid is string => vid !== null);
+
+  let verifierNames: Map<string, string> = new Map();
+  if (verifierIds.length > 0) {
+    const { data: profiles } = await client
+      .from("profiles")
+      .select("id, full_name, display_name")
+      .in("id", verifierIds);
+
+    if (profiles && Array.isArray(profiles)) {
+      for (const p of profiles) {
+        const name = (p as { display_name?: string | null; full_name?: string }).display_name?.trim() ||
+          (p as { full_name: string }).full_name || null;
+        if (name) verifierNames.set(p.id, name);
+      }
+    }
+  }
+
   return (data as unknown as ResidentPaymentRaw[]).map((row) => ({
     id: row.id,
     amount: row.amount,
-    payment_method: row.payment_method ?? null,
-    verified_at: row.verified_at ?? null,
-    verified_by_name: extractProfileName(row.verified_by_profile),
-    note: row.note ?? null,
+    payment_method: row.method ?? null,
+    verified_at: row.paid_at ?? null,
+    verified_by_name: row.verified_by ? verifierNames.get(row.verified_by) ?? null : null,
+    note: row.notes ?? null,
     created_at: row.created_at,
   }));
 }
@@ -471,8 +493,8 @@ export async function loadGeneratedReportOutputs(
 }
 
 /**
- * Load receipt candidate rows — invoices with at least one verified payment
- * for a billing period, so operators can generate resident-specific receipts.
+ * Load receipt candidate rows — one row per verified payment for a billing period,
+ * so operators can generate resident-specific receipts per RPRT-04 and D-13.
  */
 export async function loadReceiptCandidates(
   billingPeriodId: string,
@@ -482,14 +504,16 @@ export async function loadReceiptCandidates(
     throw new Error("Supabase client not available");
   }
 
-  // Get invoices that have verified payments for the billing period
+  // Get verified payments for the billing period's invoices
+  // Uses real payments columns: id, amount, paid_at, notes, invoice_id
   const { data: paymentsData, error: paymentsError } = await client
     .from("payments")
     .select(
       `
       id,
       amount,
-      verified_at,
+      paid_at,
+      notes,
       invoice_id,
       invoices(
         id,
@@ -500,7 +524,7 @@ export async function loadReceiptCandidates(
       )
     `,
     )
-    .not("verified_at", "is", null);
+    .not("paid_at", "is", null);  // payment must have paid_at (verified)
 
   if (paymentsError) {
     throw new Error(`Failed to load receipt candidates: ${paymentsError.message}`);
@@ -510,26 +534,24 @@ export async function loadReceiptCandidates(
     return [];
   }
 
-  // Group by invoice, filter to billing period
-  const invoiceMap = new Map<string, ReceiptCandidateRow>();
+  // Return one candidate per payment row (not per invoice)
+  const candidates: ReceiptCandidateRow[] = [];
   for (const row of paymentsData as unknown as PaymentWithInvoice[]) {
     const inv = row.invoices;
     if (!inv || String(inv.billing_period_id) !== billingPeriodId) continue;
 
-    if (!invoiceMap.has(inv.id)) {
-      invoiceMap.set(inv.id, {
-        invoice_id: inv.id,
-        invoice_number: inv.invoice_number,
-        kavling_id: inv.kavling_id,
-        kavling_code: getKavlingCode(inv.kavlings),
-        payment_id: row.id,
-        amount_paid: row.amount,
-        payment_date: row.verified_at ?? row.created_at,
-      });
-    }
+    candidates.push({
+      invoice_id: inv.id,
+      invoice_number: inv.invoice_number,
+      kavling_id: inv.kavling_id,
+      kavling_code: getKavlingCode(inv.kavlings),
+      payment_id: row.id,
+      amount_paid: row.amount,
+      payment_date: row.paid_at ?? row.created_at,
+    });
   }
 
-  return Array.from(invoiceMap.values());
+  return candidates;
 }
 
 // --- Helper functions ---
@@ -574,13 +596,14 @@ function extractProfileName(
 
 // --- Types for new helpers ---
 
+// Real payments columns: id, amount, method, paid_at, notes, verified_by, created_at
 interface ResidentPaymentRaw {
   id: string;
   amount: number;
-  payment_method: string | null;
-  verified_at: string | null;
-  verified_by_profile: ProfileSummary | ProfileSummary[] | null;
-  note: string | null;
+  method: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  verified_by: string | null;
   created_at: string;
 }
 
@@ -594,10 +617,11 @@ interface ReportRow {
   file_path: string | null;
 }
 
+// Real payments columns for loadReceiptCandidates: id, amount, paid_at, notes, invoice_id
 interface PaymentWithInvoice {
   id: string;
   amount: number;
-  verified_at: string | null;
+  paid_at: string | null;
   created_at: string;
   invoice_id: string;
   invoices: {
