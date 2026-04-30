@@ -263,6 +263,66 @@ export const residentNotificationPreferencesSchema = z
     }
   });
 
+// ============================================================
+// Announcement, Event, and RSVP schemas (Phase 4)
+// ============================================================
+
+export const announcementStatusSchema = z.enum(["draft", "published", "archived"]);
+
+export const announcementFormSchema = z
+  .object({
+    title: z.string().trim().min(1, "Judul wajib diisi"),
+    body: z.string().trim().min(1, "Isi pengumuman wajib diisi"),
+    is_urgent: z.boolean().optional().default(false),
+    is_pinned: z.boolean().optional().default(false),
+    status: announcementStatusSchema,
+  })
+  .strict();
+
+export const announcementAttachmentSchema = z
+  .object({
+    announcement_id: uuidSchema,
+    label: z.string().trim().min(1, "Label lampiran wajib diisi"),
+    storage_path: z.string().trim().min(1, "Path penyimpanan wajib diisi"),
+    mime_type: z.string().trim().min(1, "Tipe file wajib diisi"),
+    size_bytes: z.number().int("Ukuran file harus bilangan bulat").positive("Ukuran file tidak valid"),
+  })
+  .strict();
+
+export const eventStatusSchema = z.enum(["scheduled", "cancelled"]);
+
+export const eventFormSchema = z
+  .object({
+    title: z.string().trim().min(1, "Judul acara wajib diisi"),
+    description: z.string().trim().optional().default(""),
+    location: z.string().trim().min(1, "Lokasi acara wajib diisi"),
+    starts_at: z.string().trim().min(1, "Waktu mulai wajib diisi"),
+    ends_at: z.string().trim().optional().nullable(),
+    status: eventStatusSchema,
+    cancellation_note: z.string().trim().optional().default(""),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.ends_at != null && value.ends_at.length > 0) {
+      if (value.ends_at <= value.starts_at) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["ends_at"],
+          message: "Waktu selesai harus setelah waktu mulai",
+        });
+      }
+    }
+  });
+
+export const rsvpResponseSchema = z.enum(["attending", "not_attending", "no_response"]);
+
+export const rsvpUpsertSchema = z
+  .object({
+    event_id: uuidSchema,
+    response: rsvpResponseSchema,
+  })
+  .strict();
+
 export type KavlingFormInput = z.infer<typeof kavlingFormSchema>;
 export type ResidentFormInput = z.infer<typeof residentFormSchema>;
 export type KavlingResidentMappingInput = z.infer<typeof kavlingResidentMappingSchema>;
@@ -276,3 +336,10 @@ export type ResidentSettingsProfileInput = z.infer<typeof residentSettingsProfil
 export type ResidentNotificationCategory = z.infer<typeof residentNotificationCategorySchema>;
 export type ResidentNotificationPreferenceRowInput = z.infer<typeof residentNotificationPreferenceRowSchema>;
 export type ResidentNotificationPreferencesInput = z.infer<typeof residentNotificationPreferencesSchema>;
+export type AnnouncementFormInput = z.infer<typeof announcementFormSchema>;
+export type AnnouncementAttachmentInput = z.infer<typeof announcementAttachmentSchema>;
+export type EventFormInput = z.infer<typeof eventFormSchema>;
+export type RSVPUpsertInput = z.infer<typeof rsvpUpsertSchema>;
+export type AnnouncementStatus = z.infer<typeof announcementStatusSchema>;
+export type EventStatus = z.infer<typeof eventStatusSchema>;
+export type RSVPResponse = z.infer<typeof rsvpResponseSchema>;
