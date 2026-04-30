@@ -8,6 +8,48 @@ import {
   buildReportOutputPath,
 } from "@/features/reports/reportOutputBuilders.ts";
 
+// --- Kavling lookup for Edge Function report-row insertion ---
+
+export interface KavlingLookupResult {
+  kavlingId: string;
+}
+
+/**
+ * Resolve kavling_id for a receipt by loading the payment's invoice kavling.
+ * Used by generate-report-output to set reports.kavling_id without regenerating HTML.
+ */
+export async function loadResidentReceiptDataForKavling(
+  invoiceId: string,
+  paymentId: string,
+): Promise<KavlingLookupResult> {
+  const client = createServiceRoleClient();
+
+  // Verify payment exists and matches invoice
+  const { data: payment } = await client
+    .from("payments")
+    .select("id, invoice_id")
+    .eq("id", paymentId)
+    .eq("invoice_id", invoiceId)
+    .single();
+
+  if (!payment) {
+    throw new Error(`Payment ${paymentId} not found for invoice ${invoiceId}`);
+  }
+
+  // Get kavling from invoice
+  const { data: invoice } = await client
+    .from("invoices")
+    .select("kavling_id")
+    .eq("id", invoiceId)
+    .single();
+
+  if (!invoice) {
+    throw new Error(`Invoice not found: ${invoiceId}`);
+  }
+
+  return { kavlingId: (invoice as { kavling_id: string }).kavling_id };
+}
+
 // --- Data loading helpers ---
 
 export interface MonthlySummaryData {
@@ -96,21 +138,59 @@ export async function loadMonthlySummaryData(
 
 /**
  * Load resident receipt data for a specific invoice/payment pair.
+ * Loads the exact payments row matched by paymentId and invoiceId, then
+ * resolves related kavling/invoice/billing-period context for the receipt.
  */
 export async function loadResidentReceiptData(
   invoiceId: string,
   paymentId?: string,
-): Promise<ResidentReceiptData> {
+): Promise<ResidentReceiptData & { kavlingId: string }> {
   const client = createServiceRoleClient();
 
-  // Load invoice with kavling info
+  // Load the specific payment row when paymentId is provided
+  // Falls back to first verified payment for the invoice if no paymentId given
+  let paymentRow: {
+    id: string;
+    amount: number;
+    method: string;
+    paid_at: string;
+    notes: string | null;
+    verified_by: string | null;
+    invoice_id: string;
+  } | null = null;
+
+  if (paymentId) {
+    // Load exact payment row by id + invoice_id pair
+    const { data } = await client
+      .from("payments")
+      .select("id, amount, method, paid_at, notes, verified_by, invoice_id")
+      .eq("id", paymentId)
+      .eq("invoice_id", invoiceId)
+      .single();
+    paymentRow = data;
+  } else {
+    // Fallback: load first verified payment for this invoice
+    const { data } = await client
+      .from("payments")
+      .select("id, amount, method, paid_at, notes, verified_by, invoice_id")
+      .eq("invoice_id", invoiceId)
+      .not("verified_by", "is", null)
+      .order("paid_at", { ascending: false })
+      .limit(1)
+      .single();
+    paymentRow = data;
+  }
+
+  if (!paymentRow) {
+    throw new Error(`No verified payment found for invoice: ${invoiceId}`);
+  }
+
+  // Load invoice with kavling and billing period info
   const { data: invoice } = await client
     .from("invoices")
     .select(`
       id,
       invoice_number,
-      amount_paid,
-      paid_at,
       billing_period_id,
       kavling_id,
       kavlings!inner(code)
@@ -126,7 +206,7 @@ export async function loadResidentReceiptData(
   const { data: period } = await client
     .from("billing_periods")
     .select("label")
-    .eq("id", invoice.billing_period_id)
+    .eq("id", (invoice as { billing_period_id?: string }).billing_period_id ?? "")
     .single();
 
   const periodLabel = period?.label ?? "Unknown Period";
@@ -135,7 +215,7 @@ export async function loadResidentReceiptData(
   const { data: resident } = await client
     .from("kavling_residents")
     .select(`profile_id, profiles!inner(full_name, display_name)`)
-    .eq("kavling_id", invoice.kavling_id)
+    .eq("kavling_id", (invoice as { kavling_id: string }).kavling_id)
     .eq("active", true)
     .limit(1)
     .single();
@@ -146,15 +226,17 @@ export async function loadResidentReceiptData(
     residentName = profile.display_name?.trim() || profile.full_name || "Unknown Resident";
   }
 
-  const paymentDate = invoice.paid_at || new Date().toISOString();
+  const kavlingId = (invoice as { kavling_id: string }).kavling_id;
+  const kavlingCode = ((invoice as { kavlings?: { code?: string } }).kavlings as { code?: string })?.code || "UNKNOWN";
 
   return {
     invoiceId: invoice.id,
     invoiceNumber: (invoice as { invoice_number?: string }).invoice_number || invoice.id,
-    kavlingCode: ((invoice as { kavlings?: { code?: string } }).kavlings as { code?: string })?.code || "UNKNOWN",
+    kavlingId,
+    kavlingCode,
     residentName,
-    amountPaid: invoice.amount_paid,
-    paymentDate,
+    amountPaid: paymentRow.amount,
+    paymentDate: paymentRow.paid_at,
     periodLabel,
   };
 }
@@ -219,7 +301,7 @@ export async function generateMonthlySummaryArtifact(
 export async function generateResidentReceiptArtifact(
   invoiceId: string,
   paymentId?: string,
-): Promise<{ filePath: string; data: ResidentReceiptData }> {
+): Promise<{ filePath: string; data: ResidentReceiptData & { kavlingId: string } }> {
   const data = await loadResidentReceiptData(invoiceId, paymentId);
 
   const reportId = crypto.randomUUID();

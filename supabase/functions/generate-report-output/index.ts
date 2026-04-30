@@ -15,6 +15,7 @@ import {
 import {
   generateMonthlySummaryArtifact,
   generateResidentReceiptArtifact,
+  loadResidentReceiptDataForKavling,
 } from "../_shared/report-output.ts";
 
 interface GenerateReportOutputRequest {
@@ -54,6 +55,9 @@ async function parseRequest(request: Request): Promise<GenerateReportOutputReque
     if (!body.invoiceId || !isUuid(body.invoiceId)) {
       throw new HttpError(400, "Invalid or missing invoiceId for receipt");
     }
+    if (!body.paymentId || !isUuid(body.paymentId)) {
+      throw new HttpError(400, "Invalid or missing paymentId for receipt");
+    }
   }
 
   if (!body.title || typeof body.title !== "string" || body.title.trim().length === 0) {
@@ -92,7 +96,10 @@ async function handleGenerateReportOutput(request: Request): Promise<Response> {
       invoice_count: 0, // calculated separately if needed
     };
   } else {
-    // receipt
+    // receipt: requires paymentId and pulls from the specific payments row
+    if (!input.paymentId) {
+      throw new HttpError(400, "paymentId is required for receipt reportType");
+    }
     const result = await generateResidentReceiptArtifact(
       input.invoiceId!,
       input.paymentId,
@@ -102,6 +109,7 @@ async function handleGenerateReportOutput(request: Request): Promise<Response> {
     metadata = {
       invoice_id: result.data.invoiceId,
       invoice_number: result.data.invoiceNumber,
+      payment_id: input.paymentId,
       kavling_code: result.data.kavlingCode,
       resident_name: result.data.residentName,
       amount_paid: result.data.amountPaid,
@@ -111,16 +119,25 @@ async function handleGenerateReportOutput(request: Request): Promise<Response> {
   }
 
   // Insert/upsert report row in public.reports
+  // For receipts, kavling_id is set from the resolved payment's kavling
+  // so that resident RLS can expose the receipt via reports_select_own_receipt_or_admin
+  const reportInsert: Record<string, unknown> = {
+    report_type: input.reportType,
+    billing_period_id: input.billingPeriodId,
+    title: input.title.trim(),
+    file_path: filePath,
+    metadata,
+    generated_by: caller.id,
+  };
+
+  if (input.reportType === "receipt" && input.paymentId) {
+    const receiptData = await loadResidentReceiptDataForKavling(input.invoiceId!, input.paymentId);
+    reportInsert.kavling_id = receiptData.kavlingId;
+  }
+
   const { data: report, error: reportError } = await serviceClient
     .from("reports")
-    .insert({
-      report_type: input.reportType,
-      billing_period_id: input.billingPeriodId,
-      title: input.title.trim(),
-      file_path: filePath,
-      metadata,
-      generated_by: caller.id,
-    })
+    .insert(reportInsert)
     .select("id, file_path")
     .single();
 
