@@ -539,11 +539,11 @@ export function BillingPeriodsPage() {
                             </Button>
                             <Button
                               size="sm"
-                              variant="secondary"
-                              disabled={saving || row.status === "closed" || row.status === "archived"}
+                              variant={count > 0 ? "ghost" : "secondary"}
+                              disabled={saving || count > 0 || row.status === "closed" || row.status === "archived"}
                               onClick={() => handlePreviewInvoices(row)}
                             >
-                              Pratinjau Tagihan
+                              {count > 0 ? "Tagihan Sudah Ada" : "Pratinjau Tagihan"}
                             </Button>
                             <Button
                               size="sm"
