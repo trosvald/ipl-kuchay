@@ -147,7 +147,6 @@ export function ResidentEventDetailPage({
           event_id: id,
           profile_id: profile.id,
           response,
-          responded_at: new Date().toISOString(),
         },
         { onConflict: "event_id,profile_id" },
       );

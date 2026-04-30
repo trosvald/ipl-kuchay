@@ -421,5 +421,113 @@ begin
   where title = 'Test Announcement'
   limit 1;
 
+  -- ============================================================
+  -- Real RSVP insert/update regression (T-04-14, T-04-15)
+  -- ============================================================
+
+  -- Get the future test event for RSVP tests
+  declare
+    v_test_event_id uuid;
+    v_past_event_id uuid;
+  begin
+    select id into v_test_event_id
+    from public.events
+    where title = 'Test Event'
+      and starts_at > now()
+    limit 1;
+
+    -- Create a past (started) event for post-start cutoff tests
+    insert into public.events (id, title, description, location, starts_at, ends_at, status, created_by)
+    values (gen_random_uuid(), 'Past Test Event', 'Past Description', 'Location', now() - interval '2 days', now() - interval '2 days' + interval '2 hours', 'scheduled', v_admin)
+    returning id into v_past_event_id;
+
+    -- T-04-14 / EVNT-02: Real RSVP insert with only event_id, profile_id, response
+    -- This will fail at the application layer if responded_at is sent
+    insert into public.event_attendees (event_id, profile_id, response)
+    values (v_test_event_id, v_resident_a, 'attending')
+    on conflict (event_id, profile_id) do update set response = excluded.response;
+
+    -- Verify insert succeeded
+    if not exists (
+      select 1 from public.event_attendees
+      where event_id = v_test_event_id
+        and profile_id = v_resident_a
+        and response = 'attending'
+    ) then
+      raise exception 'RSVP insert failed: row not found after insert';
+    end if;
+
+    -- Real RSVP update (upsert on conflict) for the same row
+    insert into public.event_attendees (event_id, profile_id, response)
+    values (v_test_event_id, v_resident_a, 'not_attending')
+    on conflict (event_id, profile_id) do update set response = excluded.response;
+
+    -- Verify update succeeded
+    if not exists (
+      select 1 from public.event_attendees
+      where event_id = v_test_event_id
+        and profile_id = v_resident_a
+        and response = 'not_attending'
+    ) then
+      raise exception 'RSVP upsert update failed: response did not change to not_attending';
+    end if;
+
+    -- T-04-14: Verify responded_at column does NOT exist in event_attendees
+    -- (if it did, this would pass — this test validates the gap fix)
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'event_attendees'
+        and column_name = 'responded_at'
+    ) then
+      raise exception 'CRITICAL: event_attendees should not have responded_at column (T-04-14)';
+    end if;
+
+    -- T-04-15: Post-start event RSVP insert should be denied by RLS
+    perform set_config('request.jwt.claim.sub', v_resident_b::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    begin
+      insert into public.event_attendees (event_id, profile_id, response)
+      values (v_past_event_id, v_resident_b, 'attending');
+      raise exception 'Post-start RSVP insert was not denied by RLS (T-04-14)';
+    exception when raise_exception then
+      if sqlstate = 'P0001' then
+        raise;
+      end if;
+      -- Expected: insert fails due to RLS policy check on events.starts_at > now()
+      null;
+    end;
+
+    -- T-04-14: Wrong profile RSVP update should be denied by RLS
+    -- (resident_a trying to update resident_b's RSVP)
+    -- First give resident_b an RSVP
+    perform set_config('request.jwt.claim.sub', v_resident_b::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    insert into public.event_attendees (event_id, profile_id, response)
+    values (v_test_event_id, v_resident_b, 'no_response')
+    on conflict (event_id, profile_id) do update set response = excluded.response;
+
+    -- Now try to update as resident_a (should be blocked by profile_id check)
+    perform set_config('request.jwt.claim.sub', v_resident_a::text, true);
+    perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+    begin
+      update public.event_attendees
+      set response = 'attending'
+      where event_id = v_test_event_id
+        and profile_id = v_resident_b;
+      raise exception 'Cross-profile RSVP update was not denied by RLS (T-04-14)';
+    exception when raise_exception then
+      if sqlstate = 'P0001' then
+        raise;
+      end if;
+      -- Expected: update fails due to RLS policy check
+      null;
+    end;
+
+  end;
+
 end;
 $$;
