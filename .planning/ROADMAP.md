@@ -65,12 +65,14 @@ Plans:
   2. Resident can track payment states, rejection reasons, next steps, and payment/receipt history for their own invoices.
   3. Treasurer or admin can review payment proof through permission-checked access and verify or reject submissions through an audited workflow.
   4. Collection summaries, arrears views, CSV exports, monthly report outputs, receipt outputs, and audit trail all reflect the same invoice and payment truth shown in resident-facing screens.
-**Plans**: 3 plans
+**Plans**: 5 plans
 
 Plans:
 - [ ] 03-01-PLAN.md — Harden SQL/RPC payment verification and finance audit invariants with regression coverage.
 - [ ] 03-02-PLAN.md — Align resident submission/history and admin review/proof flows to full manual-payment lifecycle truth.
 - [ ] 03-03-PLAN.md — Add treasurer/admin reporting route for collection summary, arrears, CSV export, and monthly/receipt outputs.
+- [ ] 03-04-PLAN.md — Turn monthly summary and resident receipt outputs into private generated artifacts with signed download access.
+- [ ] 03-05-PLAN.md — Wire resident payment/receipt history and admin output download UX to the generated artifact truth.
 **UI hint**: yes
 
 ### Phase 4: Announcements, Events & Resident Home
