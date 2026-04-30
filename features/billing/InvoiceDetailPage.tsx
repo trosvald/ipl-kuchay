@@ -7,6 +7,7 @@ import { ArrowLeft, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaymentSubmissionForm } from "@/features/payments/PaymentSubmissionForm";
 import { SubmissionHistory } from "@/features/payments/SubmissionHistory";
@@ -183,6 +184,18 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
     }
   }, [page, totalPages]);
 
+  const isHistorical =
+    invoice?.status === "paid" ||
+    invoice?.status === "closed" ||
+    invoice?.status === "waived" ||
+    invoice?.status === "cancelled";
+
+  const showOutstandingAlert =
+    invoice &&
+    !isHistorical &&
+    outstanding > 0 &&
+    (invoice.status === "unpaid" || invoice.status === "overdue" || invoice.status === "partial");
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -193,7 +206,9 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
             </Link>
           </Button>
           <h1 className="text-2xl font-semibold text-slate-900">Detail Invoice</h1>
-          <p className="text-sm text-slate-600">Nomor invoice dan rincian item tagihan per periode.</p>
+          <p className="text-sm text-slate-600">
+            Rincian tagihan dan histori pembayaran per periode.
+          </p>
         </div>
 
         <Button variant="secondary" onClick={() => loadInvoice()} disabled={loading}>
@@ -207,73 +222,105 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
         </Card>
       ) : null}
 
+      {showOutstandingAlert ? (
+        <Card className="border-red-200 bg-red-50 rounded-xl">
+          <CardContent className="py-3 text-sm text-red-700">
+            <strong>Sisa tagihan:</strong> {formatRupiah(outstanding)} — silakan lakukan pembayaran sebelum jatuh tempo.
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-3 lg:grid-cols-[1.3fr_1fr]">
-        <Card>
+        <Card className="rounded-xl">
           <CardHeader>
             <CardTitle className="text-base">Informasi Invoice</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-slate-700">
-            <p>
-              <span className="text-slate-500">No Invoice:</span>{" "}
+          <CardContent className="space-y-3 text-sm text-slate-700">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">No Invoice</span>
               <span className="font-semibold text-slate-900">{invoice?.invoice_number ?? "-"}</span>
-            </p>
-            <p>
-              <span className="text-slate-500">Periode:</span>{" "}
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Periode</span>
               <span className="font-medium text-slate-900">
                 {period ? `${formatMonthYearId(period.year, period.month)} (${period.label})` : "-"}
               </span>
-            </p>
-            <p>
-              <span className="text-slate-500">Kavling:</span>{" "}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Kavling</span>
               <span className="font-medium text-slate-900">{kavlingLabel}</span>
-            </p>
-            <p>
-              <span className="text-slate-500">Due date:</span>{" "}
-              <span className="font-medium text-slate-900">{invoice?.due_date ? formatDateId(invoice.due_date) : "-"}</span>
-            </p>
-            <p>
-              <span className="text-slate-500">Status:</span>{" "}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Jatuh tempo</span>
+              <span className="font-medium text-slate-900">
+                {invoice?.due_date ? formatDateId(invoice.due_date) : "-"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Status</span>
               {invoice ? (
-                <Badge variant={statusToBadgeVariant(invoice.status)}>{formatInvoiceStatusLabel(invoice.status)}</Badge>
+                <Badge variant={statusToBadgeVariant(invoice.status)}>
+                  {formatInvoiceStatusLabel(invoice.status)}
+                </Badge>
               ) : (
                 "-"
               )}
-            </p>
+            </div>
+            {invoice?.paid_at && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Dibayar pada</span>
+                <span className="font-medium text-slate-900">{formatDateId(invoice.paid_at)}</span>
+              </div>
+            )}
             {invoice?.notes ? (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
                 Catatan: {invoice.notes}
-              </p>
+              </div>
             ) : null}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-xl">
           <CardHeader>
             <CardTitle className="text-base">Ringkasan Nominal</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-slate-700">
-            <p className="flex items-center justify-between gap-2">
-              <span>Total item</span>
-              <span className="font-semibold text-slate-900">{formatRupiah(itemsTotal)}</span>
-            </p>
-            <p className="flex items-center justify-between gap-2">
-              <span>Total tagihan</span>
-              <span className="font-semibold text-slate-900">{formatRupiah(invoice?.amount_due ?? 0)}</span>
-            </p>
-            <p className="flex items-center justify-between gap-2">
-              <span>Sudah dibayar</span>
-              <span className="font-semibold text-slate-900">{formatRupiah(invoice?.amount_paid ?? 0)}</span>
-            </p>
-            <p className="flex items-center justify-between gap-2 border-t border-slate-200 pt-2">
-              <span>Sisa</span>
-              <span className="font-semibold text-slate-900">{formatRupiah(outstanding)}</span>
-            </p>
+          <CardContent className="space-y-3 text-sm text-slate-700">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Total item</span>
+              <span className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatRupiah(itemsTotal)}
+              </span>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Total tagihan</span>
+              <span className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatRupiah(invoice?.amount_due ?? 0)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-500">Total terbayar</span>
+              <span className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatRupiah(invoice?.amount_paid ?? 0)}
+              </span>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-slate-700">Sisa tagihan</span>
+              <span
+                className={`font-semibold ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {formatRupiah(outstanding)}
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {!hasActiveKavlingAccess ? (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-200 bg-amber-50 rounded-xl">
           <CardContent className="py-3 text-sm text-amber-800">
             Invoice ini berasal dari riwayat kavling yang sudah tidak aktif di akun Anda. Detail tetap bisa dibaca, tetapi pengiriman pembayaran baru dinonaktifkan.
           </CardContent>
@@ -294,34 +341,41 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
 
       <SubmissionHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
 
-      <Card>
+      <Card className="rounded-xl">
         <CardHeader>
-          <CardTitle>Rincian Item</CardTitle>
+          <CardTitle>Rincian Tagihan</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-sm text-slate-600">Memuat item invoice...</p>
+            <p className="text-sm text-slate-600">Memuat rincian tagihan...</p>
+          ) : items.length === 0 ? (
+            <p className="text-sm text-slate-600">Tidak ada rincian item.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[640px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Deskripsi</TableHead>
-                    <TableHead>Nominal</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-slate-700">{item.description}</TableCell>
-                      <TableCell className="font-medium text-slate-900">{formatRupiah(item.amount)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-2">
+              {pagedItems.map((item) => (
+                <div key={item.id} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700">{item.description}</span>
+                  <span
+                    className="font-medium text-slate-900"
+                    style={{ fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {formatRupiah(item.amount)}
+                  </span>
+                </div>
+              ))}
+              <Separator className="my-2" />
+              <div className="flex items-center justify-between font-medium">
+                <span className="text-slate-700">Total</span>
+                <span
+                  className="font-semibold text-slate-900"
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {formatRupiah(itemsTotal)}
+                </span>
+              </div>
             </div>
           )}
-          {loading ? null : (
+          {!loading && totalRows > pageSize ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
@@ -346,7 +400,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
                   Prev
                 </Button>
                 <span className="text-xs">
-                  Page {page}/{totalPages}
+                  Halaman {page} dari {totalPages}
                 </span>
                 <Button
                   size="sm"
@@ -358,7 +412,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
                 </Button>
               </div>
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </section>
