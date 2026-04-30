@@ -51,9 +51,9 @@ Plans:
   4. Resident can review historical invoice statuses from the same billing area without needing manual admin explanation.
 **Plans**: 3 plans
 Plans:
-- [ ] 02-01-PLAN.md — Finalize SQL contract for invoice generation, override resolution, and overdue penalty application.
-- [ ] 02-02-PLAN.md — Complete admin billing period + fee configuration interfaces with auditable lifecycle operations.
-- [ ] 02-03-PLAN.md — Complete resident billing list/detail experience for clear dues, arrears, and history visibility.
+- [x] 02-01-PLAN.md — Finalize SQL contract for invoice generation, override resolution, and overdue penalty application.
+- [ ] 02-02-PLAN.md — Add admin preview/publish billing flows and finish auditable fee + override configuration.
+- [ ] 02-03-PLAN.md — Rebuild the resident billing experience around arrears focus, kavling grouping, and invoice breakdown clarity.
 **UI hint**: yes
 
 ### Phase 3: Manual Payments, Reporting & Audit
@@ -65,11 +65,12 @@ Plans:
   2. Resident can track payment states, rejection reasons, next steps, and payment/receipt history for their own invoices.
   3. Treasurer or admin can review payment proof through permission-checked access and verify or reject submissions through an audited workflow.
   4. Collection summaries, arrears views, CSV exports, monthly report outputs, receipt outputs, and audit trail all reflect the same invoice and payment truth shown in resident-facing screens.
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
-- [x] 07-01-PLAN.md — Close Phase 1 human-verification blockers and regenerate requirement/milestone audit status to passed.
-- [x] 07-02-PLAN.md — Regenerate stale milestone audit after verification artifact exists, then re-verify Phase 7 to passed.
+- [ ] 03-01-PLAN.md — Harden SQL/RPC payment verification and finance audit invariants with regression coverage.
+- [ ] 03-02-PLAN.md — Align resident submission/history and admin review/proof flows to full manual-payment lifecycle truth.
+- [ ] 03-03-PLAN.md — Add treasurer/admin reporting route for collection summary, arrears, CSV export, and monthly/receipt outputs.
 **UI hint**: yes
 
 ### Phase 4: Announcements, Events & Resident Home
