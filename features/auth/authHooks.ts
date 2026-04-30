@@ -66,3 +66,8 @@ export function useIsSuperAdmin(): boolean {
   const { role } = useAuthContext();
   return role === "super_admin";
 }
+
+export function useIsOperatorRole(): boolean {
+  const { role } = useAuthContext();
+  return role === "admin" || role === "super_admin";
+}
