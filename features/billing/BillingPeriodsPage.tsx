@@ -101,11 +101,18 @@ export function BillingPeriodsPage() {
   const [penaltyLoading, setPenaltyLoading] = useState(false);
   const [penaltyError, setPenaltyError] = useState<string | null>(null);
   const [penaltyCycleKey, setPenaltyCycleKey] = useState<string>("");
+  const [penaltyPage, setPenaltyPage] = useState(1);
 
   // Confirm dialog for generate
   const [confirmGenerate, setConfirmGenerate] = useState(false);
 
   const canReopenClosed = profile?.role === "admin" || profile?.role === "super_admin";
+  const PENALTY_PAGE_SIZE = 10;
+  const penaltyTotalPages = Math.max(1, Math.ceil(penaltyPreview.length / PENALTY_PAGE_SIZE));
+  const pagedPenalties = useMemo(
+    () => penaltyPreview.slice((penaltyPage - 1) * PENALTY_PAGE_SIZE, penaltyPage * PENALTY_PAGE_SIZE),
+    [penaltyPreview, penaltyPage],
+  );
   const totalRows = items.length;
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const pagedItems = useMemo(
@@ -382,6 +389,7 @@ export function BillingPeriodsPage() {
     setPenaltyLoading(true);
     setPenaltyError(null);
     setPenaltyPreview([]);
+    setPenaltyPage(1);
 
     const { data, error } = await client.rpc("preview_penalties_for_period", {
       target_period_id: row.id,
@@ -748,8 +756,8 @@ export function BillingPeriodsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {penaltyPreview.map((row) => (
-                    <TableRow key={row.invoice_id}>
+                  {pagedPenalties.map((row) => (
+                    <TableRow key={`${row.invoice_id}-${row.penalty_rule_id}`}>
                       <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
                       <TableCell className="text-slate-700">{row.fee_name}</TableCell>
                       <TableCell className="text-right text-slate-700">{formatRupiah(row.penalty_amount)}</TableCell>
@@ -760,6 +768,23 @@ export function BillingPeriodsPage() {
                   ))}
                 </TableBody>
               </Table>
+
+              {penaltyPreview.length > PENALTY_PAGE_SIZE ? (
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <p>
+                    Menampilkan {PENALTY_PAGE_SIZE * (penaltyPage - 1) + 1}-{Math.min(PENALTY_PAGE_SIZE * penaltyPage, penaltyPreview.length)} dari {penaltyPreview.length} data
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setPenaltyPage((v) => Math.max(1, v - 1))} disabled={penaltyPage <= 1}>
+                      Prev
+                    </Button>
+                    <span className="text-xs">Page {penaltyPage}/{penaltyTotalPages}</span>
+                    <Button size="sm" variant="outline" onClick={() => setPenaltyPage((v) => Math.min(penaltyTotalPages, v + 1))} disabled={penaltyPage >= penaltyTotalPages}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" onClick={() => setPenaltyPeriod(null)}>
