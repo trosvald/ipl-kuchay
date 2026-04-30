@@ -11,6 +11,8 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaymentSubmissionForm } from "@/features/payments/PaymentSubmissionForm";
 import { SubmissionHistory } from "@/features/payments/SubmissionHistory";
+import { ResidentPaymentHistory } from "@/features/payments/ResidentPaymentHistory";
+import { ResidentReceiptHistory } from "@/features/payments/ResidentReceiptHistory";
 import {
   formatDateId,
   formatInvoiceStatusLabel,
@@ -340,6 +342,10 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
       ) : null}
 
       <SubmissionHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+
+      <ResidentPaymentHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+
+      <ResidentReceiptHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
 
       <Card className="rounded-xl">
         <CardHeader>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/authHooks";
 import {
+  formatDateId,
   formatRupiah,
   formatInvoiceStatusLabel,
   statusToBadgeVariant,
@@ -21,8 +22,10 @@ import {
   loadCollectionSummary,
   loadGeneratedReportOutputs,
   loadReceiptCandidates,
+  type GeneratedReportOutputRow,
+  type ReceiptCandidateRow,
 } from "@/features/reports/reportQueries";
-import { generateReportOutputArtifact } from "@/features/reports/reportOutputClient";
+import { generateReportOutputArtifact, getReportOutputSignedUrl } from "@/features/reports/reportOutputClient";
 import { toCsvRows, toArrearsCsvRows, serializeCsv, downloadCsv } from "@/features/reports/reportCsv";
 import type {
   CollectionSummaryRow,
@@ -39,11 +42,17 @@ export function ReportsPage() {
 
   const [summaryRows, setSummaryRows] = useState<CollectionSummaryRow[]>([]);
   const [arrearsRows, setArrearsRows] = useState<ArrearsRow[]>([]);
+  const [outputRows, setOutputRows] = useState<GeneratedReportOutputRow[]>([]);
+  const [receiptCandidates, setReceiptCandidates] = useState<ReceiptCandidateRow[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
+  const [outputLoading, setOutputLoading] = useState(false);
+  const [outputError, setOutputError] = useState<string | null>(null);
+  const [generatingReceiptId, setGeneratingReceiptId] = useState<string | null>(null);
 
   // Period summaries for dropdown
   const loadPeriodSummaries = useCallback(async () => {
@@ -59,23 +68,30 @@ export function ReportsPage() {
     }
   }, [client, selectedPeriodId]);
 
-  // Collection summary and arrears for selected period
+  // Collection summary, arrears, output history, and receipt candidates for selected period
   const loadReportData = useCallback(async () => {
     if (!client || !selectedPeriodId) return;
 
     setLoading(true);
     setErrorMessage(null);
     setActionSuccess(null);
+    setOutputError(null);
 
     try {
-      const [summary, arrears] = await Promise.all([
+      const [summary, arrears, outputs, candidates] = await Promise.all([
         loadCollectionSummary(selectedPeriodId),
         loadArrearsList(selectedPeriodId),
+        loadGeneratedReportOutputs(selectedPeriodId),
+        loadReceiptCandidates(selectedPeriodId),
       ]);
       setSummaryRows(summary);
       setArrearsRows(arrears);
+      setOutputRows(outputs);
+      setReceiptCandidates(candidates);
+      setLastRefreshed(new Date().toISOString());
     } catch (err) {
       setErrorMessage("Gagal memuat data laporan.");
+      setOutputError("Data output belum berhasil dimuat. Coba refresh lagi.");
     } finally {
       setLoading(false);
     }
@@ -201,6 +217,43 @@ export function ReportsPage() {
       setErrorMessage("Gagal membuat laporan bukti bayar.");
     } finally {
       setActionLoading(null);
+    }
+  }, [selectedPeriodId, selectedPeriod, loadReportData]);
+
+  const handleDownloadOutput = useCallback(async (reportId: string) => {
+    if (!client) return;
+    try {
+      const result = await getReportOutputSignedUrl({ reportId });
+      window.open(result.signedUrl, "_blank", "noopener,noreferrer");
+    } catch {
+      setErrorMessage("Gagal mengunduh output. Coba lagi beberapa saat.");
+    }
+  }, [client]);
+
+  const handleGenerateResidentReceipt = useCallback(async (candidate: ReceiptCandidateRow) => {
+    setGeneratingReceiptId(candidate.invoice_id);
+    try {
+      const period = selectedPeriod;
+      await generateReportOutputArtifact({
+        reportType: "receipt",
+        billingPeriodId: selectedPeriodId,
+        invoiceId: candidate.invoice_id,
+        title: `Bukti Bayar ${candidate.kavling_code} - ${period?.label ?? ""}`,
+        metadata: {
+          invoiceNumber: candidate.invoice_number,
+          kavlingCode: candidate.kavling_code,
+          residentName: "",
+          amountPaid: candidate.amount_paid,
+          paymentDate: candidate.payment_date,
+          periodLabel: period?.label ?? "",
+        },
+      });
+      await loadReportData();
+      setActionSuccess(`Bukti bayar untuk ${candidate.kavling_code} berhasil dibuat.`);
+    } catch {
+      setErrorMessage(`Gagal membuat bukti bayar untuk ${candidate.kavling_code}.`);
+    } finally {
+      setGeneratingReceiptId(null);
     }
   }, [selectedPeriodId, selectedPeriod, loadReportData]);
 
@@ -454,6 +507,110 @@ export function ReportsPage() {
                         <Badge variant={statusToBadgeVariant(row.invoice_status)}>
                           {formatInvoiceStatusLabel(row.invoice_status)}
                         </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Reconciliation warning for stale/failed output loads (D-13) */}
+      {outputError && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <strong>Data mungkin tidak lengkap:</strong> {outputError}{" "}
+          <Button variant="link" size="sm" className="h-auto p-0 text-amber-700 underline" onClick={() => loadReportData()}>
+            Coba refresh lagi
+          </Button>
+        </div>
+      )}
+
+      {/* Output History — shows generated artifacts with download actions (D-12) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Output Laporan yang Dibuat</CardTitle>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            {lastRefreshed && (
+              <span>Terakhir diperbarui: {formatDateId(lastRefreshed)}</span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {outputLoading ? (
+            <p className="text-sm text-slate-600">Memuat output...</p>
+          ) : outputRows.length === 0 ? (
+            <p className="text-sm text-slate-600">
+              Belum ada output laporan untuk periode ini.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {outputRows.map((row) => (
+                <div key={row.id} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-slate-900">{row.title}</span>
+                    <span className="text-xs text-slate-500">
+                      {formatDateId(row.generated_at)}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadOutput(row.id)}
+                    disabled={!row.file_path}
+                  >
+                    <Download className="size-3 mr-1" />
+                    Unduh
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Receipt Candidates — resident-specific receipt generation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Bukti Bayar per Warga</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-slate-600">Memuat kandidat...</p>
+          ) : receiptCandidates.length === 0 ? (
+            <p className="text-sm text-slate-600">
+              Belum ada kandidat bukti bayar untuk periode ini.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[600px]">
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Kavling</TableHead>
+                    <TableHead>No. Invoice</TableHead>
+                    <TableHead className="text-right">Jumlah Bayar</TableHead>
+                    <TableHead>Tanggal Bayar</TableHead>
+                    <TableHead>Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {receiptCandidates.map((candidate) => (
+                    <TableRow key={candidate.invoice_id}>
+                      <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
+                      <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>
+                      <TableCell className="text-right text-green-600">{formatRupiah(candidate.amount_paid)}</TableCell>
+                      <TableCell className="text-slate-700">{formatDateId(candidate.payment_date)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateResidentReceipt(candidate)}
+                          disabled={generatingReceiptId === candidate.invoice_id}
+                        >
+                          <Receipt className="size-3 mr-1" />
+                          {generatingReceiptId === candidate.invoice_id ? "Membuat..." : "Buat Bukti"}
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
