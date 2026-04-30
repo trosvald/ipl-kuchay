@@ -4,14 +4,16 @@ import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, FilePlus2, RefreshCw } from "lucide-react";
 
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { writeAuditLog } from "@/features/audit/writeAuditLog";
 import { useAuth } from "@/features/auth/authHooks";
-import { formatMonthYearId, formatBillingPeriodStatusLabel, formatDateId, statusToBadgeVariant } from "@/lib/format";
+import { formatMonthYearId, formatBillingPeriodStatusLabel, formatDateId, formatRupiah, statusToBadgeVariant } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { billingPeriodFormSchema } from "@/lib/validation";
 
@@ -31,6 +33,29 @@ interface BillingPeriodRow {
 
 interface InvoiceCountRow {
   billing_period_id: string;
+}
+
+interface PreviewInvoiceRow {
+  kavling_id: string;
+  kavling_code: string;
+  fee_type_id: string;
+  fee_code: string;
+  fee_name: string;
+  default_amount: number;
+  resolved_amount: number;
+  amount_source: string;
+  period_total: number;
+}
+
+interface PreviewPenaltyRow {
+  invoice_id: string;
+  kavling_id: string;
+  kavling_code: string;
+  penalty_rule_id: string;
+  fee_type_id: string;
+  fee_name: string;
+  penalty_amount: number;
+  penalty_cycle_key: string;
 }
 
 function currentYearMonth() {
@@ -63,6 +88,22 @@ export function BillingPeriodsPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Invoice preview dialog
+  const [previewPeriod, setPreviewPeriod] = useState<BillingPeriodRow | null>(null);
+  const [previewInvoices, setPreviewInvoices] = useState<PreviewInvoiceRow[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // Penalty preview dialog
+  const [penaltyPeriod, setPenaltyPeriod] = useState<BillingPeriodRow | null>(null);
+  const [penaltyPreview, setPenaltyPreview] = useState<PreviewPenaltyRow[]>([]);
+  const [penaltyLoading, setPenaltyLoading] = useState(false);
+  const [penaltyError, setPenaltyError] = useState<string | null>(null);
+  const [penaltyCycleKey, setPenaltyCycleKey] = useState<string>("");
+
+  // Confirm dialog for generate
+  const [confirmGenerate, setConfirmGenerate] = useState(false);
 
   const canReopenClosed = profile?.role === "admin" || profile?.role === "super_admin";
   const totalRows = items.length;
@@ -279,6 +320,115 @@ export function BillingPeriodsPage() {
     await loadPeriods();
   };
 
+  const handlePreviewInvoices = async (row: BillingPeriodRow) => {
+    if (!client) return;
+
+    setPreviewPeriod(row);
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setPreviewInvoices([]);
+
+    const { data, error } = await client.rpc("preview_invoices_for_period", {
+      target_period_id: row.id,
+    });
+
+    setPreviewLoading(false);
+
+    if (error || !data) {
+      setPreviewError(error?.message ?? "Gagal memuat pratinjau tagihan.");
+      return;
+    }
+
+    setPreviewInvoices((data as PreviewInvoiceRow[]) ?? []);
+  };
+
+  const handleConfirmGenerate = async () => {
+    if (!client || !profile || !previewPeriod) return;
+
+    setSaving(true);
+
+    const { data, error } = await client.rpc("generate_invoices_for_period", {
+      target_period_id: previewPeriod.id,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    await writeAuditLog({
+      action: "billing_period.generate_invoices",
+      entityTable: "billing_periods",
+      entityId: previewPeriod.id,
+      beforeData: previewPeriod,
+      afterData: { created_count: data },
+      actorId: profile.id,
+      actorRole: profile.role,
+    });
+
+    setSaving(false);
+    setConfirmGenerate(false);
+    setPreviewPeriod(null);
+    await loadPeriods();
+  };
+
+  const handlePreviewPenalties = async (row: BillingPeriodRow) => {
+    if (!client) return;
+
+    const cycle = `${row.year}-${String(row.month).padStart(2, "0")}`;
+    setPenaltyCycleKey(cycle);
+    setPenaltyPeriod(row);
+    setPenaltyLoading(true);
+    setPenaltyError(null);
+    setPenaltyPreview([]);
+
+    const { data, error } = await client.rpc("preview_penalties_for_period", {
+      target_period_id: row.id,
+      cycle_key: cycle,
+    });
+
+    setPenaltyLoading(false);
+
+    if (error || !data) {
+      setPenaltyError(error?.message ?? "Gagal memuat pratinjau denda.");
+      return;
+    }
+
+    setPenaltyPreview((data as PreviewPenaltyRow[]) ?? []);
+  };
+
+  const handleConfirmApplyPenalty = async () => {
+    if (!client || !profile || !penaltyPeriod) return;
+
+    setSaving(true);
+
+    const { data, error } = await client.rpc("apply_penalties_for_period", {
+      target_period_id: penaltyPeriod.id,
+      cycle_key: penaltyCycleKey,
+    });
+
+    if (error) {
+      setErrorMessage(error.message);
+      setSaving(false);
+      return;
+    }
+
+    await writeAuditLog({
+      action: "billing_period.apply_penalties",
+      entityTable: "billing_periods",
+      entityId: penaltyPeriod.id,
+      beforeData: penaltyPeriod,
+      afterData: { applied_count: data },
+      actorId: profile.id,
+      actorRole: profile.role,
+    });
+
+    setSaving(false);
+    setPenaltyPeriod(null);
+    await loadPeriods();
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -391,18 +541,36 @@ export function BillingPeriodsPage() {
                               size="sm"
                               variant="secondary"
                               disabled={saving || row.status === "closed" || row.status === "archived"}
-                              onClick={() => handleGenerateInvoices(row)}
+                              onClick={() => handlePreviewInvoices(row)}
                             >
-                              Generate
+                              Pratinjau Tagihan
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={saving || row.status === "draft" || row.status === "archived"}
+                              onClick={() => handlePreviewPenalties(row)}
+                            >
+                              Pratinjau Denda
                             </Button>
                             {row.status === "draft" ? (
                               <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleStatusChange(row, "open")}>
-                                Open
+                                Buka Periode
                               </Button>
                             ) : null}
                             {row.status === "open" ? (
                               <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleStatusChange(row, "closed")}>
-                                Close
+                                Tutup Periode
+                              </Button>
+                            ) : null}
+                            {row.status === "closed" ? (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={saving}
+                                onClick={() => handleStatusChange(row, "archived")}
+                              >
+                                Arsipkan Periode
                               </Button>
                             ) : null}
                             {row.status === "closed" ? (
@@ -413,7 +581,7 @@ export function BillingPeriodsPage() {
                                 onClick={() => handleStatusChange(row, "open")}
                                 title={canReopenClosed ? "Buka ulang periode" : "Hanya admin/super_admin"}
                               >
-                                Reopen
+                                Buka Ulang Periode
                               </Button>
                             ) : null}
                           </div>
@@ -465,6 +633,150 @@ export function BillingPeriodsPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      {/* Invoice Preview Dialog */}
+      <Dialog open={previewPeriod !== null} onOpenChange={(open: boolean) => !open && setPreviewPeriod(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pratinjau Tagihan — {previewPeriod ? formatMonthYearId(previewPeriod.year, previewPeriod.month) : ""}</DialogTitle>
+            <DialogDescription>
+              Pratinjau tagihan per kavling sebelum diterbitkan. Klik "Buat Tagihan" untuk mengkonfirmasi.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewLoading ? (
+            <p className="text-sm text-slate-600 py-4">Memuat pratinjau...</p>
+          ) : previewError ? (
+            <p className="text-sm text-red-600 py-4">{previewError}</p>
+          ) : previewInvoices.length === 0 ? (
+            <p className="text-sm text-slate-600 py-4">Tidak ada kavling aktif untuk periode ini.</p>
+          ) : (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Kavling</TableHead>
+                    <TableHead>Jenis Biaya</TableHead>
+                    <TableHead>Nominal Default</TableHead>
+                    <TableHead>Nominal Resolved</TableHead>
+                    <TableHead>Sumber</TableHead>
+                    <TableHead className="text-right">Total Periode</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {previewInvoices.map((row, idx) => (
+                    <TableRow key={`${row.kavling_id}-${row.fee_type_id}-${idx}`}>
+                      <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
+                      <TableCell className="text-slate-700">
+                        <p className="font-medium">{row.fee_name}</p>
+                        <p className="text-xs text-slate-500">{row.fee_code}</p>
+                      </TableCell>
+                      <TableCell className="text-slate-700">{formatRupiah(row.default_amount)}</TableCell>
+                      <TableCell className="text-slate-700">{formatRupiah(row.resolved_amount)}</TableCell>
+                      <TableCell>
+                        <Badge variant={row.amount_source === "override" ? "warning" : "secondary"}>
+                          {row.amount_source === "override" ? "Override" : "Default"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-slate-900">{formatRupiah(row.period_total)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setPreviewPeriod(null)}>
+                  Batal
+                </Button>
+                <Button
+                  onClick={() => {
+                    setConfirmGenerate(true);
+                  }}
+                  disabled={saving}
+                >
+                  Buat Tagihan
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Generate Dialog */}
+      <AlertDialog open={confirmGenerate} onOpenChange={setConfirmGenerate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Terbitkan Tagihan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tagihan akan dibuat untuk semua kavling aktif pada periode ini. Kavling yang sudah memiliki tagihan tidak akan diduplikasi.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmGenerate} disabled={saving}>
+              {saving ? "Menyimpan..." : "Konfirmasi dan Terbitkan"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Penalty Preview Dialog */}
+      <Dialog open={penaltyPeriod !== null} onOpenChange={(open: boolean) => !open && setPenaltyPeriod(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pratinjau Denda — {penaltyPeriod ? formatMonthYearId(penaltyPeriod.year, penaltyPeriod.month) : ""}</DialogTitle>
+            <DialogDescription>
+              Denda akan ditambahkan ke invoice yang belum lunas. Siklus: {penaltyCycleKey}
+            </DialogDescription>
+          </DialogHeader>
+
+          {penaltyLoading ? (
+            <p className="text-sm text-slate-600 py-4">Memuat pratinjau...</p>
+          ) : penaltyError ? (
+            <p className="text-sm text-red-600 py-4">{penaltyError}</p>
+          ) : penaltyPreview.length === 0 ? (
+            <p className="text-sm text-slate-600 py-4">Tidak ada invoice yang memenuhi syarat untuk denda.</p>
+          ) : (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Kavling</TableHead>
+                    <TableHead>Jenis Denda</TableHead>
+                    <TableHead className="text-right">Nominal Denda</TableHead>
+                    <TableHead>Siklus</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {penaltyPreview.map((row) => (
+                    <TableRow key={row.invoice_id}>
+                      <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
+                      <TableCell className="text-slate-700">{row.fee_name}</TableCell>
+                      <TableCell className="text-right text-slate-700">{formatRupiah(row.penalty_amount)}</TableCell>
+                      <TableCell>
+                        <Badge variant="destructive">{row.penalty_cycle_key}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setPenaltyPeriod(null)}>
+                  Batal
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleConfirmApplyPenalty}
+                  disabled={saving}
+                >
+                  Terapkan Denda
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -20,6 +20,7 @@ export type AuditAction =
   | "fee_override.end"
   | "billing_period.create"
   | "billing_period.generate_invoices"
+  | "billing_period.apply_penalties"
   | "billing_period.status_open"
   | "billing_period.status_closed";
 
