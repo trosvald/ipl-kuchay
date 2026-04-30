@@ -132,29 +132,29 @@ const { data, error } = await client
     }
   }
 
-  // Load owner names via kavling_residents join
-  if (kavlingMap.size > 0) {
-    const kavlingIds = Array.from(kavlingMap.keys());
-    const { data: residentData } = await client
-      .from("kavling_residents")
-      .select(`kavling_id, profiles(full_name, display_name)`)
-      .in("kavling_id", kavlingIds)
-      .eq("active", true)
-      .limit(1);
+// Load owner names per kavling — map all active residents by kavling_id
+    // so every summary row gets its own owner (no global .limit(1) which drops multi-kavling names)
+    if (kavlingMap.size > 0) {
+      const kavlingIds = Array.from(kavlingMap.keys());
+      const { data: residentData } = await client
+        .from("kavling_residents")
+        .select(`kavling_id, profiles(full_name, display_name)`)
+        .in("kavling_id", kavlingIds)
+        .eq("active", true);
 
-    if (residentData && Array.isArray(residentData)) {
-      for (const kr of residentData) {
-        const krTyped = kr as { kavling_id: string; profiles: ProfileSummary | ProfileSummary[] | null };
-        const entry = kavlingMap.get(krTyped.kavling_id);
-        if (entry && krTyped.profiles) {
-          const profile = getFirstProfile(krTyped.profiles);
-          if (profile) {
-            entry.owner_name = profile.display_name?.trim() || profile.full_name;
+      if (residentData && Array.isArray(residentData)) {
+        for (const kr of residentData) {
+          const krTyped = kr as { kavling_id: string; profiles: ProfileSummary | ProfileSummary[] | null };
+          const entry = kavlingMap.get(krTyped.kavling_id);
+          if (entry && krTyped.profiles) {
+            const profile = getFirstProfile(krTyped.profiles);
+            if (profile) {
+              entry.owner_name = profile.display_name?.trim() || profile.full_name;
+            }
           }
         }
       }
     }
-  }
 
   // Load period label
   const { data: periodData } = await client
@@ -240,30 +240,29 @@ export async function loadArrearsList(
     });
   }
 
-  // Load owner names
-  if (arrears.length > 0) {
-    const kavlingIds = arrears.map((a) => a.kavling_id);
+// Load owner names per kavling — map all active residents by kavling_id
+    // so every arrears row gets its own owner (no global .limit(1) which drops multi-kavling names)
+    if (arrears.length > 0) {
+      const kavlingIds = arrears.map((a) => a.kavling_id);
+      const { data: residentData } = await client
+        .from("kavling_residents")
+        .select(`kavling_id, profiles(full_name, display_name)`)
+        .in("kavling_id", kavlingIds)
+        .eq("active", true);
 
-    const { data: residentData } = await client
-      .from("kavling_residents")
-      .select(`kavling_id, profiles(full_name, display_name)`)
-      .in("kavling_id", kavlingIds)
-      .eq("active", true)
-      .limit(1);
-
-    if (residentData && Array.isArray(residentData)) {
-      for (const kr of residentData) {
-        const krTyped = kr as { kavling_id: string; profiles: ProfileSummary | ProfileSummary[] | null };
-        const entry = arrears.find((a) => a.kavling_id === krTyped.kavling_id);
-        if (entry && krTyped.profiles) {
-          const profile = getFirstProfile(krTyped.profiles);
-          if (profile) {
-            entry.owner_name = profile.display_name?.trim() || profile.full_name;
+      if (residentData && Array.isArray(residentData)) {
+        for (const kr of residentData) {
+          const krTyped = kr as { kavling_id: string; profiles: ProfileSummary | ProfileSummary[] | null };
+          const entry = arrears.find((a) => a.kavling_id === krTyped.kavling_id);
+          if (entry && krTyped.profiles) {
+            const profile = getFirstProfile(krTyped.profiles);
+            if (profile) {
+              entry.owner_name = profile.display_name?.trim() || profile.full_name;
+            }
           }
         }
       }
     }
-  }
 
   // Load period label
   const { data: periodData } = await client
@@ -348,41 +347,189 @@ export async function loadBillingPeriodSummaries(): Promise<BillingPeriodSummary
 }
 
 /**
- * Generate and persist a report output record in public.reports.
- * Returns the generated report record with file_path for download link.
+ * Load resident visible verified payment history for one invoice.
+ * Maps payments rows into deterministic labels, dates, and amounts (PAY-06).
  */
-export async function generateReportOutput(
-  reportType: "monthly_summary" | "receipt" | "arrears" | "kavling_history",
-  billingPeriodId: string,
-  title: string,
-  metadata: Record<string, unknown>,
-): Promise<{ id: string; file_path: string | null }> {
+export async function loadResidentPaymentHistory(
+  invoiceId: string,
+): Promise<ResidentPaymentHistoryRow[]> {
   const client = getSupabaseBrowserClient();
   if (!client) {
     throw new Error("Supabase client not available");
   }
 
-  const userResult = await client.auth.getUser();
-  const userId =
-    userResult.data.user?.id ?? "00000000-0000-0000-0000-000000000000";
+  const { data, error } = await client
+    .from("payments")
+    .select(
+      `
+      id,
+      amount,
+      payment_method,
+      verified_at,
+      verified_by_profile:profiles!verified_by(full_name, display_name),
+      note,
+      created_at
+    `,
+    )
+    .eq("invoice_id", invoiceId)
+    .order("verified_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load resident payment history: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  return (data as unknown as ResidentPaymentRaw[]).map((row) => ({
+    id: row.id,
+    amount: row.amount,
+    payment_method: row.payment_method ?? null,
+    verified_at: row.verified_at ?? null,
+    verified_by_name: extractProfileName(row.verified_by_profile),
+    note: row.note ?? null,
+    created_at: row.created_at,
+  }));
+}
+
+/**
+ * Load resident visible receipt history entries for one invoice (D-10).
+ * Only returns receipt rows from public.reports whose metadata contains the given invoice_id.
+ * Never exposes raw file_path — only provides report_id for signed-URL access.
+ */
+export async function loadResidentReceiptHistory(
+  invoiceId: string,
+): Promise<ResidentReceiptHistoryRow[]> {
+  const client = getSupabaseBrowserClient();
+  if (!client) {
+    throw new Error("Supabase client not available");
+  }
 
   const { data, error } = await client
     .from("reports")
-    .insert({
-      report_type: reportType,
-      billing_period_id: billingPeriodId,
-      title,
-      metadata,
-      generated_by: userId,
-    })
-    .select("id, file_path")
-    .single();
+    .select(`id, title, metadata, generated_at`)
+    .eq("report_type", "receipt")
+    .order("generated_at", { ascending: false });
 
   if (error) {
-    throw new Error(`Failed to generate report output: ${error.message}`);
+    throw new Error(`Failed to load resident receipt history: ${error.message}`);
   }
 
-  return { id: data.id, file_path: data.file_path };
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  // Filter to receipts whose metadata includes the given invoice_id
+  return (data as ReportRow[])
+    .filter((row) => {
+      const meta = row.metadata as Record<string, unknown> | null;
+      return meta && String(meta.invoice_id) === invoiceId;
+    })
+    .map((row) => ({
+      report_id: row.id,
+      title: row.title,
+      generated_at: row.generated_at,
+    }));
+}
+
+/**
+ * Load generated output history for a billing period.
+ * Used by /admin/reports to surface created artifacts with download actions (D-12).
+ */
+export async function loadGeneratedReportOutputs(
+  billingPeriodId: string,
+): Promise<GeneratedReportOutputRow[]> {
+  const client = getSupabaseBrowserClient();
+  if (!client) {
+    throw new Error("Supabase client not available");
+  }
+
+  const { data, error } = await client
+    .from("reports")
+    .select(`id, report_type, title, metadata, generated_at, generated_by, file_path`)
+    .eq("billing_period_id", billingPeriodId)
+    .order("generated_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to load generated report outputs: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  return (data as ReportRow[]).map((row) => ({
+    id: row.id,
+    report_type: row.report_type,
+    title: row.title,
+    metadata: row.metadata as Record<string, unknown>,
+    generated_at: row.generated_at,
+    generated_by: row.generated_by,
+    file_path: row.file_path,
+  }));
+}
+
+/**
+ * Load receipt candidate rows — invoices with at least one verified payment
+ * for a billing period, so operators can generate resident-specific receipts.
+ */
+export async function loadReceiptCandidates(
+  billingPeriodId: string,
+): Promise<ReceiptCandidateRow[]> {
+  const client = getSupabaseBrowserClient();
+  if (!client) {
+    throw new Error("Supabase client not available");
+  }
+
+  // Get invoices that have verified payments for the billing period
+  const { data: paymentsData, error: paymentsError } = await client
+    .from("payments")
+    .select(
+      `
+      id,
+      amount,
+      verified_at,
+      invoice_id,
+      invoices(
+        id,
+        invoice_number,
+        kavling_id,
+        kavlings(code),
+        billing_period_id
+      )
+    `,
+    )
+    .not("verified_at", "is", null);
+
+  if (paymentsError) {
+    throw new Error(`Failed to load receipt candidates: ${paymentsError.message}`);
+  }
+
+  if (!paymentsData || paymentsData.length === 0) {
+    return [];
+  }
+
+  // Group by invoice, filter to billing period
+  const invoiceMap = new Map<string, ReceiptCandidateRow>();
+  for (const row of paymentsData as unknown as PaymentWithInvoice[]) {
+    const inv = row.invoices;
+    if (!inv || String(inv.billing_period_id) !== billingPeriodId) continue;
+
+    if (!invoiceMap.has(inv.id)) {
+      invoiceMap.set(inv.id, {
+        invoice_id: inv.id,
+        invoice_number: inv.invoice_number,
+        kavling_id: inv.kavling_id,
+        kavling_code: getKavlingCode(inv.kavlings),
+        payment_id: row.id,
+        amount_paid: row.amount,
+        payment_date: row.verified_at ?? row.created_at,
+      });
+    }
+  }
+
+  return Array.from(invoiceMap.values());
 }
 
 // --- Helper functions ---
@@ -409,4 +556,91 @@ function getFirstProfile(
     return profiles[0] ?? null;
   }
   return profiles;
+}
+
+function extractProfileName(
+  profile: ProfileSummary | ProfileSummary[] | null,
+): string | null {
+  if (!profile) {
+    return null;
+  }
+  const p = Array.isArray(profile) ? profile[0] : profile;
+  if (!p) return null;
+  if (p.display_name && p.display_name.trim().length > 0) {
+    return p.display_name.trim();
+  }
+  return p.full_name || null;
+}
+
+// --- Types for new helpers ---
+
+interface ResidentPaymentRaw {
+  id: string;
+  amount: number;
+  payment_method: string | null;
+  verified_at: string | null;
+  verified_by_profile: ProfileSummary | ProfileSummary[] | null;
+  note: string | null;
+  created_at: string;
+}
+
+interface ReportRow {
+  id: string;
+  report_type: string;
+  title: string;
+  metadata: Record<string, unknown>;
+  generated_at: string;
+  generated_by: string;
+  file_path: string | null;
+}
+
+interface PaymentWithInvoice {
+  id: string;
+  amount: number;
+  verified_at: string | null;
+  created_at: string;
+  invoice_id: string;
+  invoices: {
+    id: string;
+    invoice_number: string;
+    kavling_id: string;
+    billing_period_id: string;
+    kavlings: KavlingSummary | KavlingSummary[] | null;
+  } | null;
+}
+
+export interface ResidentPaymentHistoryRow {
+  id: string;
+  amount: number;
+  payment_method: string | null;
+  verified_at: string | null;
+  verified_by_name: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface ResidentReceiptHistoryRow {
+  report_id: string;
+  title: string;
+  generated_at: string;
+}
+
+export interface GeneratedReportOutputRow {
+  id: string;
+  report_type: string;
+  title: string;
+  metadata: Record<string, unknown>;
+  generated_at: string;
+  generated_by: string;
+  file_path: string | null;
+}
+
+export interface ReceiptCandidateRow {
+  invoice_id: string;
+  invoice_number: string;
+  kavling_id: string;
+  kavling_code: string;
+  payment_id: string;
+  amount_paid: number;
+  payment_date: string;
 }

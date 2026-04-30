@@ -19,8 +19,10 @@ import {
   loadArrearsList,
   loadBillingPeriodSummaries,
   loadCollectionSummary,
-  generateReportOutput,
+  loadGeneratedReportOutputs,
+  loadReceiptCandidates,
 } from "@/features/reports/reportQueries";
+import { generateReportOutputArtifact } from "@/features/reports/reportOutputClient";
 import { toCsvRows, toArrearsCsvRows, serializeCsv, downloadCsv } from "@/features/reports/reportCsv";
 import type {
   CollectionSummaryRow,
@@ -149,25 +151,26 @@ export function ReportsPage() {
     setActionLoading("monthly");
     try {
       const period = selectedPeriod;
-      await generateReportOutput(
-        "monthly_summary",
-        selectedPeriodId,
-        `Laporan Bulanan ${period?.label ?? ""}`,
-        {
-          total_invoiced: totalInvoiced,
-          total_collected: totalCollected,
-          total_pending: totalRemaining,
-          invoice_count: summaryRows.length,
-          period_label: period?.label ?? "",
+      await generateReportOutputArtifact({
+        reportType: "monthly_summary",
+        billingPeriodId: selectedPeriodId,
+        title: `Laporan Bulanan ${period?.label ?? ""}`,
+        metadata: {
+          totalInvoiced: totalInvoiced,
+          totalCollected: totalCollected,
+          totalPending: totalRemaining,
+          periodLabel: period?.label ?? "",
+          generatedScope: "all",
         },
-      );
+      });
+      await loadReportData();
       setActionSuccess("Laporan bulanan berhasil dibuat.");
     } catch (err) {
       setErrorMessage("Gagal membuat laporan bulanan.");
     } finally {
       setActionLoading(null);
     }
-  }, [selectedPeriodId, selectedPeriod, totalInvoiced, totalCollected, totalRemaining, summaryRows]);
+  }, [selectedPeriodId, selectedPeriod, totalInvoiced, totalCollected, totalRemaining, summaryRows, loadReportData]);
 
   const handleGenerateReceiptReport = useCallback(async () => {
     if (!selectedPeriodId) return;
@@ -175,22 +178,31 @@ export function ReportsPage() {
     setActionLoading("receipt");
     try {
       const period = selectedPeriod;
-      await generateReportOutput(
-        "receipt",
-        selectedPeriodId,
-        `Bukti Bayar ${period?.label ?? ""}`,
-        {
-          invoice_count: summaryRows.length,
-          period_label: period?.label ?? "",
+      // Period-wide receipt artifact: use a placeholder invoiceId since this generates
+      // a period-level receipt listing. Resident-specific receipt generation is done
+      // via the receipt candidate rows in the output history section.
+      await generateReportOutputArtifact({
+        reportType: "receipt",
+        billingPeriodId: selectedPeriodId,
+        invoiceId: "00000000-0000-0000-0000-000000000000",
+        title: `Bukti Bayar ${period?.label ?? ""}`,
+        metadata: {
+          invoiceNumber: "",
+          kavlingCode: "",
+          residentName: "",
+          amountPaid: 0,
+          paymentDate: "",
+          periodLabel: period?.label ?? "",
         },
-      );
+      });
+      await loadReportData();
       setActionSuccess("Laporan bukti bayar berhasil dibuat.");
     } catch (err) {
       setErrorMessage("Gagal membuat laporan bukti bayar.");
     } finally {
       setActionLoading(null);
     }
-  }, [selectedPeriodId, selectedPeriod, summaryRows]);
+  }, [selectedPeriodId, selectedPeriod, loadReportData]);
 
   return (
     <section className="space-y-6">
