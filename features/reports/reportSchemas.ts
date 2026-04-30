@@ -46,18 +46,34 @@ export interface ReportOutputPayload {
   billing_period_id: string;
   generated_by: string;
   title: string;
-  metadata: {
-    total_invoiced?: number;
-    total_collected?: number;
-    total_pending?: number;
-    invoice_count?: number;
-    period_label?: string;
-    kavling_code?: string;
-    owner_name?: string;
-    amount_paid?: number;
-    payment_date?: string;
-    [key: string]: unknown;
-  };
+  metadata: ReportMetadataFields;
+}
+
+/**
+ * Typed metadata fields for report output artifacts.
+ * Includes invoice_id, payment_id, resident_name, kavling_code, and generated_scope
+ * as required by the artifact generation contract.
+ */
+export interface ReportMetadataFields {
+  // Monthly summary fields
+  total_invoiced?: number;
+  total_collected?: number;
+  total_pending?: number;
+  invoice_count?: number;
+  period_label?: string;
+  generated_scope?: string; // e.g. "all" or "kavling:A01"
+  // Receipt/resident fields
+  invoice_id?: string;
+  invoice_number?: string;
+  payment_id?: string;
+  resident_name?: string;
+  kavling_code?: string;
+  amount_paid?: number;
+  payment_date?: string;
+  // Legacy/common fields
+  kavling_id?: string;
+  owner_name?: string;
+  [key: string]: unknown;
 }
 
 /**
