@@ -1,9 +1,11 @@
 import {
   Building2,
+  Calendar,
   ClipboardCheck,
   Cog,
   Home,
   LayoutDashboard,
+  Megaphone,
   ReceiptText,
   ShieldCheck,
   Users,
@@ -47,6 +49,14 @@ const ADMIN_DASHBOARDS_GROUP: NavGroup = {
   ],
 };
 
+const COMMUNICATION_GROUP: NavGroup = {
+  label: "Communication",
+  items: [
+    { title: "Pengumuman", href: "/admin/announcements", icon: Megaphone },
+    { title: "Acara", href: "/admin/events", icon: Calendar },
+  ],
+};
+
 const TREASURER_DASHBOARDS_GROUP: NavGroup = {
   label: "Keuangan",
   items: [
@@ -60,8 +70,8 @@ const TREASURER_DASHBOARDS_GROUP: NavGroup = {
 
 const NAVIGATION_BY_ROLE: Record<AdminRole, NavGroup[]> = {
   treasurer: [TREASURER_DASHBOARDS_GROUP, SHARED_PAGES_GROUP],
-  admin: [ADMIN_DASHBOARDS_GROUP, SHARED_PAGES_GROUP],
-  super_admin: [ADMIN_DASHBOARDS_GROUP, SHARED_PAGES_GROUP],
+  admin: [ADMIN_DASHBOARDS_GROUP, COMMUNICATION_GROUP, SHARED_PAGES_GROUP],
+  super_admin: [ADMIN_DASHBOARDS_GROUP, COMMUNICATION_GROUP, SHARED_PAGES_GROUP],
 };
 
 export function getAdminNavigationByRole(role: AppRole | null): NavGroup[] {

@@ -32,6 +32,28 @@ describe("getAdminNavigationByRole", () => {
     expect(superAdminHrefs).toContain("/admin/settings");
   });
 
+  it("Pengumuman and Acara appear only for admin and super_admin, not treasurer", () => {
+    const adminHrefs = getAdminNavigationByRole("admin").flatMap((group) =>
+      group.items.map((item) => item.href),
+    );
+    const superAdminHrefs = getAdminNavigationByRole("super_admin").flatMap((group) =>
+      group.items.map((item) => item.href),
+    );
+    const treasurerHrefs = getAdminNavigationByRole("treasurer").flatMap((group) =>
+      group.items.map((item) => item.href),
+    );
+
+    // admin and super_admin have both entries
+    expect(adminHrefs).toContain("/admin/announcements");
+    expect(adminHrefs).toContain("/admin/events");
+    expect(superAdminHrefs).toContain("/admin/announcements");
+    expect(superAdminHrefs).toContain("/admin/events");
+
+    // treasurer does NOT have these entries
+    expect(treasurerHrefs).not.toContain("/admin/announcements");
+    expect(treasurerHrefs).not.toContain("/admin/events");
+  });
+
   it("returns shared pages only for resident/anonymous", () => {
     const residentHrefs = getAdminNavigationByRole("resident").flatMap((group) =>
       group.items.map((item) => item.href),
