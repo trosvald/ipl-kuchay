@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  announcementFormSchema,
+  announcementAttachmentSchema,
+  eventFormSchema,
+  rsvpUpsertSchema,
   billingPeriodFormSchema,
   kavlingResidentMappingSchema,
   paymentSubmissionFormSchema,
@@ -86,6 +90,166 @@ describe("validation schemas", () => {
       enabled: true,
     });
     expect(invalid.success).toBe(false);
+  });
+
+  it("accepts valid announcement create payload with all writable fields", () => {
+    const result = announcementFormSchema.safeParse({
+      title: "Pengumuman Gotong Royong",
+      body: "Akan diadakan kerja bakti minggu depan.",
+      is_urgent: false,
+      is_pinned: true,
+      status: "draft",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty title on announcement payload", () => {
+    const result = announcementFormSchema.safeParse({
+      title: "   ",
+      body: "Some body content",
+      status: "draft",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty body on announcement payload", () => {
+    const result = announcementFormSchema.safeParse({
+      title: "Valid Title",
+      body: "",
+      status: "published",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unknown extra fields on announcement payload (strict)", () => {
+    const result = announcementFormSchema.safeParse({
+      title: "Valid Title",
+      body: "Valid body",
+      status: "draft",
+      created_at: "2026-01-01T00:00:00Z",
+      published_at: "2026-01-01T00:00:00Z",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts valid event create payload with all writable fields", () => {
+    const result = eventFormSchema.safeParse({
+      title: "Kerja Bakti",
+      description: "Kegiatan kebersihan lingkungan",
+      location: "Halaman mansion",
+      starts_at: "2026-05-10T08:00:00Z",
+      ends_at: "2026-05-10T11:00:00Z",
+      status: "scheduled",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects event when ends_at is before starts_at", () => {
+    const result = eventFormSchema.safeParse({
+      title: "Kerja Bakti",
+      description: "Kegiatan",
+      location: "Halaman",
+      starts_at: "2026-05-10T11:00:00Z",
+      ends_at: "2026-05-10T08:00:00Z",
+      status: "scheduled",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing title on event payload", () => {
+    const result = eventFormSchema.safeParse({
+      description: "Kegiatan",
+      location: "Halaman",
+      starts_at: "2026-05-10T08:00:00Z",
+      status: "scheduled",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing location on event payload", () => {
+    const result = eventFormSchema.safeParse({
+      title: "Kerja Bakti",
+      description: "Kegiatan",
+      starts_at: "2026-05-10T08:00:00Z",
+      status: "scheduled",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts valid RSVP upsert payload with attending response", () => {
+    const result = rsvpUpsertSchema.safeParse({
+      event_id: "11111111-1111-4111-8111-111111111111",
+      response: "attending",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts valid RSVP upsert payload with not_attending response", () => {
+    const result = rsvpUpsertSchema.safeParse({
+      event_id: "11111111-1111-4111-8111-111111111111",
+      response: "not_attending",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts valid RSVP upsert payload with no_response response", () => {
+    const result = rsvpUpsertSchema.safeParse({
+      event_id: "11111111-1111-4111-8111-111111111111",
+      response: "no_response",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects RSVP payload with invalid response value", () => {
+    const result = rsvpUpsertSchema.safeParse({
+      event_id: "11111111-1111-4111-8111-111111111111",
+      response: "maybe_attending",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts valid announcement attachment metadata", () => {
+    const result = announcementAttachmentSchema.safeParse({
+      announcement_id: "11111111-1111-4111-8111-111111111111",
+      label: "Surat Edaran.pdf",
+      storage_path: "announcements/abc123/surat.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 204800,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty label on attachment metadata", () => {
+    const result = announcementAttachmentSchema.safeParse({
+      announcement_id: "11111111-1111-4111-8111-111111111111",
+      label: "   ",
+      storage_path: "announcements/abc123/surat.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 204800,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty storage_path on attachment metadata", () => {
+    const result = announcementAttachmentSchema.safeParse({
+      announcement_id: "11111111-1111-4111-8111-111111111111",
+      label: "Surat.pdf",
+      storage_path: "",
+      mime_type: "application/pdf",
+      size_bytes: 204800,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty mime_type on attachment metadata", () => {
+    const result = announcementAttachmentSchema.safeParse({
+      announcement_id: "11111111-1111-4111-8111-111111111111",
+      label: "Surat.pdf",
+      storage_path: "announcements/abc123/surat.pdf",
+      mime_type: "   ",
+      size_bytes: 204800,
+    });
+    expect(result.success).toBe(false);
   });
 
   it("validates kavling-resident mapping payload for relation and identity fields", () => {
