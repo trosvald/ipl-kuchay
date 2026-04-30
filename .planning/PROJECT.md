@@ -31,11 +31,10 @@ Residents can reliably check what they owe, submit payment, track status, and re
 - [ ] Add Telegram account linking, resident/admin bot flows, reminders, and notifications where planned
 - [ ] Keep the public dashboard aggregate-only at launch
 - [ ] Launch with manual transfer as the required payment path; QRIS may exist later but is not required for go-live
-- [ ] Add resident-only neighborhood announcements and events as first-class v1 features
-- [ ] Provide a unified resident home that combines bills, payment status, announcements, and upcoming events
-- [ ] Add resident profile management and notification preferences
-- [ ] Add announcement lifecycle support: publish/unpublish, urgent pinning, Telegram push, and attachments
-- [ ] Add structured event details and RSVP tracking for residents and admins
+- ✓ Resident-only neighborhood announcements and events as first-class v1 features — Validated in Phase 04: Announcements, Events & Resident Home
+- ✓ Unified resident home combining bills, payment status, announcements, and upcoming events — Validated in Phase 04
+- ✓ Announcement lifecycle support: publish/unpublish, urgent pinning, attachments with signed-URL access — Validated in Phase 04
+- ✓ Structured event details and RSVP tracking for residents and admins — Validated in Phase 04
 - [ ] Execute the project with pragmatic TDD, with stricter test-first discipline on billing, auth, payments, roles/RLS, Telegram, and other security-sensitive flows
 
 ### Out of Scope
