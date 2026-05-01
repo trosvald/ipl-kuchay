@@ -27,9 +27,7 @@ interface AttachmentRow {
   id: string;
   announcement_id: string;
   label: string;
-  storage_path: string;
   mime_type: string;
-  size_bytes: number;
 }
 
 function AnnouncementHeroSkeleton() {
@@ -121,7 +119,7 @@ export function ResidentAnnouncementsPage() {
     if (rows.length > 0) {
       const { data: attachRows } = await client
         .from("announcement_attachments")
-        .select("id, announcement_id, label, storage_path, mime_type, size_bytes");
+        .select("id, announcement_id, label, mime_type");
 
       if (attachRows) {
         const attachMap: Record<string, AttachmentRow[]> = {};

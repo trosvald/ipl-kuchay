@@ -54,7 +54,7 @@ Recommended schema shape:
 - `announcements`: `id`, `title`, `body`, `status`, `is_urgent`, `is_pinned`, `published_at`, `archived_at`, `created_by`, `updated_by`, timestamps
 - `announcement_attachments`: `id`, `announcement_id`, `label`, `storage_path` or `file_url`, `mime_type`, `size_bytes`, timestamps
 - `events`: `id`, `title`, `description`, `location`, `starts_at`, `ends_at`, `status`, `cancelled_at`, `created_by`, `updated_by`, timestamps
-- `event_attendees`: `id`, `event_id`, `profile_id`, `response`, `responded_at`, timestamps, unique `(event_id, profile_id)`
+- `event_attendees`: `id`, `event_id`, `profile_id`, `response`, timestamps, unique `(event_id, profile_id)`
 
 Why: Phase 4 has distinct lifecycle rules for announcements versus events, plus resident-owned RSVP state.
 

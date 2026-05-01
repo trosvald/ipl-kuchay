@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateId } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { rsvpUpsertSchema } from "@/lib/validation";
 import { useAuth } from "@/features/auth/authHooks";
 
 interface EventDetailRow {
@@ -140,13 +141,23 @@ export function ResidentEventDetailPage({
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    const parsed = rsvpUpsertSchema.safeParse({
+      event_id: id,
+      response,
+    });
+
+    if (!parsed.success) {
+      setErrorMessage("Data RSVP tidak valid.");
+      setSaving(false);
+      return;
+    }
+
     const { error } = await client
       .from("event_attendees")
       .upsert(
         {
-          event_id: id,
+          ...parsed.data,
           profile_id: profile.id,
-          response,
         },
         { onConflict: "event_id,profile_id" },
       );

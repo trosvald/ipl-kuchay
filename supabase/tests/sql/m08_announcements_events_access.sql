@@ -421,6 +421,17 @@ begin
   where title = 'Test Announcement'
   limit 1;
 
+  -- T-04-07: event lifecycle updates must be timestamp-auditable
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'events_set_updated_at'
+      and tgrelid = 'public.events'::regclass
+      and not tgisinternal
+  ) then
+    raise exception 'events_set_updated_at trigger missing on public.events (T-04-07)';
+  end if;
+
   -- ============================================================
   -- Real RSVP insert/update regression (T-04-14, T-04-15)
   -- ============================================================

@@ -1,208 +1,199 @@
 ---
 phase: 04-announcements-events-resident-home
-reviewed: 2026-04-30T00:00:00Z
+reviewed: 2026-04-30T13:00:00Z
 depth: standard
-files_reviewed: 21
+files_reviewed: 8
 files_reviewed_list:
   - app/admin/announcements/page.tsx
   - app/admin/events/page.tsx
-  - app/app/announcements/[id]/page.tsx
-  - app/app/announcements/page.tsx
-  - app/app/events/[id]/page.tsx
-  - app/app/events/page.tsx
   - features/announcements/AdminAnnouncementsPage.tsx
   - features/announcements/ResidentAnnouncementDetailPage.tsx
-  - features/announcements/ResidentAnnouncementsPage.tsx
-  - features/events/AdminEventsPage.tsx
+  - features/auth/RequireOperatorRole.tsx
+  - features/auth/authHooks.ts
   - features/events/ResidentEventDetailPage.tsx
-  - features/events/ResidentEventsPage.tsx
-  - features/layout/adminNavigation.ts
-  - features/layout/ResidentShell.tsx
-  - features/resident/ResidentHomePage.tsx
-  - lib/__tests__/adminNavigation.test.ts
-  - lib/__tests__/validation.test.ts
-  - lib/validation.ts
-  - package.json
-  - supabase/migrations/0019_m08_announcements_events.sql
   - supabase/tests/sql/m08_announcements_events_access.sql
 findings:
-  critical: 2
-  warning: 4
-  info: 5
-  total: 11
+  critical: 0
+  warning: 5
+  info: 3
+  total: 8
 status: issues_found
 ---
 
-# Phase 04: Code Review Report — Announcements, Events & Resident Home
+# Phase 04: Code Review Report
 
-**Reviewed:** 2026-04-30
+**Reviewed:** 2026-04-30T13:00:00Z
 **Depth:** standard
-**Files Reviewed:** 21
-**Status:** issues_found — 2 critical, 4 warnings, 5 info items
+**Files Reviewed:** 8
+**Status:** issues_found
 
 ## Summary
 
-Phase 04 introduces announcements, events, RSVP functionality, and a revamped resident home dashboard. The SQL schema and RLS policies are well-structured with appropriate access controls — residents see only published/archived content, operators manage all lifecycle, and treasurers are excluded from content management. The test suite demonstrates good coverage of policy enforcement and schema validation.
+Reviewed 8 files from Phase 04 gap closure: operator role guard, announcement attachment flow, event RSVP fix, and SQL regression tests. The code is generally well-structured with proper RLS enforcement and consistent patterns. Found 5 warnings and 3 info items. No critical security vulnerabilities or crash-level bugs detected.
 
-However, two critical bugs were identified:
-1. **The resident home page will never display any announcements** — the Supabase `.select()` call omits the `status` column, making all subsequent filtering logic compare against `undefined`.
-2. **The `events` table is missing its `updated_at` trigger** — every other table in the codebase has one; `events` was omitted.
-
-There are also several warnings about RSVP lock timing mismatches and announcement visibility logic that could exclude important announcements from the home page.
-
----
-
-## Critical Issues
-
-### CR-01: Resident Home Page — `status` column omitted from `.select()`, breaking all announcement display
-
-**File:** `features/resident/ResidentHomePage.tsx:459-465`
-**Issue:** The `loadAnnouncements` function fetches announcements with `.select("id, title, body, is_urgent, is_pinned, published_at, created_at")` — notably **missing the `status` field**. The `AnnouncementRow` interface (line 42-51) declares `status: string`, but since it isn't selected, every row will have `status: undefined`.
-
-All downstream logic that reads `a.status` will silently fail:
-- **Line 532:** `announcements.find(a => a.status === "published" && ...)` → `undefined === "published"` → always `null`. The urgent hero card is never rendered.
-- **Line 536:** `announcements.filter(a => a.status === "published" && ...)` → always empty. No regular announcement cards appear.
-- **Lines 539-544:** `latestAnnouncements` is always empty.
-
-**Result:** The "Pengumuman Terbaru" section on the resident home page perpetually shows the empty state ("Belum ada pengumuman") regardless of how many published announcements exist in the database.
-
-**Fix:** Add `status` (and `archived_at` for completeness) to the select list:
-```typescript
-// features/resident/ResidentHomePage.tsx, line 461
-.select("id, title, body, status, is_urgent, is_pinned, published_at, archived_at, created_at")
-```
-
----
-
-### CR-02: `events` table missing `updated_at` trigger — inconsistent with codebase pattern
-
-**File:** `supabase/migrations/0019_m08_announcements_events.sql:95-111`
-**Issue:** Migration `0002_tables.sql` establishes a codebase-wide pattern: every table with `updated_at` gets a `before update` trigger calling `public.set_updated_at()`. Migration `0019` adds triggers for `announcements` (line 105-107) and `event_attendees` (line 109-111), but **omits `events`**. The `events` table has an `updated_at` column (line 59) that will never be automatically updated. The app code in `AdminEventsPage.tsx` (lines 229-272) does not manually set `updated_at` in the update payload.
-
-**Result:** When an admin edits an event, `updated_at` remains at the row creation timestamp. This breaks data integrity for any debugging, audit, or sync logic that relies on `updated_at` across tables.
-
-**Fix:** Add the missing trigger in the migration:
-```sql
-create trigger events_set_updated_at
-  before update on public.events
-  for each row execute function public.set_updated_at();
-```
-
----
+Key concerns: two bugs in the attachment upload flow (client-generated UUID doesn't match DB, storage orphan on failed insert), a publish-date overwrite issue in announcement editing, a popup-blocking risk for attachment viewing, and a missing nullable type annotation on the event cancellation_note field.
 
 ## Warnings
 
-### WR-01: Resident Home Page — `nonUrgentPublished` filter excludes urgent-but-not-pinned announcements
+### WR-01: Client-generated attachment ID doesn't match DB-assigned ID
 
-**File:** `features/resident/ResidentHomePage.tsx:531-544`
-**Issue:** The `nonUrgentPublished` filter (line 536) uses `!a.is_urgent` to exclude all urgent announcements from the regular feed. However, `urgentAnnouncement` (line 531-533) requires **both** `is_urgent` AND `is_pinned` to qualify as the hero. An announcement that is urgent but not pinned falls through both gaps — it qualifies as neither the hero nor a regular card, making it completely invisible on the home page.
-
-**Fix:** Exclude the hero announcement by ID rather than by the `is_urgent` flag:
-```typescript
-const nonUrgentPublished = useMemo(() => {
-  return announcements.filter(
-    (a) => a.status === "published" && a.id !== urgentAnnouncement?.id
-  );
-}, [announcements, urgentAnnouncement]);
-```
-
----
-
-### WR-02: RSVP frontend lock uses strict `<` while RLS uses strict `>` — boundary mismatch
-
-**File:** `features/events/ResidentEventDetailPage.tsx:218-229` and `supabase/migrations/0019_m08_announcements_events.sql:195-215`
-**Issue:** The frontend RSVP lock checks `startDate < now` (line 218: `isPast = startDate < now`). The RLS insert/update policies check `e.starts_at > now()` (line 199-201, 212-213). When `startDate === now` (the exact moment the event starts):
-- **Frontend:** `isPast = false` → RSVP controls remain active
-- **RLS:** `starts_at > now()` → `false` → DB blocks the upsert with a policy violation error
-
-The user sees "Gagal memperbarui RSVP" with no explanation that the event just started.
-
-**Fix:** Align the frontend check to match RLS behavior:
-```typescript
-const isPast = startDate <= now;  // was: startDate < now
-```
-
-Alternatively, if a grace period is desired, update both to use a consistent boundary.
-
----
-
-### WR-03: `urgentHero` filter requires `is_pinned` — potentially inconsistent with "satu hero penting" intent
-
-**File:** `features/announcements/ResidentAnnouncementsPage.tsx:149-151` and `features/resident/ResidentHomePage.tsx:531-533`
-**Issue:** Both the resident announcements list page and the home page define the hero announcement as one that is `is_urgent && is_pinned`. An urgent announcement that is not pinned never gets hero treatment. The admin UI description (line 498 of AdminAnnouncementsPage) says "Beranda warga hanya menampilkan satu hero penting" — implying urgency alone should qualify.
-
-If the intent is that admins *must* explicitly pin a hero, the admin UI should enforce this (or at least warn). Currently, an admin can mark an announcement as `is_urgent=true, is_pinned=false` and expect it to show as the hero — it won't.
-
-**Fix:** Either:
-1. Make `is_pinned` mandatory when `is_urgent` is true (admin-side constraint), or
-2. Change the hero filter to use `is_urgent` alone and use `is_pinned` as a tiebreaker: `find(a => a.status === "published" && a.is_urgent)` with `is_pinned` sorting
-
----
-
-### WR-04: RSVP upsert in `ResidentEventDetailPage` not validated against `rsvpUpsertSchema`
-
-**File:** `features/events/ResidentEventDetailPage.tsx:143-153`
-**Issue:** The RSVP upsert builds the payload manually and sends it directly to Supabase without Zod validation, even though `rsvpUpsertSchema` is defined in `lib/validation.ts`. While the `RSVPControl` component limits inputs to three hardcoded buttons, defense-in-depth validation would catch data corruption or future code changes that introduce new input paths.
-
+**File:** `features/announcements/AdminAnnouncementsPage.tsx:365`
+**Issue:** After inserting an attachment row into `announcement_attachments`, the code adds a local state entry using `crypto.randomUUID()` as the `id` field. This UUID does not match the server-generated ID. If the user clicks delete on this attachment before the editor is closed and re-fetched, `handleDeleteAttachment(att.id, att.storage_path)` sends the fake UUID to `.eq("id", attachmentId)`, which matches 0 rows — the DB row is never deleted while the storage file is removed, creating an orphan DB row.
 **Fix:**
 ```typescript
-const parsed = rsvpUpsertSchema.safeParse({ event_id: id, response });
-if (!parsed.success) {
-  setErrorMessage("Data RSVP tidak valid.");
-  setSaving(false);
+// In handleFileUpload (line 349-374):
+const { data: insertData, error: insertError } = await client
+  .from("announcement_attachments")
+  .insert({
+    announcement_id: editor.id,
+    label: file.name,
+    storage_path: storagePath,
+    mime_type: file.type,
+    size_bytes: file.size,
+  })
+  .select("id")
+  .single();
+
+if (insertError) {
+  setErrorMessage(`Gagal menyimpan data lampiran ${file.name}.`);
+  return;
+}
+setEditor((prev) => ({
+  ...prev,
+  attachments: [
+    ...prev.attachments,
+    {
+      id: insertData.id,  // Use the real server-assigned ID
+      announcement_id: editor.id!,
+      label: file.name,
+      storage_path: storagePath,
+      mime_type: file.type,
+      size_bytes: file.size,
+      created_at: new Date().toISOString(),
+    },
+  ],
+}));
+```
+
+### WR-02: Storage orphan when DB insert fails after upload
+
+**File:** `features/announcements/AdminAnnouncementsPage.tsx:341-358`
+**Issue:** In `handleFileUpload`, the file is uploaded to storage first (line 341-344), then a DB row is inserted (line 349). If the storage upload succeeds but the DB insert fails, the storage object remains as an orphan with no corresponding DB reference. No cleanup/rollback of the storage object is attempted.
+**Fix:**
+```typescript
+// In handleFileUpload, after a failed DB insert, remove the orphaned storage file:
+if (insertError) {
+  // Clean up orphaned storage object
+  await client.storage.from("announcement-assets").remove([storagePath]);
+  setErrorMessage(`Gagal menyimpan data lampiran ${file.name}.`);
   return;
 }
 ```
 
----
+### WR-03: `published_at` overwritten on every save of a published announcement
+
+**File:** `features/announcements/AdminAnnouncementsPage.tsx:237`
+**Issue:** When editing an existing published announcement (e.g., changing its title), `handleSave` sets `published_at: targetStatus === "published" ? new Date().toISOString() : null`. This overwrites the original publication timestamp with the current time every time the announcement is saved. The `published_at` should be preserved when editing an already-published announcement.
+**Fix:**
+```typescript
+// Replace line 237-238 with:
+published_at: isNew
+  ? (targetStatus === "published" ? new Date().toISOString() : null)
+  : (targetStatus === "published"
+    ? (editor.published_at ?? new Date().toISOString())
+    : null),
+archived_at: isNew
+  ? null
+  : (targetStatus === "archived" ? new Date().toISOString() :
+    targetStatus === "draft" ? null : editor.archived_at),
+```
+Note: `published_at` and `archived_at` fields need to be added to the `EditorState` interface and populated from the fetched row in `openEditEditor`.
+
+### WR-04: Browser popup likely blocked due to async window.open
+
+**File:** `features/announcements/ResidentAnnouncementDetailPage.tsx:94-111`
+**Issue:** `handleOpenAttachment` is an async click handler. It first `await`s `createSignedUrl`, then calls `openSignedArtifactUrl`, which calls `globalThis.open("", "_blank")`. Because `window.open` occurs after an `await` (not in the synchronous click call stack), most browsers will block it as a popup. The same issue exists in `lib/privateArtifact.ts` which is shared with the payment proof flow.
+**Fix:** Open the popup synchronously during the click handler, then navigate it after the async work completes:
+```typescript
+const handleOpenAttachment = async (att: AttachmentRow) => {
+  if (!client || openingId) return;
+  setOpeningId(att.id);
+  // Open popup synchronously during click event to avoid popup blocker
+  const popup = globalThis.open("", "_blank");
+  if (popup) {
+    popup.document.write("<p style=\"font-family:sans-serif;padding:16px;\">Memuat dokumen...</p>");
+  }
+  try {
+    const { data, error } = await client.storage
+      .from("announcement-assets")
+      .createSignedUrl(att.storage_path, 60);
+    if (error || !data?.signedUrl) {
+      setErrorMessage("Gagal menghasilkan tautan lampiran.");
+      popup?.close();
+      return;
+    }
+    // Navigate the existing popup instead of opening a new one
+    const response = await fetch(data.signedUrl, { method: "GET", credentials: "omit" });
+    if (!response.ok) throw new Error(`Failed to load artifact: ${response.status}`);
+    const contentType = response.headers.get("content-type") ?? "";
+    const body = await response.arrayBuffer();
+    const blob = new Blob([body], { type: contentType || "application/octet-stream" });
+    const objectUrl = URL.createObjectURL(blob);
+    if (popup && !popup.closed) {
+      popup.location.replace(objectUrl);
+    } else {
+      globalThis.open(objectUrl, "_blank", "noopener,noreferrer");
+    }
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch {
+    setErrorMessage("Gagal membuka lampiran.");
+    popup?.close();
+  } finally {
+    setOpeningId(null);
+  }
+};
+```
+Note: This fix should also be applied to `lib/privateArtifact.ts` for the same pattern used by payment proofs.
+
+### WR-05: `cancellation_note` typed as `string` but should be nullable
+
+**File:** `features/events/ResidentEventDetailPage.tsx:24`
+**Issue:** The `EventDetailRow` interface declares `cancellation_note: string`, but for non-cancelled events this field is `null` in the database. The code at line 277 handles this with a truthiness check (`isCancelled && event.cancellation_note`), which works at runtime, but the TypeScript type is inaccurate and could lead to type-safety issues in other contexts where `null` is not handled.
+**Fix:**
+```typescript
+// Line 24: Change to nullable type
+cancellation_note: string | null;
+```
 
 ## Info
 
-### IN-01: Unused `FormEvent` import in `AdminAnnouncementsPage`
+### IN-01: Missing space in "Aksesoperator" label
 
-**File:** `features/announcements/AdminAnnouncementsPage.tsx:3`
-**Issue:** `FormEvent` is imported from React but never used in the component. The form submissions use `handleSaveDraft`/`handlePublish`/`handleSave` via button `onClick`, not form `onSubmit`.
+**File:** `features/auth/RequireOperatorRole.tsx:30`
+**Issue:** The card title says "Aksesoperator diperlukan" — the word "Aksesoperator" is missing a space. In Indonesian, it should be "Akses operator" or "Akses Operator" (two words).
+**Fix:** Change `"Aksesoperator diperlukan"` to `"Akses operator diperlukan"`.
 
-**Fix:** Remove `type FormEvent` from the import.
+### IN-02: No file size validation for announcement attachments
 
----
+**File:** `features/announcements/AdminAnnouncementsPage.tsx:335`
+**Issue:** `handleFileUpload` accepts files without checking their size. The project has a `PAYMENT_PROOF_MAX_SIZE_BYTES` constant in `lib/storage.ts`, but no equivalent size limit is enforced for announcement attachments. A user could upload arbitrarily large files.
+**Fix:** Add a size check before uploading:
+```typescript
+const MAX_ANNOUNCEMENT_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5 MB
+if (file.size > MAX_ANNOUNCEMENT_ATTACHMENT_BYTES) {
+  setErrorMessage(`File ${file.name} melebihi batas 5 MB.`);
+  return;
+}
+```
 
-### IN-02: Unused `FormEvent` and `X` icon imports in `AdminEventsPage`
+### IN-03: Attachment count loads all rows instead of using aggregate
 
-**File:** `features/events/AdminEventsPage.tsx:3-4`
-**Issue:** `FormEvent` is imported from React but never used. The `X` icon from lucide-react is imported but never rendered.
-
-**Fix:** Remove both unused imports.
-
----
-
-### IN-03: Redundant client-side filtering of already-filtered `upcomingEvents` in `ResidentHomePage`
-
-**File:** `features/resident/ResidentHomePage.tsx:546-551`
-**Issue:** `loadEvents` (lines 498-503) already filters to `status === "scheduled" && new Date(e.starts_at) >= now` before setting state. The `upcomingEvents` useMemo applies the same filter again. This is harmless but wasteful.
-
-**Fix:** Remove the redundant filter from `upcomingEvents` or remove it from `loadEvents` and let the memo handle it. Either is fine; the current state does both.
-
----
-
-### IN-04: Inconsistent error handling patterns across `ResidentHomePage` data loaders
-
-**File:** `features/resident/ResidentHomePage.tsx:398-517`
-**Issue:** `loadBilling` (line 398) uses `try/catch` for error handling. `loadAnnouncements` (line 452) and `loadEvents` (line 481) also use `try/catch`. All three are called in `useEffect` (lines 512-517) without `.catch()`. While this works because errors are caught internally, the inconsistency with other pages (e.g., `AdminAnnouncementsPage` line 151-156 using `.catch()` on the promise) makes the codebase harder to reason about.
-
-**Fix:** Either normalize to `.catch()` in the useEffect (matching the pattern in `AdminAnnouncementsPage`, `AdminEventsPage`, `ResidentAnnouncementsPage`, etc.) or document that these loaders are self-contained.
+**File:** `features/announcements/AdminAnnouncementsPage.tsx:134-146`
+**Issue:** `loadAnnouncements` fetches all rows from `announcement_attachments` just to count per-announcement. With many announcements this could be expensive. A Supabase RPC or a `select("announcement_id")` with client-side grouping (current approach) works but may not scale.
+**Fix:** Consider adding a `count` query with grouping, or including attachment counts in the initial announcements query via an RPC. This is a scalability concern for later, not a correctness bug.
 
 ---
 
-### IN-05: `no_response` presented as a user-selectable RSVP option
-
-**File:** `features/events/ResidentEventDetailPage.tsx:44`
-**Issue:** `{ value: "no_response", label: "Belum Menjawab", variant: "outline" }` is presented alongside "Saya Hadir" and "Tidak Bisa Hadir" as an active choice. The label "Belum Menjawab" suggests a passive state rather than an action. A resident clicking it might not realize it overwrites their previous RSVP to `no_response`.
-
-**Fix:** Consider renaming to "Hapus Jawaban Saya" or "Batal RSVP" to make the active nature of this choice clearer. Alternatively, make "no_response" the implicit default when no RSVP row exists, and only offer the two active choices.
-
----
-
-_Reviewed: 2026-04-30T00:00:00Z_
+_Reviewed: 2026-04-30T13:00:00Z_
 _Reviewer: OpenCode (gsd-code-reviewer)_
 _Depth: standard_
