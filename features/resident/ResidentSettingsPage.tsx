@@ -21,6 +21,12 @@ interface NotificationPreferenceRow {
   telegram_enabled: boolean;
 }
 
+interface TelegramAccountInfo {
+  username: string | null;
+  first_name: string | null;
+  linked_at: string | null;
+}
+
 const notificationCategoryLabels: Record<NotificationCategory, string> = {
   billing_reminders: "Pengingat tagihan",
   payment_status: "Status pembayaran",
@@ -54,6 +60,10 @@ export function ResidentSettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [telegramAccount, setTelegramAccount] = useState<TelegramAccountInfo | null>(null);
+  const [isLoadingTelegram, setIsLoadingTelegram] = useState(true);
+  const [isLinking, setIsLinking] = useState(false);
+  const [deepLink, setDeepLink] = useState<string | null>(null);
 
   useEffect(() => {
     setDisplayName(profile?.display_name ?? "");
@@ -122,6 +132,61 @@ export function ResidentSettingsPage() {
       setIsLoading(false);
     });
   }, [loadPreferences]);
+
+  // Load Telegram account link state (D-14 through D-17)
+  useEffect(() => {
+    if (!client || !profile) {
+      setIsLoadingTelegram(false);
+      return;
+    }
+
+    const loadTelegram = async () => {
+      try {
+        const { data, error } = await client
+          .from("telegram_accounts")
+          .select("username, first_name, linked_at")
+          .eq("profile_id", profile.id)
+          .maybeSingle();
+
+        if (!error && data) {
+          setTelegramAccount(data as TelegramAccountInfo);
+        } else {
+          setTelegramAccount(null);
+        }
+      } catch {
+        setTelegramAccount(null);
+      } finally {
+        setIsLoadingTelegram(false);
+      }
+    };
+
+    loadTelegram();
+  }, [client, profile]);
+
+  const handleLinkTelegram = async () => {
+    if (!client) return;
+
+    setIsLinking(true);
+    setErrorMessage(null);
+    setDeepLink(null);
+
+    try {
+      const { data, error } = await client.functions.invoke<{
+        plain_token: string;
+        deep_link: string;
+      }>("link-telegram-account", { body: {} });
+
+      if (error || !data?.deep_link) {
+        setErrorMessage("Gagal membuat tautan Telegram. Silakan coba lagi.");
+      } else {
+        setDeepLink(data.deep_link);
+      }
+    } catch {
+      setErrorMessage("Gagal menghubungi server. Silakan coba lagi.");
+    }
+
+    setIsLinking(false);
+  };
 
   const protectedIdentityRows = useMemo(
     () => [
@@ -245,6 +310,61 @@ export function ResidentSettingsPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="space-y-3 rounded-lg border border-border bg-background p-4">
+          <h3 className="text-sm font-semibold text-foreground">Akun Telegram</h3>
+          {isLoadingTelegram ? (
+            <p className="text-sm text-muted-foreground">Memuat data Telegram...</p>
+          ) : telegramAccount ? (
+            <div className="space-y-2">
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Username Telegram</p>
+                  <p className="text-sm font-medium text-foreground">@{telegramAccount.username ?? "-"}</p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Nama Telegram</p>
+                  <p className="text-sm font-medium text-foreground">{telegramAccount.first_name ?? "-"}</p>
+                </div>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Terhubung sejak</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {telegramAccount.linked_at ? new Date(telegramAccount.linked_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-"}
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Untuk memutuskan akun Telegram, gunakan perintah /unlink dari Telegram.
+              </p>
+            </div>
+          ) : deepLink ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Klik tautan berikut untuk menghubungkan akun Telegram kamu:
+              </p>
+              <a
+                href={deepLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Hubungkan di Telegram
+              </a>
+              <p className="text-xs text-muted-foreground">
+                Tautan berlaku 15 menit. Setelah terhubung, refresh halaman ini untuk melihat status.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Hubungkan akun Telegram kamu untuk menerima notifikasi tagihan, status pembayaran, dan pengumuman warga.
+              </p>
+              <Button onClick={handleLinkTelegram} disabled={isLinking} variant="default" size="sm">
+                {isLinking ? "Membuat tautan..." : "Hubungkan Telegram"}
+              </Button>
+            </div>
+          )}
         </section>
 
         <section className="space-y-3 rounded-lg border border-border bg-background p-4">
