@@ -198,6 +198,30 @@ begin
     raise exception 'Test 1 FAILED: resident_b with allows_notifications=false must not be eligible (D-02)';
   end if;
 
+  -- Case 1e: admin-only templates must never target residents even if
+  -- they have payment_status telegram notifications enabled
+  insert into public.telegram_accounts (profile_id, telegram_user_id, telegram_chat_id, username, first_name, allows_notifications)
+  values (v_admin, 999000099, 888000099, 'admin_user', 'Admin', true)
+  on conflict (profile_id) do update set telegram_user_id = excluded.telegram_user_id, telegram_chat_id = excluded.telegram_chat_id, allows_notifications = excluded.allows_notifications;
+
+  insert into public.notification_preferences (profile_id, category, in_app_enabled, telegram_enabled)
+  values (v_admin, 'payment_status', true, true)
+  on conflict (profile_id, category) do update set telegram_enabled = excluded.telegram_enabled;
+
+  if exists (
+    select 1 from public.get_linked_telegram_recipients('admin_pending_submission')
+    where profile_id = v_resident_a
+  ) then
+    raise exception 'Test 1 FAILED: resident_a must not receive admin_pending_submission';
+  end if;
+
+  if not exists (
+    select 1 from public.get_linked_telegram_recipients('admin_pending_submission')
+    where profile_id = v_admin
+  ) then
+    raise exception 'Test 1 FAILED: admin must receive admin_pending_submission when payment_status telegram notifications are enabled';
+  end if;
+
   -- ============================================================
   -- Test 2: Reminder dedupe allows at most one resident_payment_reminder
   -- delivery per invoice/profile/billing month per D-05

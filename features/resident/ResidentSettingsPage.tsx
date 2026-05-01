@@ -172,14 +172,18 @@ export function ResidentSettingsPage() {
 
     try {
       const { data, error } = await client.functions.invoke<{
-        plain_token: string;
-        deep_link: string;
+        plain_token?: string;
+        plainToken?: string;
+        deep_link?: string;
+        deepLink?: string;
       }>("link-telegram-account", { body: {} });
 
-      if (error || !data?.deep_link) {
+      const nextDeepLink = data?.deepLink ?? data?.deep_link ?? null;
+
+      if (error || !nextDeepLink) {
         setErrorMessage("Gagal membuat tautan Telegram. Silakan coba lagi.");
       } else {
-        setDeepLink(data.deep_link);
+        setDeepLink(nextDeepLink);
       }
     } catch {
       setErrorMessage("Gagal menghubungi server. Silakan coba lagi.");

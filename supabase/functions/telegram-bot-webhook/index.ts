@@ -1,6 +1,5 @@
-// @ts-expect-error Node TypeScript cannot resolve Deno npm: specifiers in editor mode.
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { createServiceRoleClient } from "../_shared/supabase.ts";
+import { getOptionalEnv } from "../_shared/supabase.ts";
 import { jsonResponse, methodNotAllowed, optionsResponse } from "../_shared/responses.ts";
 import {
   extractLinkToken,
@@ -10,16 +9,10 @@ import {
   type TelegramUpdate,
 } from "../_shared/telegram.ts";
 
-// Deno runtime compatibility
-declare function serve(handler: (req: Request) => Response | Promise<Response>): void;
-
 const TELEGRAM_WEBHOOK_SECRET_HEADER = "X-Telegram-Bot-Api-Secret-Token";
 
 function requireTelegramSecret(request: Request): void {
-  const denoEnv = "Deno" in globalThis
-    ? (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno?.env
-    : undefined;
-  const expected = denoEnv?.get?.("TELEGRAM_WEBHOOK_SECRET");
+  const expected = getOptionalEnv("TELEGRAM_WEBHOOK_SECRET");
   if (!expected) throw new Error("Missing TELEGRAM_WEBHOOK_SECRET");
   const received = request.headers.get(TELEGRAM_WEBHOOK_SECRET_HEADER);
   if (!received || received !== expected) throw new Error("Invalid secret");
@@ -68,16 +61,23 @@ async function handleStart(
   client: SupabaseClient,
   chatId: number,
   telegramUserId: number,
+  telegramUser: {
+    username: string | null;
+    first_name: string;
+    last_name: string | null;
+    language_code: string | null;
+  } | null,
   messageText: string | null,
 ): Promise<string> {
   // Check if this is a deep-link /start link_<token>
   const linkToken = extractLinkToken(messageText);
   if (linkToken) {
-    // Parse Telegram identity from the update
-    const telegramUser = parseTelegramUser(update);
-    const telegramChat = parseTelegramChat(update);
-
-    const telegramUserData = telegramUser || { id: telegramUserId, is_bot: false, username: null, first_name: "", last_name: null, language_code: null };
+    const telegramUserData = telegramUser || {
+      username: null,
+      first_name: "",
+      last_name: null,
+      language_code: null,
+    };
 
     const { data } = await client.rpc("consume_telegram_link_token", {
       p_plain_token: linkToken,
@@ -126,22 +126,50 @@ async function handleStatus(
   const linked = await resolveLinkedProfile(client, telegramUserId);
   if (!linked) return unlinkedMessage();
 
-  const { data: invoices } = await client.rpc("get_resident_invoice_summary", {
-    p_profile_id: linked.profile_id,
-  });
+  const { data: mappings } = await client
+    .from("kavling_residents")
+    .select("kavling_id")
+    .eq("profile_id", linked.profile_id)
+    .eq("active", true);
+
+  const kavlingIds = (mappings ?? []).map((item: { kavling_id: string }) => item.kavling_id);
+  if (kavlingIds.length === 0) {
+    return "Tidak ada tagihan aktif saat ini.";
+  }
+
+  const { data: invoices } = await client
+    .from("invoices")
+    .select("amount_due, amount_paid, status, kavlings(code)")
+    .in("kavling_id", kavlingIds)
+    .in("status", ["unpaid", "overdue", "partial"])
+    .order("due_date", { ascending: true });
 
   if (!invoices || (Array.isArray(invoices) && invoices.length === 0)) {
     return "Tidak ada tagihan aktif saat ini.";
   }
 
   const rows = Array.isArray(invoices) ? invoices : [];
+  const summaryByKavling = new Map<string, { amount: number; status: string }>();
   let message = "Ringkasan Tagihan IPL Jatiloka:\n";
   let total = 0;
 
   for (const row of rows) {
-    const amount = row.total_outstanding ?? row.amount_due ?? 0;
-    total += Number(amount);
-    message += `\n${row.kavling_code ?? "?"}: Rp ${Number(amount).toLocaleString("id-ID")} (${row.status ?? "?"})`;
+    const outstanding = Math.max(Number(row.amount_due ?? 0) - Number(row.amount_paid ?? 0), 0);
+    if (outstanding <= 0) {
+      continue;
+    }
+
+    const kavlingCode = row.kavlings?.code ?? "?";
+    const previous = summaryByKavling.get(kavlingCode);
+    summaryByKavling.set(kavlingCode, {
+      amount: (previous?.amount ?? 0) + outstanding,
+      status: previous?.status ?? String(row.status ?? "?"),
+    });
+    total += outstanding;
+  }
+
+  for (const [kavlingCode, row] of summaryByKavling.entries()) {
+    message += `\n${kavlingCode}: Rp ${row.amount.toLocaleString("id-ID")} (${row.status})`;
   }
 
   message += `\n\nTotal: Rp ${total.toLocaleString("id-ID")}`;
@@ -156,6 +184,17 @@ async function handleTagihanKu(
   const linked = await resolveLinkedProfile(client, telegramUserId);
   if (!linked) return unlinkedMessage();
 
+  const { data: mappings } = await client
+    .from("kavling_residents")
+    .select("kavling_id")
+    .eq("profile_id", linked.profile_id)
+    .eq("active", true);
+
+  const kavlingIds = (mappings ?? []).map((item: { kavling_id: string }) => item.kavling_id);
+  if (kavlingIds.length === 0) {
+    return "Tidak ada tagihan.";
+  }
+
   const { data } = await client
     .from("invoices")
     .select(`
@@ -163,7 +202,7 @@ async function handleTagihanKu(
       billing_periods(label, month, year),
       kavlings(code)
     `)
-    .eq("kavling_residents.profile_id", linked.profile_id)
+    .in("kavling_id", kavlingIds)
     .order("due_date", { ascending: false })
     .limit(10);
 
@@ -322,7 +361,7 @@ function unlinkedMessage(): string {
 // Main handler
 // ============================================================
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return optionsResponse();
   if (req.method !== "POST") return methodNotAllowed();
 
@@ -352,7 +391,7 @@ serve(async (req: Request) => {
 
   // If /start — handle deep-link or welcome
   if (!messageText || messageText.trim().startsWith("/start")) {
-    const reply = await handleStart(adminClient, telegramChat.id, telegramUserId, messageText);
+    const reply = await handleStart(adminClient, telegramChat.id, telegramUserId, telegramUser, messageText);
     if (reply) {
       await sendTelegramMessage(telegramChat.id, reply);
     }

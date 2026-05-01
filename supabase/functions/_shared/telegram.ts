@@ -10,18 +10,20 @@
  * No bot token is ever exposed to browser code.
  */
 
-// Deno runtime note: this file uses Deno-compatible npm: specifiers.
 import "npm:@supabase/supabase-js@2";
+
+import { getOptionalEnv } from "./supabase.ts";
 
 /**
  * Telegram Bot API endpoint base.
  * Token is read server-side only — never exposed to browser.
  */
+function isTelegramMockEnabled(): boolean {
+  return getOptionalEnv("TELEGRAM_BOT_MOCK") === "true";
+}
+
 function getTelegramApiUrl(): string {
-  const denoEnv = "Deno" in globalThis
-    ? (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno?.env
-    : undefined;
-  const botToken = denoEnv?.get?.("TELEGRAM_BOT_TOKEN");
+  const botToken = getOptionalEnv("TELEGRAM_BOT_TOKEN");
 
   if (!botToken) {
     throw new Error("Missing required env: TELEGRAM_BOT_TOKEN");
@@ -76,10 +78,10 @@ export interface TelegramUpdate {
 
 /**
  * Extract the deep-link token from a Telegram /start command text.
- * Returns the plain token (without "link_" prefix) if found, or null.
+ * Returns the full plain token (including the "link_" prefix) if found, or null.
  *
  * Examples:
- *   "/start link_abc123" → "abc123"
+ *   "/start link_abc123" → "link_abc123"
  *   "/startlink_abc123" → null
  *   "/help" → null
  */
@@ -108,12 +110,11 @@ export function extractLinkToken(commandText: string | null | undefined): string
     return null;
   }
 
-  const token = tokenPart.slice(5); // strip "link_" prefix
-  if (token.length === 0) {
+  if (tokenPart.length === 5) {
     return null;
   }
 
-  return token;
+  return tokenPart;
 }
 
 /**
@@ -173,6 +174,12 @@ export async function sendTelegramMessage(
   text: string,
   parseMode: "MarkdownV2" | "HTML" | undefined = undefined,
 ): Promise<{ ok: boolean; message_id?: number; error?: string }> {
+  if (isTelegramMockEnabled()) {
+    const messageId = Date.now();
+    console.info(`[telegram-mock] chat=${chatId} message_id=${messageId} text=${text}`);
+    return { ok: true, message_id: messageId };
+  }
+
   const apiBase = getTelegramApiUrl();
 
   const body: Record<string, unknown> = {
@@ -213,6 +220,11 @@ export async function sendTelegramMessage(
 export async function answerTelegramStart(
   startParameter: string,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (isTelegramMockEnabled()) {
+    console.info(`[telegram-mock] answerStartParam start=${startParameter}`);
+    return { ok: true };
+  }
+
   const apiBase = getTelegramApiUrl();
 
   try {

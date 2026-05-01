@@ -2,16 +2,21 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 function requireEnv(name: string): string {
-  const denoEnv =
-    "Deno" in globalThis
-      ? (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno?.env
-      : undefined;
-  const value = denoEnv?.get?.(name);
+  const value = getOptionalEnv(name);
 
   if (!value) {
     throw new Error(`Missing required env: ${name}`);
   }
   return value;
+}
+
+export function getOptionalEnv(name: string): string | undefined {
+  const denoEnv =
+    "Deno" in globalThis
+      ? (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno?.env
+      : undefined;
+
+  return denoEnv?.get?.(name);
 }
 
 export function createServiceRoleClient() {

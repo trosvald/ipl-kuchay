@@ -1,17 +1,18 @@
-// @ts-expect-error Node TypeScript cannot resolve Deno npm: specifiers in editor mode.
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { createServiceRoleClient } from "../_shared/supabase.ts";
+import { createUserClient, getOptionalEnv } from "../_shared/supabase.ts";
 import { jsonResponse, HttpError, methodNotAllowed, optionsResponse } from "../_shared/responses.ts";
-import { buildDeepLinkUrl } from "../_shared/telegram.ts";
 
-// Deno runtime: uses npm: specifiers and reads env via Deno.env.
-// Browser code never sees the bot token or direct Telegram API calls.
+function requireBotUsername(): string {
+  const username = getOptionalEnv("TELEGRAM_BOT_USERNAME");
 
-interface IssueTokenRequest {
-  botUsername: string;
+  if (!username) {
+    throw new Error("Missing TELEGRAM_BOT_USERNAME");
+  }
+
+  return username;
 }
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
     return optionsResponse();
@@ -29,7 +30,7 @@ serve(async (req: Request) => {
     }
 
     // Create authenticated Supabase client
-    const supabase = createClient(authHeader);
+    const supabase = createUserClient(authHeader);
 
     // Get the authenticated user
     const {
@@ -41,25 +42,7 @@ serve(async (req: Request) => {
       return jsonResponse(401, { error: "Invalid or expired session" });
     }
 
-    // Parse request body
-    let body: IssueTokenRequest;
-    try {
-      body = (await req.json()) as IssueTokenRequest;
-    } catch {
-      return jsonResponse(400, { error: "Invalid JSON body" });
-    }
-
-    if (!body.botUsername || typeof body.botUsername !== "string" || body.botUsername.length === 0) {
-      // Fall back to env var so browser code doesn't need to know the bot username
-      const denoEnv = "Deno" in globalThis
-        ? (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno?.env
-        : undefined;
-      const envUsername = denoEnv?.get?.("TELEGRAM_BOT_USERNAME");
-      if (!envUsername) {
-        return jsonResponse(400, { error: "botUsername is required" });
-      }
-      body.botUsername = envUsername;
-    }
+    const botUsername = requireBotUsername();
 
     // Create service-role client to call the SQL contract (bypasses RLS
     // since the contract function uses security definer)
@@ -68,7 +51,7 @@ serve(async (req: Request) => {
     // Call the SQL contract to issue a one-time link token
     const { data, error: rpcError } = await adminClient.rpc("issue_telegram_link_token", {
       p_profile_id: user.id,
-      p_bot_username: body.botUsername,
+      p_bot_username: botUsername,
     });
 
     if (rpcError) {
@@ -84,9 +67,10 @@ serve(async (req: Request) => {
     }
 
     return jsonResponse(200, {
+      deep_link: row.deep_link,
       deepLink: row.deep_link,
+      plain_token: row.plain_token,
       plainToken: row.plain_token,
-      // Include expiry info so the UI can show countdown
       expiresInMinutes: 15,
     });
   } catch (err) {
