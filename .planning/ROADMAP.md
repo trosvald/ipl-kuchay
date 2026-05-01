@@ -108,7 +108,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 05-01-PLAN.md — Build the secure deep-link linking foundation (token SQL contract, issuer function, webhook consume path).
-- [ ] 05-02-PLAN.md — Implement auditable Telegram delivery dispatch, reminders, monthly summary, and real payment/announcement event wiring.
+- [x] 05-02-PLAN.md — Implement auditable Telegram delivery dispatch, reminders, monthly summary, and real payment/announcement event wiring.
 - [ ] 05-03-PLAN.md — Deliver full bot commands, resident Telegram settings UX, and admin delivery/template operations UI.
 **UI hint**: yes
 
