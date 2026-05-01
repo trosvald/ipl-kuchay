@@ -73,26 +73,20 @@ async function handleStart(
   // Check if this is a deep-link /start link_<token>
   const linkToken = extractLinkToken(messageText);
   if (linkToken) {
-    const telegramUser = await client
-      .from("telegram_accounts")
-      .select("profile_id")
-      .eq("telegram_user_id", telegramUserId)
-      .maybeSingle();
+    // Parse Telegram identity from the update
+    const telegramUser = parseTelegramUser(update);
+    const telegramChat = parseTelegramChat(update);
 
-    if (telegramUser?.profile_id) {
-      // D-11: already linked
-      return "Akun Telegram kamu sudah terhubung dengan IPL Jatiloka. Gunakan /status untuk cek tagihan atau /help untuk daftar perintah.";
-    }
+    const telegramUserData = telegramUser || { id: telegramUserId, is_bot: false, username: null, first_name: "", last_name: null, language_code: null };
 
-    // Consume the link token
     const { data } = await client.rpc("consume_telegram_link_token", {
       p_plain_token: linkToken,
       p_telegram_user_id: telegramUserId,
       p_telegram_chat_id: chatId,
-      p_username: null,
-      p_first_name: "",
-      p_last_name: null,
-      p_language_code: null,
+      p_username: telegramUserData.username ?? null,
+      p_first_name: telegramUserData.first_name,
+      p_last_name: telegramUserData.last_name ?? null,
+      p_language_code: telegramUserData.language_code ?? null,
     });
 
     const result = (Array.isArray(data) ? data[0] : data) as { success: boolean; error?: string } | null;

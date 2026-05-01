@@ -50,7 +50,15 @@ serve(async (req: Request) => {
     }
 
     if (!body.botUsername || typeof body.botUsername !== "string" || body.botUsername.length === 0) {
-      return jsonResponse(400, { error: "botUsername is required" });
+      // Fall back to env var so browser code doesn't need to know the bot username
+      const denoEnv = "Deno" in globalThis
+        ? (globalThis as { Deno?: { env?: { get?: (key: string) => string | undefined } } }).Deno?.env
+        : undefined;
+      const envUsername = denoEnv?.get?.("TELEGRAM_BOT_USERNAME");
+      if (!envUsername) {
+        return jsonResponse(400, { error: "botUsername is required" });
+      }
+      body.botUsername = envUsername;
     }
 
     // Create service-role client to call the SQL contract (bypasses RLS

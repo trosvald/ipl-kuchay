@@ -1,5 +1,5 @@
 // @ts-expect-error Node TypeScript cannot resolve Deno npm: specifiers in editor mode.
-import { createServiceRoleClient } from "../_shared/supabase.ts";
+import { createServiceRoleClient, createUserClient } from "../_shared/supabase.ts";
 import { jsonResponse, optionsResponse } from "../_shared/responses.ts";
 import { sendTelegramMessage } from "../_shared/telegram.ts";
 import {
@@ -33,17 +33,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-function requireAuth(req: Request): { userId: string } {
+async function requireAuth(req: Request): Promise<string> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     throw new Error("Authentication required");
   }
-  // Supabase auth is validated by the gateway (verify_jwt = true default).
-  // We extract the user ID from the Supabase context if available.
-  // For service_role calls (from internal functions), this is bypassed.
-  const token = authHeader.slice(7);
-  // Return a placeholder — the actual auth is handled by Supabase
-  return { userId: "authenticated" };
+  // Validate JWT via Supabase and return the authenticated user's ID
+  const userClient = createUserClient(authHeader);
+  const { data: { user }, error } = await userClient.auth.getUser();
+  if (error || !user) {
+    throw new Error("Authentication required");
+  }
+  return user.id;
 }
 
 interface SendPayload {
@@ -61,8 +62,8 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Auth gate: require authenticated JWT or service_role
-    requireAuth(req);
+    // Auth gate: require authenticated JWT
+    await requireAuth(req);
 
     const body: SendPayload = await req.json();
 
