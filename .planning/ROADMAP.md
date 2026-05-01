@@ -13,7 +13,7 @@ This roadmap assumes the existing Next.js + Supabase foundation already covers b
 - [ ] **Phase 1: Access, Scope & Resident Identity** - Harden role-scoped access, public privacy boundaries, resident profile management, and kavling mapping.
 - [ ] **Phase 2: Billing Configuration & Resident Billing View** - Complete invoice configuration and give residents one trustworthy billing experience.
 - [ ] **Phase 3: Manual Payments, Reporting & Audit** - Make manual transfer verification, finance reporting, and auditability launch-trustworthy.
-- [ ] **Phase 4: Announcements, Events & Resident Home** - Add resident communication features and unify them into one home experience.
+- [x] **Phase 4: Announcements, Events & Resident Home** - Add resident communication features and unify them into one home experience. *(2026-05-01)*
 - [ ] **Phase 5: Telegram Linking & Notifications** - Turn Telegram into a secure linked channel for reminders, alerts, and billing shortcuts.
 - [ ] **Phase 6: Imports, Optional QRIS & Launch Readiness** - Complete cutover workflows, feature-flagged QRIS support, and spreadsheet-free operations.
 - [ ] **Phase 7: Phase 1 Gap Closure & Milestone Verification** - Close unresolved Phase 1 human-verification gaps and convert Phase 1 requirements to auditable pass status.
@@ -149,7 +149,7 @@ Plans:
 | 1. Access, Scope & Resident Identity | 0/6 | Not started | - |
 | 2. Billing Configuration & Resident Billing View | 0/TBD | Not started | - |
 | 3. Manual Payments, Reporting & Audit | 0/TBD | Not started | - |
-| 4. Announcements, Events & Resident Home | 0/TBD | Not started | - |
+| 4. Announcements, Events & Resident Home | 5/5 | Complete | 2026-05-01 |
 | 5. Telegram Linking & Notifications | 0/TBD | Not started | - |
 | 6. Imports, Optional QRIS & Launch Readiness | 0/TBD | Not started | - |
 | 7. Phase 1 Gap Closure & Milestone Verification | 0/TBD | Not started | - |

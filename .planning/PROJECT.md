@@ -74,8 +74,8 @@ The current process being replaced is spreadsheet-based neighborhood billing and
 | Resident self-service is the top product priority | This is the clearest user-facing value and the main trust layer for launch success | — Pending |
 | Public dashboard is aggregate-only at launch | It provides transparency without exposing resident-level payment state publicly | — Pending |
 | Manual transfer is the required launch payment path | Launch must not depend on QRIS readiness | — Pending |
-| Neighborhood announcements and events are part of v1 | The product must cover neighborhood communication, not only billing operations | — Pending |
-| Resident home should unify billing and neighborhood information | Residents need one place to check obligations and updates instead of fragmented sections | — Pending |
+| Neighborhood announcements and events are part of v1 | The product must cover neighborhood communication, not only billing operations | ✓ Implemented — Phase 04 |
+| Resident home should unify billing and neighborhood information | Residents need one place to check obligations and updates instead of fragmented sections | ✓ Implemented — Phase 04 |
 | TDD should be pragmatic, with strictness on risky flows | This balances delivery speed with the need for strong protection around billing, auth, payments, and security rules | — Pending |
 
 ## Evolution
@@ -96,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 after Phase 02 completion*
+*Last updated: 2026-05-01 after Phase 04 completion*
