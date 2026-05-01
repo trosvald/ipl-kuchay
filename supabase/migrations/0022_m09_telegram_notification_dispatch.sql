@@ -105,9 +105,11 @@ begin
         then 'payment_status'
       when p_template_code in ('admin_pending_submission', 'admin_monthly_summary')
         then 'payment_status'
+      when p_template_code = 'resident_announcement'
+        then 'announcements'
       else null
     end
-  where ta.allows_notifications = true
+where ta.allows_notifications = true
     and p.is_active = true
     and np.telegram_enabled = true;
 end;
@@ -194,7 +196,7 @@ begin
     and de.related_invoice_id = ui.invoice_id
     and de.billing_period_month = ui.billing_month
   where np.telegram_enabled = true
-    and de.profile_id is null  -- not yet sent this cycle
+    and de.profile_id is null
   order by ui.due_date asc;
 end;
 $$;
@@ -247,30 +249,56 @@ end;
 $$;
 
 -- ============================================================
+-- Seed resident announcement notification template (COMM-05)
+-- ============================================================
+
+insert into public.notification_templates (code, channel, title, body_template)
+values (
+  'resident_announcement',
+  'telegram',
+  'Pengumuman baru',
+  'Ada pengumuman baru di IPL Jatiloka: \"{{title}}\". Buka aplikasi web untuk membaca selengkapnya.'
+)
+on conflict (code) do update
+set
+  title = excluded.title,
+  body_template = excluded.body_template,
+  active = true;
+
+-- ============================================================
 -- Cron schedule registration (pg_cron)
 -- These are idempotent; running multiple times is safe.
 -- Schedule: daily at 07:00 WIB (UTC+7 = -7h from UTC)
 -- Note: Supabase-managed pg_cron uses UTC internally.
 -- 07:00 WIB = 00:00 UTC.  We register in UTC.
+-- Wrapped in conditional DO block: cron extension may not be
+-- available in local dev (pg_cron requires a Supabase platform
+-- add-on or self-hosted cron configuration).
 -- ============================================================
 
--- Daily reminder job: run at 00:00 UTC (07:00 WIB)
-select cron.schedule(
-  'daily-resident-reminder',
-  '0 0 * * *',
-  $$
-  select * from public.select_reminder_recipients() limit 1;
-  $$
-);
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    -- Daily reminder job: run at 00:00 UTC (07:00 WIB)
+    perform cron.schedule(
+      'daily-resident-reminder',
+      '0 0 * * *',
+      $cron$
+      select * from public.select_reminder_recipients() limit 1;
+      $cron$
+    );
 
--- Monthly summary job: run on the 1st of each month at 00:00 UTC
-select cron.schedule(
-  'monthly-admin-summary',
-  '0 0 1 * *',
-  $$
-  select 1;  -- placeholder; actual dispatch happens in run-monthly-summary edge function
-  $$
-);
+    -- Monthly summary job: run on the 1st of each month at 00:00 UTC
+    perform cron.schedule(
+      'monthly-admin-summary',
+      '0 0 1 * *',
+      $cron$
+      select 1;  -- placeholder; actual dispatch happens in run-monthly-summary edge function
+      $cron$
+    );
+  end if;
+end;
+$$;
 
 -- ============================================================
 -- Grant execute to service_role so Edge Functions can call helpers

@@ -20,7 +20,8 @@ export type NotificationTemplateCode =
   | "resident_payment_rejected"
   | "resident_payment_reminder"
   | "admin_pending_submission"
-  | "admin_monthly_summary";
+  | "admin_monthly_summary"
+  | "resident_announcement";
 
 export const VALID_TEMPLATE_CODES: NotificationTemplateCode[] = [
   "resident_invoice_created",
@@ -30,6 +31,7 @@ export const VALID_TEMPLATE_CODES: NotificationTemplateCode[] = [
   "resident_payment_reminder",
   "admin_pending_submission",
   "admin_monthly_summary",
+  "resident_announcement",
 ];
 
 /**

@@ -264,8 +264,11 @@ create index if not exists idx_telegram_accounts_profile_id
   on public.telegram_accounts(profile_id);
 
 -- ============================================================
--- Trigger: set linked_at / updated_at on telegram_accounts
+-- Trigger: set updated_at on telegram_accounts
 -- ============================================================
+
+alter table public.telegram_accounts
+  add column if not exists updated_at timestamptz not null default now();
 
 create or replace trigger telegram_accounts_set_updated_at
   before update on public.telegram_accounts

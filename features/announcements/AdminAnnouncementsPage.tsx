@@ -268,6 +268,20 @@ export function AdminAnnouncementsPage() {
 
     setSaving(false);
     setEditorOpen(false);
+
+    // COMM-05: trigger resident announcement notification on publish (fire-and-forget, T-05-14)
+    if (targetStatus === "published") {
+      const announcementId = isNew ? (data as { id: string })?.id : editor.id;
+      client.functions
+        .invoke("send-telegram-notification", {
+          body: {
+            template_code: "resident_announcement",
+            template_vars: { title: parsed.data.title },
+          },
+        })
+        .catch(() => {});
+    }
+
     await loadAnnouncements();
   };
 
