@@ -73,3 +73,12 @@ enable_anonymous_sign_ins = false
 enable_manual_linking = false
 minimum_password_length = 6
 password_requirements = ""
+
+[edge_functions]
+# Only telegram-bot-webhook is public-facing (no JWT verification).
+# All other functions require authenticated requests.
+verify_jwt = true
+
+[[edge_functions]]
+name = "telegram-bot-webhook"
+verify_jwt = false
