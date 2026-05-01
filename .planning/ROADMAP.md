@@ -107,9 +107,9 @@ Plans:
   4. Admin-like users can receive Telegram summaries or alerts relevant to payment verification and neighborhood operations.
 **Plans**: 3 plans
 Plans:
-- [ ] 05-01-PLAN.md — Build secure one-time Telegram account linking contracts (DB + edge consume flow).
-- [ ] 05-02-PLAN.md — Implement preference-aware Telegram notification dispatch and wire payment/announcement events.
-- [ ] 05-03-PLAN.md — Deliver Telegram command/deep-link utility flows and resident settings link-state management.
+- [ ] 05-01-PLAN.md — Build the secure deep-link linking foundation (token SQL contract, issuer function, webhook consume path).
+- [ ] 05-02-PLAN.md — Implement auditable Telegram delivery dispatch, reminders, monthly summary, and real payment/announcement event wiring.
+- [ ] 05-03-PLAN.md — Deliver full bot commands, resident Telegram settings UX, and admin delivery/template operations UI.
 **UI hint**: yes
 
 ### Phase 6: Imports, Optional QRIS & Launch Readiness
@@ -150,6 +150,6 @@ Plans:
 | 2. Billing Configuration & Resident Billing View | 0/TBD | Not started | - |
 | 3. Manual Payments, Reporting & Audit | 0/TBD | Not started | - |
 | 4. Announcements, Events & Resident Home | 5/5 | Complete | 2026-05-01 |
-| 5. Telegram Linking & Notifications | 0/TBD | Not started | - |
+| 5. Telegram Linking & Notifications | 0/3 | Not started | - |
 | 6. Imports, Optional QRIS & Launch Readiness | 0/TBD | Not started | - |
 | 7. Phase 1 Gap Closure & Milestone Verification | 0/TBD | Not started | - |

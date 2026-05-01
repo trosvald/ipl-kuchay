@@ -8,6 +8,9 @@ declare
   v_plain_token text;
   v_token_hash text;
   v_deep_link text;
+  v_plain_token2 text;
+  v_token_hash2 text;
+  v_deep_link2 text;
   v_bot_username text := 'test_ipl_jatiloka_bot';
 begin
   -- ============================================================
@@ -123,10 +126,6 @@ begin
   end if;
 
   -- Issue second token — prior unconsumed token must be invalidated (consumed_at set)
-  declare
-    v_plain_token2 text;
-    v_token_hash2 text;
-    v_deep_link2 text;
   begin
     select plain_token, token_hash, deep_link
     into v_plain_token2, v_token_hash2, v_deep_link2

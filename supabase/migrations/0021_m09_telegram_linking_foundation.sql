@@ -14,10 +14,10 @@ declare
   v_bytes bytea;
 begin
   v_bytes := gen_random_bytes(32);
-  -- base64url encoding: replace '+' with '-', '/' with '_', remove '=' padding
+  -- base64url encoding: replace '+' with '-', '/' with '_', strip '=' padding
   return 'link_' || translate(
     encode(v_bytes, 'base64'),
-    '+/',
+    '+/=',
     '-_'
   );
 end;
@@ -54,9 +54,6 @@ returns table (
 language plpgsql
 security definer
 as $$
-declare
-  v_plain_token text;
-  v_token_hash text;
 begin
   -- Validate inputs
   if p_profile_id is null then
@@ -74,16 +71,16 @@ begin
   where profile_id = p_profile_id
     and consumed_at is null;
 
-  -- Generate the one-time token
-  v_plain_token := public.gen_telegram_link_token();
-  v_token_hash := public.hash_telegram_link_token(v_plain_token);
+  -- Generate the one-time token (OUT params: plain_token, token_hash, deep_link)
+  plain_token := public.gen_telegram_link_token();
+  token_hash := public.hash_telegram_link_token(plain_token);
 
   -- Store only the hash, never the plain token (T-05-01)
   insert into public.telegram_link_tokens (profile_id, token_hash, expires_at)
-  values (p_profile_id, v_token_hash, now() + interval '15 minutes');
+  values (p_profile_id, token_hash, now() + interval '15 minutes');
 
-  -- Return plain token (for deep link construction), hash (for DB lookup), and deep link
-  deep_link := 'https://t.me/' || p_bot_username || '?start=' || v_plain_token;
+  -- Construct deep link with the plain token
+  deep_link := 'https://t.me/' || p_bot_username || '?start=' || plain_token;
 
   return next;
 end;
