@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Megaphone,
   ReceiptText,
+  Send,
   ShieldCheck,
   Users,
   Wallet,
@@ -46,6 +47,7 @@ const ADMIN_DASHBOARDS_GROUP: NavGroup = {
     { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
     { title: "Laporan", href: "/admin/reports", icon: ReceiptText },
     { title: "Audit Log", href: "/admin/audit", icon: ShieldCheck },
+    { title: "Telegram", href: "/admin/telegram", icon: Send },
   ],
 };
 
