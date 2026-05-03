@@ -11,6 +11,29 @@ export const rupiahAmountSchema = z
   .positive("Nominal harus lebih dari 0");
 
 export const requiredStringSchema = z.string().trim().min(1, "Wajib diisi");
+export const csvIntegerStringSchema = z
+  .string()
+  .trim()
+  .regex(/^-?\d+$/, "Harus berupa angka bulat")
+  .transform((value) => Number.parseInt(value, 10));
+
+export const csvPositiveIntegerStringSchema = csvIntegerStringSchema.refine((value) => value > 0, {
+  message: "Nominal harus lebih dari 0",
+});
+
+export const csvBooleanStringSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine((value) => ["true", "false", "1", "0", "yes", "no", "y", "n"].includes(value), {
+    message: "Nilai boolean tidak valid",
+  })
+  .transform((value) => ["true", "1", "yes", "y"].includes(value));
+
+export const optionalIsoDateStringSchema = z
+  .string()
+  .trim()
+  .refine((value) => value.length === 0 || parseIsoDateInput(value) !== null, "Format tanggal harus yyyy-mm-dd");
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const kavlingFormSchema = z.object({
