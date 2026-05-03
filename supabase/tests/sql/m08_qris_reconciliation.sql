@@ -1,7 +1,8 @@
 do $$
 declare
   v_resident uuid := '82000000-0000-0000-0000-000000000001'::uuid;
-  v_kavling uuid;
+  v_kavling_settle uuid;
+  v_kavling_expire uuid;
   v_period uuid;
   v_invoice_settle uuid;
   v_invoice_expire uuid;
@@ -23,12 +24,18 @@ begin
       role = excluded.role,
       is_active = excluded.is_active;
 
-  select id into v_kavling
+  select id into v_kavling_settle
   from public.kavlings
   order by sort_order, code
   limit 1;
 
-  if v_kavling is null then
+  select id into v_kavling_expire
+  from public.kavlings
+  order by sort_order, code
+  offset 1
+  limit 1;
+
+  if v_kavling_settle is null or v_kavling_expire is null then
     raise exception 'no kavling found in seed data';
   end if;
 
@@ -41,7 +48,7 @@ begin
   returning id into v_period;
 
   insert into public.invoices (billing_period_id, kavling_id, invoice_number, amount_due, amount_paid, due_date, status)
-  values (v_period, v_kavling, 'IPL-M08-QRIS-SETTLE', 350000, 0, current_date + interval '14 day', 'unpaid')
+  values (v_period, v_kavling_settle, 'IPL-M08-QRIS-SETTLE', 350000, 0, current_date + interval '14 day', 'unpaid')
   on conflict (billing_period_id, kavling_id) do update
   set invoice_number = excluded.invoice_number,
       amount_due = excluded.amount_due,
@@ -50,7 +57,7 @@ begin
   returning id into v_invoice_settle;
 
   insert into public.invoices (billing_period_id, kavling_id, invoice_number, amount_due, amount_paid, due_date, status)
-  values (v_period, v_kavling, 'IPL-M08-QRIS-EXPIRE', 200000, 0, current_date + interval '14 day', 'unpaid')
+  values (v_period, v_kavling_expire, 'IPL-M08-QRIS-EXPIRE', 200000, 0, current_date + interval '14 day', 'unpaid')
   on conflict (billing_period_id, kavling_id) do update
   set invoice_number = excluded.invoice_number,
       amount_due = excluded.amount_due,
