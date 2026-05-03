@@ -125,9 +125,9 @@ Plans:
 
 Plans:
 - [x] 06-01-PLAN.md — Define and test the CSV preview validation contracts for kavling, resident-mapping, and fee-override imports.
-- [ ] 06-02-PLAN.md — Build admin imports preview/apply workflow with Edge functions and import job audit persistence.
+- [x] 06-02-PLAN.md — Build admin imports preview/apply workflow with Edge functions and import job audit persistence.
 - [x] 06-03-PLAN.md — Implement Midtrans QRIS create/reconciliation backend with idempotent webhook handling.
-- [ ] 06-04-PLAN.md — Add admin QRIS feature flag controls and resident QRIS UI while preserving manual-transfer fallback.
+- [x] 06-04-PLAN.md — Add admin QRIS feature flag controls and resident QRIS UI while preserving manual-transfer fallback.
 - [ ] 06-05-PLAN.md — Produce launch-readiness operational verification artifacts and spreadsheet-free workflow proof.
 
 ### Phase 7: Phase 1 Gap Closure & Milestone Verification
