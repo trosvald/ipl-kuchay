@@ -1,17 +1,17 @@
 ---
-status: diagnosed
+status: awaiting_human_verify
 trigger: "Investigate the Phase 03 proof preview failure: browser POST to /functions/v1/get-proof-signed-url returns 500."
 created: 2026-04-30T00:00:00Z
-updated: 2026-04-30T07:52:40Z
+updated: 2026-05-03T00:12:00Z
 ---
 
 ## Current Focus
 <!-- OVERWRITE on each update - reflects NOW -->
 
-hypothesis: Confirmed path-format mismatch; additionally check whether host normalization is needed for local callers.
-test: Compare get-proof-signed-url behavior with get-report-output-signed-url normalization and verify storage path conventions from attach/upload flow.
-expecting: proof_path should be object key only; prefixed value breaks createSignedUrl. Normalization may be separately needed for local networking but not for this immediate 500.
-next_action: implement minimal safe normalization of stored proof path before createSignedUrl
+hypothesis: Fix has been applied in get-proof-signed-url; need real workflow verification that preview now succeeds for legacy prefixed proof_path records.
+test: Confirm function strips optional `payment-proofs/` prefix, passes normalized key to createSignedUrl, and normalizes local signed URL host.
+expecting: no `payment-proofs/payment-proofs/...` lookup; existing `payment-proofs/...` rows resolve to valid object key and endpoint no longer returns 500 for this root cause.
+next_action: user verifies proof preview in actual UAT flow for previously failing submission.
 
 ## Symptoms
 <!-- Written during gathering, then IMMUTABLE -->
@@ -48,10 +48,15 @@ started: Observed during Phase 03 UAT proof preview flow.
   found: Report flow includes signed URL host normalization for local runtimes (`kong` / `supabase_edge_runtime_*`) after URL creation.
   implication: Host normalization addresses caller reachability, not storage object lookup; it does not explain current 500 but may still be worthwhile parity improvement.
 
+- timestamp: 2026-05-03T00:12:00Z
+  checked: supabase/functions/get-proof-signed-url/index.ts
+  found: Function now normalizes proof path via `normalizeProofPath()` (`payment-proofs/` prefix stripped), uses `normalizedProofPath` in `createSignedUrl`, and normalizes signed URL host for local callers.
+  implication: Confirmed code-level fix directly addresses the double-bucket lookup root cause and includes local-host parity hardening.
+
 ## Resolution
 <!-- OVERWRITE as understanding evolves -->
 
-root_cause: "payment_submissions.proof_path for affected submission includes `payment-proofs/` bucket prefix, but get-proof-signed-url passes it directly to createSignedUrl on bucket `payment-proofs`, causing lookup of a non-existent object key and returning `Object not found` (surfaced as 500)."
-fix: "Normalize `proof_path` in get-proof-signed-url to strip optional `payment-proofs/` prefix before createSignedUrl; optionally also normalize returned signed URL host for local environments as parity hardening."
-verification: ""
-files_changed: []
+root_cause: "payment_submissions.proof_path for affected submission includes `payment-proofs/` bucket prefix, but get-proof-signed-url passed it directly to createSignedUrl on bucket `payment-proofs`, causing lookup of a non-existent object key and returning `Object not found` (surfaced as 500)."
+fix: "get-proof-signed-url now strips optional leading `payment-proofs/` from proof_path before createSignedUrl, and also normalizes signed URL host for local runtime callers."
+verification: "Static verification complete: function computes `normalizedProofPath` and uses it in storage signed URL generation; this removes the double-bucket key path. Pending human verification in real UAT flow."
+files_changed: ["supabase/functions/get-proof-signed-url/index.ts"]
