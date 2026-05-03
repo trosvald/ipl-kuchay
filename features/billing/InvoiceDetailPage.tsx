@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PaymentSubmissionForm } from "@/features/payments/PaymentSubmissionForm";
+import { QrisPaymentPanel } from "@/features/payments/QrisPaymentPanel";
 import { SubmissionHistory } from "@/features/payments/SubmissionHistory";
 import { ResidentPaymentHistory } from "@/features/payments/ResidentPaymentHistory";
 import { ResidentReceiptHistory } from "@/features/payments/ResidentReceiptHistory";
@@ -91,6 +92,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
   const [pageSize, setPageSize] = useState(10);
   const [submissionReloadToken, setSubmissionReloadToken] = useState(0);
   const [hasActiveKavlingAccess, setHasActiveKavlingAccess] = useState(true);
+  const [paymentGatewayEnabled, setPaymentGatewayEnabled] = useState(false);
 
   const loadInvoice = useCallback(async () => {
     if (!client) {
@@ -102,7 +104,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
     setLoading(true);
     setErrorMessage(null);
 
-    const [invoiceRes, itemsRes] = await Promise.all([
+    const [invoiceRes, itemsRes, gatewayRes] = await Promise.all([
       client
         .from("invoices")
         .select(
@@ -116,6 +118,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
         .eq("invoice_id", invoiceId)
         .order("sort_order", { ascending: true })
         .order("description", { ascending: true }),
+      client.from("app_settings").select("value").eq("key", "payment_gateway").maybeSingle(),
     ]);
 
     if (invoiceRes.error || itemsRes.error) {
@@ -126,6 +129,16 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
 
     setInvoice((invoiceRes.data ?? null) as InvoiceDetail | null);
     setItems((itemsRes.data ?? []) as InvoiceItemRow[]);
+    if (gatewayRes.error) {
+      console.warn("Gagal memuat konfigurasi payment gateway:", gatewayRes.error.message);
+    }
+
+    const gatewayEnabled =
+      (gatewayRes.data?.value &&
+        typeof gatewayRes.data.value === "object" &&
+        (gatewayRes.data.value as { enabled?: unknown }).enabled === true) ||
+      false;
+    setPaymentGatewayEnabled(gatewayEnabled);
 
     const invoiceData = invoiceRes.data as InvoiceDetail | null;
     if (!profile || !invoiceData?.kavling_id) {
@@ -330,22 +343,41 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
       ) : null}
 
       {invoice && hasActiveKavlingAccess ? (
-        <PaymentSubmissionForm
-          invoiceId={invoice.id}
-          invoiceStatus={invoice.status}
-          outstandingAmount={outstanding}
-          onSubmitted={async () => {
-            await loadInvoice();
-            setSubmissionReloadToken((value) => value + 1);
-          }}
-        />
+        <div className="grid gap-3 lg:grid-cols-2">
+          <QrisPaymentPanel
+            invoiceId={invoice.id}
+            invoiceStatus={invoice.status}
+            outstandingAmount={outstanding}
+            gatewayEnabled={paymentGatewayEnabled}
+          />
+
+          <PaymentSubmissionForm
+            invoiceId={invoice.id}
+            invoiceStatus={invoice.status}
+            outstandingAmount={outstanding}
+            onSubmitted={async () => {
+              await loadInvoice();
+              setSubmissionReloadToken((value) => value + 1);
+            }}
+          />
+        </div>
       ) : null}
 
-      <SubmissionHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+      {invoice ? (
+        <>
+          <SubmissionHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
 
-      <ResidentPaymentHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+          <ResidentPaymentHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
 
-      <ResidentReceiptHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+          <ResidentReceiptHistory invoiceId={invoiceId} reloadToken={submissionReloadToken} />
+        </>
+      ) : !loading ? (
+        <Card className="border-amber-200 bg-amber-50 rounded-xl">
+          <CardContent className="py-3 text-sm text-amber-800">
+            Detail invoice tidak tersedia untuk akun Anda. Riwayat pembayaran tidak dapat ditampilkan karena invoice ini di luar cakupan akses riwayat kavling Anda.
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="rounded-xl">
         <CardHeader>

@@ -55,6 +55,10 @@ interface PreparedSubmissionInput {
 
 const SUBMITTABLE_STATUSES = new Set(["unpaid", "overdue", "rejected", "partial"]);
 
+export function canSubmitManualTransfer(invoiceStatus: string, outstandingAmount: number): boolean {
+  return SUBMITTABLE_STATUSES.has(invoiceStatus) && outstandingAmount > 0;
+}
+
 function readFunctionError<T extends { error?: string }>(payload: T | null, fallbackMessage: string): string {
   if (!payload?.error) {
     return fallbackMessage;
@@ -84,7 +88,7 @@ export function PaymentSubmissionForm({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => {
-    return SUBMITTABLE_STATUSES.has(invoiceStatus) && outstandingAmount > 0;
+    return canSubmitManualTransfer(invoiceStatus, outstandingAmount);
   }, [invoiceStatus, outstandingAmount]);
 
   const loadBankAccounts = useCallback(async () => {
