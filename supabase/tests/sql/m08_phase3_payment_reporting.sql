@@ -167,6 +167,13 @@ begin
   -- ----------------------------------------------------------------
   -- TEST 2: reject_payment_submission writes reason + recalculates + audit
   -- ----------------------------------------------------------------
+  delete from public.payments where invoice_id = v_invoice;
+  update public.invoices
+  set amount_paid = 0,
+      status = 'unpaid',
+      paid_at = null
+  where id = v_invoice;
+
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice, v_resident, 300000, 'submitted')
   returning id into v_submission_reject;
@@ -187,8 +194,8 @@ begin
   from public.invoices
   where id = v_invoice;
 
-  if v_invoice_status <> 'paid' then
-    raise exception 'rejecting extra submission on already-paid invoice must stay paid; got %', v_invoice_status;
+  if v_invoice_status <> 'rejected' then
+    raise exception 'rejecting unpaid invoice submission must set status rejected; got %', v_invoice_status;
   end if;
 
   select count(*)

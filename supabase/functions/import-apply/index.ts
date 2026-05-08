@@ -23,6 +23,21 @@ interface ImportJobRow {
   id: string;
 }
 
+interface KavlingLookupRow {
+  id: string;
+  code: string;
+}
+
+interface ProfileLookupRow {
+  id: string;
+  email: string;
+}
+
+interface FeeTypeLookupRow {
+  id: string;
+  code: string;
+}
+
 function isImportType(value: unknown): value is ImportType {
   return value === "kavling" || value === "resident_mapping" || value === "fee_override";
 }
@@ -71,128 +86,141 @@ async function parseRequest(request: Request): Promise<{
 async function applyKavlingRows(rows: KavlingImportRow[]) {
   const client = createServiceRoleClient();
 
-  for (const row of rows) {
-    const { error } = await client.from("kavlings").upsert(
-      {
-        code: row.code,
-        block: row.block || null,
-        sort_order: row.sort_order,
-        active: row.active,
-        notes: row.notes || null,
-      },
-      { onConflict: "code" },
-    );
+  const payload = rows.map((row) => ({
+    code: row.code,
+    block: row.block || null,
+    sort_order: row.sort_order,
+    active: row.active,
+    notes: row.notes || null,
+  }));
 
-    if (error) {
-      throw new HttpError(400, `Gagal menerapkan data kavling (${row.code}): ${error.message}`);
-    }
+  const { error } = await client.from("kavlings").upsert(payload, { onConflict: "code" });
+
+  if (error) {
+    throw new HttpError(400, `Gagal menerapkan data kavling: ${error.message}`);
   }
 }
 
 async function applyResidentMappings(rows: ResidentMappingImportRow[]) {
   const client = createServiceRoleClient();
 
-  for (const row of rows) {
-    const { data: kavling, error: kavlingError } = await client
-      .from("kavlings")
-      .select("id")
-      .eq("code", row.kavling_code)
-      .maybeSingle();
+  const kavlingCodes = [...new Set(rows.map((row) => row.kavling_code))];
+  const residentEmails = [...new Set(rows.map((row) => row.resident_email))];
 
-    if (kavlingError) {
-      throw new HttpError(400, `Gagal mencari kavling ${row.kavling_code}: ${kavlingError.message}`);
-    }
+  const { data: kavlings, error: kavlingError } = await client
+    .from("kavlings")
+    .select("id, code")
+    .in("code", kavlingCodes);
 
-    if (!kavling?.id) {
+  if (kavlingError) {
+    throw new HttpError(400, `Gagal memuat data kavling import: ${kavlingError.message}`);
+  }
+
+  const { data: profiles, error: profileError } = await client
+    .from("profiles")
+    .select("id, email")
+    .in("email", residentEmails);
+
+  if (profileError) {
+    throw new HttpError(400, `Gagal memuat data resident import: ${profileError.message}`);
+  }
+
+  const kavlingByCode = new Map(
+    ((kavlings ?? []) as KavlingLookupRow[]).map((row) => [row.code, row.id]),
+  );
+  const profileByEmail = new Map(
+    ((profiles ?? []) as ProfileLookupRow[]).map((row) => [row.email, row.id]),
+  );
+
+  const payload = rows.map((row) => {
+    const kavlingId = kavlingByCode.get(row.kavling_code);
+    if (!kavlingId) {
       throw new HttpError(400, `Kavling tidak ditemukan: ${row.kavling_code}`);
     }
 
-    const { data: profile, error: profileError } = await client
-      .from("profiles")
-      .select("id")
-      .eq("email", row.resident_email)
-      .maybeSingle();
-
-    if (profileError) {
-      throw new HttpError(400, `Gagal mencari resident ${row.resident_email}: ${profileError.message}`);
-    }
-
-    if (!profile?.id) {
+    const profileId = profileByEmail.get(row.resident_email);
+    if (!profileId) {
       throw new HttpError(400, `Resident tidak ditemukan: ${row.resident_email}`);
     }
 
-    const { error } = await client.from("kavling_residents").upsert(
-      {
-        kavling_id: kavling.id,
-        profile_id: profile.id,
-        relation: row.relation,
-        relation_type: "other",
-        relation_label: row.relation,
-        is_primary: row.is_primary,
-        active: row.active,
-      },
-      { onConflict: "kavling_id,profile_id" },
-    );
+    return {
+      kavling_id: kavlingId,
+      profile_id: profileId,
+      relation: row.relation,
+      relation_type: "other",
+      relation_label: row.relation,
+      is_primary: row.is_primary,
+      active: row.active,
+    };
+  });
 
-    if (error) {
-      throw new HttpError(
-        400,
-        `Gagal menerapkan mapping ${row.kavling_code} - ${row.resident_email}: ${error.message}`,
-      );
-    }
+  const { error } = await client
+    .from("kavling_residents")
+    .upsert(payload, { onConflict: "kavling_id,profile_id" });
+
+  if (error) {
+    throw new HttpError(400, `Gagal menerapkan mapping resident: ${error.message}`);
   }
 }
 
 async function applyFeeOverrides(rows: FeeOverrideImportRow[]) {
   const client = createServiceRoleClient();
 
-  for (const row of rows) {
-    const { data: kavling, error: kavlingError } = await client
-      .from("kavlings")
-      .select("id")
-      .eq("code", row.kavling_code)
-      .maybeSingle();
+  const kavlingCodes = [...new Set(rows.map((row) => row.kavling_code))];
+  const feeTypeCodes = [...new Set(rows.map((row) => row.fee_type_code))];
 
-    if (kavlingError) {
-      throw new HttpError(400, `Gagal mencari kavling ${row.kavling_code}: ${kavlingError.message}`);
-    }
+  const { data: kavlings, error: kavlingError } = await client
+    .from("kavlings")
+    .select("id, code")
+    .in("code", kavlingCodes);
 
-    if (!kavling?.id) {
+  if (kavlingError) {
+    throw new HttpError(400, `Gagal memuat data kavling import: ${kavlingError.message}`);
+  }
+
+  const { data: feeTypes, error: feeTypeError } = await client
+    .from("fee_types")
+    .select("id, code")
+    .in("code", feeTypeCodes);
+
+  if (feeTypeError) {
+    throw new HttpError(400, `Gagal memuat jenis iuran import: ${feeTypeError.message}`);
+  }
+
+  const kavlingByCode = new Map(
+    ((kavlings ?? []) as KavlingLookupRow[]).map((row) => [row.code, row.id]),
+  );
+  const feeTypeByCode = new Map(
+    ((feeTypes ?? []) as FeeTypeLookupRow[]).map((row) => [row.code, row.id]),
+  );
+
+  const payload = rows.map((row) => {
+    const kavlingId = kavlingByCode.get(row.kavling_code);
+    if (!kavlingId) {
       throw new HttpError(400, `Kavling tidak ditemukan: ${row.kavling_code}`);
     }
 
-    const { data: feeType, error: feeTypeError } = await client
-      .from("fee_types")
-      .select("id")
-      .eq("code", row.fee_type_code)
-      .maybeSingle();
-
-    if (feeTypeError) {
-      throw new HttpError(400, `Gagal mencari jenis iuran ${row.fee_type_code}: ${feeTypeError.message}`);
-    }
-
-    if (!feeType?.id) {
+    const feeTypeId = feeTypeByCode.get(row.fee_type_code);
+    if (!feeTypeId) {
       throw new HttpError(400, `Jenis iuran tidak ditemukan: ${row.fee_type_code}`);
     }
 
-    const { error } = await client.from("kavling_fee_overrides").upsert(
-      {
-        kavling_id: kavling.id,
-        fee_type_id: feeType.id,
-        amount: row.amount,
-        active_from: row.active_from || null,
-        active_until: row.active_until || null,
-        notes: row.notes || null,
-      },
-      { onConflict: "kavling_id,fee_type_id,active_from" },
-    );
+    return {
+      kavling_id: kavlingId,
+      fee_type_id: feeTypeId,
+      amount: row.amount,
+      active_from: row.active_from || null,
+      active_until: row.active_until || null,
+      notes: row.notes || null,
+    };
+  });
 
-    if (error) {
-      throw new HttpError(
-        400,
-        `Gagal menerapkan override ${row.kavling_code} - ${row.fee_type_code}: ${error.message}`,
-      );
-    }
+  const { error } = await client
+    .from("kavling_fee_overrides")
+    .upsert(payload, { onConflict: "kavling_id,fee_type_id,active_from" });
+
+  if (error) {
+    throw new HttpError(400, `Gagal menerapkan override iuran: ${error.message}`);
   }
 }
 

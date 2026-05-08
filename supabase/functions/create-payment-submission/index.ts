@@ -17,18 +17,6 @@ interface CreateSubmissionRequest {
   note?: string;
 }
 
-interface InvoiceRow {
-  id: string;
-  amount_due: number;
-  amount_paid: number;
-  status: string;
-}
-
-interface BankAccountRow {
-  id: string;
-  is_active: boolean;
-}
-
 function isUuid(value: unknown): value is string {
   if (typeof value !== "string") {
     return false;
@@ -103,73 +91,19 @@ async function handleCreateSubmission(request: Request): Promise<Response> {
   requireRole(caller, ["resident", "treasurer", "admin", "super_admin"]);
 
   const input = await parseRequest(request);
-
-  const { data: invoice, error: invoiceError } = await userClient
-    .from("invoices")
-    .select("id, amount_due, amount_paid, status")
-    .eq("id", input.invoiceId)
-    .maybeSingle();
-
-  if (invoiceError) {
-    throw new HttpError(400, invoiceError.message);
-  }
-
-  if (!invoice) {
-    throw new HttpError(404, "Invoice not found or not accessible");
-  }
-
-  const invoiceRow = invoice as InvoiceRow;
-  const outstandingAmount = Math.max(invoiceRow.amount_due - invoiceRow.amount_paid, 0);
-
-  if (outstandingAmount <= 0) {
-    throw new HttpError(400, "Invoice outstanding is already zero");
-  }
-
-  if (input.amountSubmitted > outstandingAmount) {
-    throw new HttpError(400, "amountSubmitted exceeds outstanding invoice balance");
-  }
-
-  const { data: bankAccount, error: bankError } = await userClient
-    .from("bank_accounts")
-    .select("id, is_active")
-    .eq("id", input.bankAccountId)
-    .maybeSingle();
-
-  if (bankError) {
-    throw new HttpError(400, bankError.message);
-  }
-
-  if (!bankAccount || !(bankAccount as BankAccountRow).is_active) {
-    throw new HttpError(400, "Bank account not found or inactive");
-  }
-
-  const { data: submission, error: insertError } = await userClient
-    .from("payment_submissions")
-    .insert({
-      invoice_id: input.invoiceId,
-      submitted_by: caller.id,
-      amount_submitted: input.amountSubmitted,
-      bank_account_id: input.bankAccountId,
-      note: input.note,
-      status: "submitted",
-    })
-    .select("id")
-    .single();
-
-  if (insertError || !submission?.id) {
-    throw new HttpError(400, insertError?.message ?? "Failed to create payment submission");
-  }
-
-  const { error: recalcError } = await userClient.rpc("recalculate_invoice_status", {
+  const { data: submissionId, error: createError } = await userClient.rpc("create_payment_submission", {
     target_invoice_id: input.invoiceId,
+    target_amount_submitted: input.amountSubmitted,
+    target_bank_account_id: input.bankAccountId,
+    target_note: input.note,
   });
 
-  if (recalcError) {
-    throw new HttpError(400, recalcError.message);
+  if (createError || !submissionId) {
+    throw new HttpError(400, createError?.message ?? "Failed to create payment submission");
   }
 
   return jsonResponse(200, {
-    submissionId: submission.id,
+    submissionId,
   });
 }
 

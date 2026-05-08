@@ -6,7 +6,7 @@ import { Download, FileText, Receipt, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectItem } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/authHooks";
 import {
@@ -34,6 +34,7 @@ import type {
 } from "@/features/reports/reportSchemas";
 
 export function ReportsPage() {
+  const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
   const client = getSupabaseBrowserClient();
   const { role } = useAuth();
 
@@ -53,6 +54,10 @@ export function ReportsPage() {
   const [outputLoading, setOutputLoading] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
   const [generatingReceiptId, setGeneratingReceiptId] = useState<string | null>(null);
+  const [summaryPage, setSummaryPage] = useState(1);
+  const [summaryPageSize, setSummaryPageSize] = useState<number>(10);
+  const [arrearsPage, setArrearsPage] = useState(1);
+  const [arrearsPageSize, setArrearsPageSize] = useState<number>(10);
 
   // Period summaries for dropdown
   const loadPeriodSummaries = useCallback(async () => {
@@ -161,6 +166,52 @@ export function ReportsPage() {
     [summaryRows],
   );
 
+  const summaryTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(summaryRows.length / summaryPageSize)),
+    [summaryRows.length, summaryPageSize],
+  );
+
+  const pagedSummaryRows = useMemo(() => {
+    const start = (summaryPage - 1) * summaryPageSize;
+    return summaryRows.slice(start, start + summaryPageSize);
+  }, [summaryRows, summaryPage, summaryPageSize]);
+
+  const summaryStart = summaryRows.length === 0 ? 0 : (summaryPage - 1) * summaryPageSize + 1;
+  const summaryEnd = Math.min(summaryPage * summaryPageSize, summaryRows.length);
+
+  const arrearsTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(arrearsRows.length / arrearsPageSize)),
+    [arrearsRows.length, arrearsPageSize],
+  );
+
+  const pagedArrearsRows = useMemo(() => {
+    const start = (arrearsPage - 1) * arrearsPageSize;
+    return arrearsRows.slice(start, start + arrearsPageSize);
+  }, [arrearsRows, arrearsPage, arrearsPageSize]);
+
+  const arrearsStart = arrearsRows.length === 0 ? 0 : (arrearsPage - 1) * arrearsPageSize + 1;
+  const arrearsEnd = Math.min(arrearsPage * arrearsPageSize, arrearsRows.length);
+
+  useEffect(() => {
+    setSummaryPage(1);
+  }, [selectedPeriodId, summaryPageSize]);
+
+  useEffect(() => {
+    if (summaryPage > summaryTotalPages) {
+      setSummaryPage(summaryTotalPages);
+    }
+  }, [summaryPage, summaryTotalPages]);
+
+  useEffect(() => {
+    setArrearsPage(1);
+  }, [selectedPeriodId, arrearsPageSize]);
+
+  useEffect(() => {
+    if (arrearsPage > arrearsTotalPages) {
+      setArrearsPage(arrearsTotalPages);
+    }
+  }, [arrearsPage, arrearsTotalPages]);
+
   const handleExportCsv = useCallback(async () => {
     if (!selectedPeriodId || summaryRows.length === 0) return;
 
@@ -232,7 +283,7 @@ export function ReportsPage() {
   }, [client]);
 
   const handleGenerateResidentReceipt = useCallback(async (candidate: ReceiptCandidateRow) => {
-    setGeneratingReceiptId(candidate.invoice_id);
+    setGeneratingReceiptId(candidate.payment_id);
     try {
       const period = selectedPeriod;
       await generateReportOutputArtifact({
@@ -289,17 +340,14 @@ export function ReportsPage() {
             <Select
               value={selectedPeriodId}
               onChange={(e) => setSelectedPeriodId(e.target.value)}
+              className="w-[200px]"
             >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue>{selectedPeriod?.label || "Pilih periode..."}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {periodSummaries.map((period) => (
-                  <SelectItem key={period.id} value={period.id}>
-                    {period.label} ({period.invoice_count} invoice)
-                  </SelectItem>
-                ))}
-              </SelectContent>
+              <option value="">Pilih periode...</option>
+              {periodSummaries.map((period) => (
+                <SelectItem key={period.id} value={period.id}>
+                  {period.label} ({period.invoice_count} invoice)
+                </SelectItem>
+              ))}
             </Select>
 
             {selectedPeriod && (
@@ -409,6 +457,23 @@ export function ReportsPage() {
             <p className="text-sm text-slate-600">Belum ada data untuk periode ini.</p>
           ) : (
             <div className="overflow-x-auto">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                <span>
+                  Menampilkan {summaryStart}-{summaryEnd} dari {summaryRows.length} kavling
+                </span>
+                <div className="flex items-center gap-2">
+                  <span>Limit:</span>
+                  <Select
+                    value={String(summaryPageSize)}
+                    onChange={(e) => setSummaryPageSize(Number(e.target.value))}
+                    className="h-8 w-[90px]"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={String(size)}>{size}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
               <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -422,7 +487,7 @@ export function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {summaryRows.map((row) => (
+                  {pagedSummaryRows.map((row) => (
                     <TableRow key={row.kavling_id}>
                       <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
                       <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
@@ -447,6 +512,25 @@ export function ReportsPage() {
                   ))}
                 </TableBody>
               </Table>
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSummaryPage((page) => Math.max(1, page - 1))}
+                  disabled={summaryPage === 1}
+                >
+                  Prev
+                </Button>
+                <span className="text-sm text-slate-600">Page {summaryPage}/{summaryTotalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSummaryPage((page) => Math.min(summaryTotalPages, page + 1))}
+                  disabled={summaryPage >= summaryTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -464,6 +548,23 @@ export function ReportsPage() {
             <p className="text-sm text-slate-600">Tidak ada tunggakan untuk periode ini.</p>
           ) : (
             <div className="overflow-x-auto">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                <span>
+                  Menampilkan {arrearsStart}-{arrearsEnd} dari {arrearsRows.length} item tunggakan
+                </span>
+                <div className="flex items-center gap-2">
+                  <span>Limit:</span>
+                  <Select
+                    value={String(arrearsPageSize)}
+                    onChange={(e) => setArrearsPageSize(Number(e.target.value))}
+                    className="h-8 w-[90px]"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={String(size)}>{size}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
               <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -478,7 +579,7 @@ export function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {arrearsRows.map((row) => (
+                  {pagedArrearsRows.map((row) => (
                     <TableRow key={row.kavling_id}>
                       <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
                       <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
@@ -506,6 +607,25 @@ export function ReportsPage() {
                   ))}
                 </TableBody>
               </Table>
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setArrearsPage((page) => Math.max(1, page - 1))}
+                  disabled={arrearsPage === 1}
+                >
+                  Prev
+                </Button>
+                <span className="text-sm text-slate-600">Page {arrearsPage}/{arrearsTotalPages}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setArrearsPage((page) => Math.min(arrearsTotalPages, page + 1))}
+                  disabled={arrearsPage >= arrearsTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -590,7 +710,7 @@ export function ReportsPage() {
                 </TableHeader>
                 <TableBody>
                   {receiptCandidates.map((candidate) => (
-                    <TableRow key={candidate.invoice_id}>
+                    <TableRow key={candidate.payment_id}>
                       <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
                       <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>
                       <TableCell className="text-right text-green-600">{formatRupiah(candidate.amount_paid)}</TableCell>
@@ -600,10 +720,10 @@ export function ReportsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleGenerateResidentReceipt(candidate)}
-                          disabled={generatingReceiptId === candidate.invoice_id}
+                          disabled={generatingReceiptId === candidate.payment_id}
                         >
                           <Receipt className="size-3 mr-1" />
-                          {generatingReceiptId === candidate.invoice_id ? "Membuat..." : "Buat Bukti"}
+                          {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
                         </Button>
                       </TableCell>
                     </TableRow>

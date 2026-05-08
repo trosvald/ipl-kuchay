@@ -155,11 +155,17 @@ begin
     raise exception 'expected paid / 300000 after second verification, got % / %', v_invoice_status, v_amount_paid;
   end if;
 
-  insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
-  values (v_invoice_verify, v_resident, 50000, 'submitted')
-  returning id into v_submission_3;
-
-  perform public.reject_payment_submission(v_submission_3, 'proof does not match transfer');
+  begin
+    insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
+    values (v_invoice_verify, v_resident, 50000, 'submitted')
+    returning id into v_submission_3;
+    raise exception 'submission on fully paid invoice must fail';
+  exception
+    when others then
+      if position('reservable' in lower(sqlerrm)) = 0 then
+        raise;
+      end if;
+  end;
 
   select status
   into v_invoice_status
@@ -192,12 +198,11 @@ begin
     and entity_id in (
       v_submission_1::text,
       v_submission_2::text,
-      v_submission_3::text,
       v_submission_4::text
     );
 
-  if v_audit_count <> 4 then
-    raise exception 'expected 4 verify/reject audit logs, got %', v_audit_count;
+  if v_audit_count <> 3 then
+    raise exception 'expected 3 verify/reject audit logs, got %', v_audit_count;
   end if;
 end;
 $$;

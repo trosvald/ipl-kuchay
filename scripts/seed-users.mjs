@@ -155,6 +155,46 @@ async function seed() {
   }
 
   // ==========================================================
+  // 4b. Default bank account for manual transfer UAT
+  // ==========================================================
+  console.log("\nEnsuring default bank account...");
+  const existingAccounts = await api(
+    "GET",
+    "/rest/v1/bank_accounts?select=id,label&label=eq.Rekening Kas IPL"
+  );
+
+  if (existingAccounts?.length > 0) {
+    await api(
+      "PATCH",
+      `/rest/v1/bank_accounts?id=eq.${existingAccounts[0].id}`,
+      {
+        bank_name: "BCA",
+        account_number: "1234567890",
+        account_holder: "IPL Jatiloka",
+        is_default: true,
+        is_active: true,
+      },
+      { "Prefer": "return=minimal" }
+    );
+    console.log("  • Rekening Kas IPL already exists (ensured active/default)");
+  } else {
+    await api(
+      "POST",
+      "/rest/v1/bank_accounts",
+      {
+        label: "Rekening Kas IPL",
+        bank_name: "BCA",
+        account_number: "1234567890",
+        account_holder: "IPL Jatiloka",
+        is_default: true,
+        is_active: true,
+      },
+      { "Prefer": "return=minimal" }
+    );
+    console.log("  ✓ Rekening Kas IPL created");
+  }
+
+  // ==========================================================
   // 5. Sign in as admin to call auth-gated RPCs
   // ==========================================================
   console.log("\nSigning in as admin...");
