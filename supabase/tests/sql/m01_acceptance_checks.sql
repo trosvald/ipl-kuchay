@@ -4,6 +4,7 @@ declare
   v_fee_type_count integer;
   v_bucket_count integer;
   v_public_bucket_count integer;
+  v_kavling_status_fn regprocedure;
 begin
   select count(*) into v_kavling_count from public.kavlings;
   if v_kavling_count <> 34 then
@@ -32,6 +33,16 @@ begin
 
   if v_public_bucket_count <> 0 then
     raise exception 'payment/report buckets must be private';
+  end if;
+
+  if not has_function_privilege('anon', 'public.get_public_period_summary()', 'execute') then
+    raise exception 'anon must execute public.get_public_period_summary()';
+  end if;
+
+  v_kavling_status_fn := to_regprocedure('public.get_public_kavling_status(uuid)');
+  if v_kavling_status_fn is not null
+     and has_function_privilege('anon', 'public.get_public_kavling_status(uuid)', 'execute') then
+    raise exception 'anon must not execute public.get_public_kavling_status(uuid)';
   end if;
 end;
 $$;
