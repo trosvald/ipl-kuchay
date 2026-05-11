@@ -314,8 +314,8 @@ begin
   perform set_config('request.jwt.claim.sub', v_resident_new::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
-  if not public.can_access_invoice_history(v_invoice_old) then
-    raise exception 'active resident must keep access to older kavling invoice history after mapping handoff';
+  if public.can_access_invoice_history(v_invoice_old) then
+    raise exception 'active resident must not access older kavling invoice history before started_at';
   end if;
 
   if not public.can_access_invoice_history(v_invoice_new) then
@@ -333,8 +333,8 @@ begin
     using v_report_old, v_report_new;
   execute 'reset role';
 
-  if v_visible_count <> 2 then
-    raise exception 'active resident must read receipt reports for accessible kavling invoice history';
+  if v_visible_count <> 1 then
+    raise exception 'active resident must read only receipt reports inside their occupancy window';
   end if;
 
   perform set_config('request.jwt.claim.sub', v_treasurer::text, true);

@@ -67,6 +67,21 @@ describe("phase 06 launch readiness contract", () => {
     expect(canSubmitManualTransfer("overdue", 125000)).toBe(true);
   });
 
+  it("keeps deployment guidance aligned with private storage and Next.js env vars", () => {
+    const guide = readRepoFile("PANDUAN-DEPLOY.md");
+
+    expect(guide).toContain("Jangan memakai `supabase-setup.sql`");
+    expect(guide).toContain("`payment-proofs` dan `report-outputs`");
+    expect(guide).toContain("public = false");
+    expect(guide).toContain("NEXT_PUBLIC_SUPABASE_URL");
+    expect(guide).toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    expect(guide).toContain("APP_INTERNAL_CRON_SECRET");
+    expect(guide).toContain("QRIS tetap nonaktif");
+    expect(guide).not.toContain("VITE_SUPABASE");
+    expect(guide).not.toContain("bukti-transfer");
+    expect(guide).not.toContain("Public bucket");
+  });
+
   it("keeps in-app report export able to represent launch billing truth without spreadsheet formulas", () => {
     const csv = serializeCsv(
       toCsvRows([
