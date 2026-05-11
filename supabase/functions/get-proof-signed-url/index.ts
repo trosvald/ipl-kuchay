@@ -19,6 +19,8 @@ interface SignedUrlRequest {
 
 interface SubmissionRow {
   id: string;
+  invoice_id: string;
+  submitted_by: string;
   proof_path: string | null;
 }
 
@@ -93,23 +95,24 @@ async function handleGetProofSignedUrl(request: Request): Promise<Response> {
 
   const input = await parseRequest(request);
 
-  const { data: accessibleSubmission, error: accessError } = await userClient
-    .from("payment_submissions")
-    .select("id")
-    .eq("id", input.submissionId)
-    .maybeSingle();
+  const { data: canAccessProof, error: accessError } = await userClient.rpc(
+    "can_access_payment_proof_submission",
+    {
+      target_submission_id: input.submissionId,
+    },
+  );
 
   if (accessError) {
     throw new HttpError(400, accessError.message);
   }
 
-  if (!accessibleSubmission) {
+  if (canAccessProof !== true) {
     throw new HttpError(404, "Submission not found or not accessible");
   }
 
   const { data: submission, error: submissionError } = await serviceClient
     .from("payment_submissions")
-    .select("id, proof_path")
+    .select("id, invoice_id, submitted_by, proof_path")
     .eq("id", input.submissionId)
     .maybeSingle();
 
@@ -143,24 +146,24 @@ async function handleGetProofSignedUrl(request: Request): Promise<Response> {
 
   const signedUrl = normalizeSignedUrlForCaller(request, signed.signedUrl);
 
-  if (caller.role === "treasurer" || caller.role === "admin" || caller.role === "super_admin") {
-    const { error: auditError } = await serviceClient.from("audit_logs").insert({
-      actor_id: caller.id,
-      actor_role: caller.role,
-      action: "payment_submission.proof_signed_url",
-      entity_table: "payment_submissions",
-      entity_id: row.id,
-      before_data: null,
-      after_data: {
-        submission_id: row.id,
-        expires_in_seconds: expiresInSeconds,
-      },
-      request_id: request.headers.get("x-request-id"),
-    });
+  const { error: auditError } = await serviceClient.from("audit_logs").insert({
+    actor_id: caller.id,
+    actor_role: caller.role,
+    action: "payment_submission.proof_signed_url",
+    entity_table: "payment_submissions",
+    entity_id: row.id,
+    before_data: null,
+    after_data: {
+      submission_id: row.id,
+      invoice_id: row.invoice_id,
+      access_scope: caller.role === "resident" && caller.id === row.submitted_by ? "submitter" : "finance",
+      expires_in_seconds: expiresInSeconds,
+    },
+    request_id: request.headers.get("x-request-id"),
+  });
 
-    if (auditError) {
-      throw new HttpError(500, auditError.message);
-    }
+  if (auditError) {
+    throw new HttpError(500, auditError.message);
   }
 
   return jsonResponse(200, {
