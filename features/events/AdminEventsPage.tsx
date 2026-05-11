@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 import { Calendar, FilePlus2, MapPin, RefreshCw, X } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -163,15 +163,12 @@ export function AdminEventsPage() {
     });
   }, [loadEvents]);
 
-  const now = new Date();
-
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      if (activeTab === "cancelled") return item.status === "cancelled";
-      if (activeTab === "past") return item.status === "scheduled" && new Date(item.starts_at) < now;
-      return item.status === "scheduled" && new Date(item.starts_at) >= now;
-    });
-  }, [items, activeTab]);
+  const filteredItems = items.filter((item) => {
+    const now = new Date();
+    if (activeTab === "cancelled") return item.status === "cancelled";
+    if (activeTab === "past") return item.status === "scheduled" && new Date(item.starts_at) < now;
+    return item.status === "scheduled" && new Date(item.starts_at) >= now;
+  });
 
   const handleTabChange = (value: string) => {
     setActiveTab(parseTab(value));
@@ -368,7 +365,7 @@ export function AdminEventsPage() {
                 <TableBody>
                   {filteredItems.map((row) => {
                     const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
-                    const isPast = new Date(row.starts_at) < now;
+                    const isPast = new Date(row.starts_at) < new Date();
                     return (
                       <TableRow key={row.id}>
                         <TableCell className="max-w-xs">

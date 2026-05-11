@@ -54,7 +54,7 @@ npm run supabase:reset
 - `npm run build` - build production bundle
 - `npm run start` - run production server
 - `npm run typecheck` - run TypeScript checks
-- `npm run lint` - run Next.js lint checks
+- `npm run lint` - run ESLint checks
 - `npm run supabase:start` - start local Supabase
 - `npm run supabase:stop` - stop local Supabase
 - `npm run supabase:reset` - reset local Supabase database

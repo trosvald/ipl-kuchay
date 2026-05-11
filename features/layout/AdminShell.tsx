@@ -40,7 +40,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
       }
     }
     return "Admin";
-  }, [isNavItemActive]);
+  }, [isNavItemActive, navGroups]);
 
   const handleSignOut = () => {
     signOut().catch(() => undefined);

@@ -286,7 +286,7 @@ export function ReportsPage() {
     } finally {
       setActionLoading(null);
     }
-  }, [selectedPeriodId, selectedPeriod, totalInvoiced, totalCollected, totalRemaining, summaryRows, loadReportData]);
+  }, [selectedPeriodId, selectedPeriod, totalInvoiced, totalCollected, totalRemaining, loadReportData]);
 
   const handleDownloadOutput = useCallback(async (reportId: string) => {
     if (!client) return;

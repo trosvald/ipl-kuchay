@@ -20,8 +20,8 @@ describe("imports admin flow", () => {
   });
 
   it("expects preview-before-apply guard message in imports page", async () => {
-    const module = await import("@/features/imports/ImportJobsPage");
-    const sourceHint = String(module.ImportJobsPage);
+    const importJobsModule = await import("@/features/imports/ImportJobsPage");
+    const sourceHint = String(importJobsModule.ImportJobsPage);
     expect(sourceHint).toContain("Masih ada baris tidak valid. Perbaiki CSV sebelum apply.");
   });
 });

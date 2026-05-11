@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Calendar, RefreshCw } from "lucide-react";
 
@@ -150,8 +150,6 @@ export function ResidentEventsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const now = new Date();
-
   const loadEvents = useCallback(async () => {
     if (!client) {
       setLoading(false);
@@ -199,21 +197,15 @@ export function ResidentEventsPage() {
     });
   }, [loadEvents]);
 
-  const upcomingEvents = useMemo(() => {
-    return events.filter(
-      (e) => e.status === "scheduled" && new Date(e.starts_at) >= now,
-    );
-  }, [events, now]);
+  const upcomingEvents = events.filter(
+    (e) => e.status === "scheduled" && new Date(e.starts_at) >= new Date(),
+  );
 
-  const cancelledEvents = useMemo(() => {
-    return events.filter((e) => e.status === "cancelled");
-  }, [events]);
+  const cancelledEvents = events.filter((e) => e.status === "cancelled");
 
-  const pastEvents = useMemo(() => {
-    return events.filter(
-      (e) => e.status === "scheduled" && new Date(e.starts_at) < now,
-    );
-  }, [events, now]);
+  const pastEvents = events.filter(
+    (e) => e.status === "scheduled" && new Date(e.starts_at) < new Date(),
+  );
 
   const formatRsvpLabel = (response: string | undefined): { label: string; variant: "success" | "destructive" | "secondary" } => {
     if (!response) return { label: "Belum Menjawab", variant: "secondary" };
