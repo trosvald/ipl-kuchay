@@ -56,6 +56,14 @@ begin
   if not exists (
     select 1 from pg_proc
     where pronamespace = 'public'::regnamespace
+      and proname = 'get_payment_event_telegram_recipients'
+  ) then
+    raise exception 'public.get_payment_event_telegram_recipients(text, uuid) is required';
+  end if;
+
+  if not exists (
+    select 1 from pg_proc
+    where pronamespace = 'public'::regnamespace
       and proname = 'select_reminder_recipients'
   ) then
     raise exception 'public.select_reminder_recipients() is required';
@@ -90,6 +98,15 @@ begin
   on conflict (id) do update
   set full_name = excluded.full_name, role = excluded.role, is_active = excluded.is_active;
 
+  delete from public.notification_deliveries
+  where profile_id in (v_super_admin, v_admin, v_resident_a, v_resident_b);
+
+  delete from public.notification_preferences
+  where profile_id in (v_super_admin, v_admin, v_resident_a, v_resident_b);
+
+  delete from public.telegram_accounts
+  where profile_id in (v_super_admin, v_admin, v_resident_a, v_resident_b);
+
   -- Seed kavlings and billing period
   insert into public.kavlings (id, code, sort_order)
   values
@@ -115,12 +132,34 @@ begin
   select id into v_invoice_a from public.invoices where invoice_number = 'INV-A-2026-04';
   select id into v_invoice_b from public.invoices where invoice_number = 'INV-B-2026-04';
 
+  delete from public.payment_submissions
+  where id = 'd9000000-0000-0000-0000-000000000001'::uuid;
+
   insert into public.payment_submissions (id, invoice_id, submitted_by, amount_submitted, status)
   values
     ('d9000000-0000-0000-0000-000000000001', v_invoice_a, v_resident_a, 350000, 'submitted')
   on conflict do nothing;
 
   select id into v_submission_a from public.payment_submissions where invoice_id = v_invoice_a;
+
+  update public.payment_submissions
+  set proof_path = format('proofs/%s/%s/%s.pdf', v_resident_a, v_invoice_a, v_submission_a),
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_a;
+
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values (
+    'payment-proofs',
+    format('proofs/%s/%s/%s.pdf', v_resident_a, v_invoice_a, v_submission_a),
+    v_resident_a,
+    v_resident_a::text,
+    jsonb_build_object('mimetype', 'application/pdf', 'size', 1024)
+  )
+  on conflict (bucket_id, name) do update
+  set owner = excluded.owner,
+      owner_id = excluded.owner_id,
+      metadata = excluded.metadata;
 
   -- Seed kavling-resident links (required for select_reminder_recipients)
   insert into public.kavling_residents (kavling_id, profile_id, relation, is_primary, active)
@@ -143,7 +182,7 @@ begin
 
   -- get_linked_telegram_recipients should return 0 for resident_a (no pref row)
   select count(*) into v_count
-  from public.get_linked_telegram_recipients('resident_payment_verified')
+  from public.get_linked_telegram_recipients('resident_payment_reminder')
   where profile_id = v_resident_a;
 
   if v_count > 0 then
@@ -156,7 +195,7 @@ begin
   on conflict (profile_id, category) do update set telegram_enabled = excluded.telegram_enabled;
 
   select count(*) into v_count
-  from public.get_linked_telegram_recipients('resident_payment_verified')
+  from public.get_linked_telegram_recipients('resident_payment_reminder')
   where profile_id = v_resident_a;
 
   if v_count > 0 then
@@ -174,7 +213,7 @@ begin
   on conflict (profile_id, category) do update set telegram_enabled = excluded.telegram_enabled;
 
   select count(*) into v_count
-  from public.get_linked_telegram_recipients('resident_payment_verified')
+  from public.get_linked_telegram_recipients('resident_payment_reminder')
   where profile_id = v_resident_a;
 
   if v_count = 0 then
@@ -191,15 +230,28 @@ begin
   on conflict (profile_id, category) do update set telegram_enabled = excluded.telegram_enabled;
 
   select count(*) into v_count
-  from public.get_linked_telegram_recipients('resident_payment_verified')
+  from public.get_linked_telegram_recipients('resident_payment_reminder')
   where profile_id = v_resident_b;
 
   if v_count > 0 then
     raise exception 'Test 1 FAILED: resident_b with allows_notifications=false must not be eligible (D-02)';
   end if;
 
-  -- Case 1e: admin-only templates must never target residents even if
-  -- they have payment_status telegram notifications enabled
+  -- Case 1e: contextual payment templates must not use broad category-wide lookup
+  if exists (
+    select 1 from public.get_linked_telegram_recipients('resident_payment_verified')
+  ) then
+    raise exception 'Test 1 FAILED: resident_payment_verified must not use broad category-wide recipient lookup';
+  end if;
+
+  if exists (
+    select 1 from public.get_linked_telegram_recipients('admin_pending_submission')
+  ) then
+    raise exception 'Test 1 FAILED: admin_pending_submission must not use broad category-wide recipient lookup';
+  end if;
+
+  -- Case 1f: admin-only payment event templates must target active finance users
+  -- from submission context, never residents.
   insert into public.telegram_accounts (profile_id, telegram_user_id, telegram_chat_id, username, first_name, allows_notifications)
   values (v_admin, 999000099, 888000099, 'admin_user', 'Admin', true)
   on conflict (profile_id) do update set telegram_user_id = excluded.telegram_user_id, telegram_chat_id = excluded.telegram_chat_id, allows_notifications = excluded.allows_notifications;
@@ -209,17 +261,66 @@ begin
   on conflict (profile_id, category) do update set telegram_enabled = excluded.telegram_enabled;
 
   if exists (
-    select 1 from public.get_linked_telegram_recipients('admin_pending_submission')
+    select 1 from public.get_payment_event_telegram_recipients('admin_pending_submission', v_submission_a)
     where profile_id = v_resident_a
   ) then
     raise exception 'Test 1 FAILED: resident_a must not receive admin_pending_submission';
   end if;
 
   if not exists (
-    select 1 from public.get_linked_telegram_recipients('admin_pending_submission')
+    select 1 from public.get_payment_event_telegram_recipients('admin_pending_submission', v_submission_a)
     where profile_id = v_admin
+      and related_invoice_id = v_invoice_a
+      and related_submission_id = v_submission_a
+      and template_vars->>'kavling_code' = 'Kav A'
+      and template_vars->>'period_label' = 'April 2026'
+      and template_vars->>'amount_submitted' = '350000'
   ) then
-    raise exception 'Test 1 FAILED: admin must receive admin_pending_submission when payment_status telegram notifications are enabled';
+    raise exception 'Test 1 FAILED: admin must receive contextual admin_pending_submission with DB-derived vars';
+  end if;
+
+  -- Case 1g: payment outcome notifications must go only to the submitting resident.
+  update public.telegram_accounts set allows_notifications = true where profile_id = v_resident_b;
+
+  update public.payment_submissions
+  set status = 'verified',
+      verified_at = now(),
+      verified_by = v_admin
+  where id = v_submission_a;
+
+  if not exists (
+    select 1 from public.get_payment_event_telegram_recipients('resident_payment_verified', v_submission_a)
+    where profile_id = v_resident_a
+      and related_invoice_id = v_invoice_a
+      and related_submission_id = v_submission_a
+      and template_vars->>'kavling_code' = 'Kav A'
+      and template_vars->>'period_label' = 'April 2026'
+  ) then
+    raise exception 'Test 1 FAILED: submitting resident must receive payment verified notification';
+  end if;
+
+  if exists (
+    select 1 from public.get_payment_event_telegram_recipients('resident_payment_verified', v_submission_a)
+    where profile_id in (v_resident_b, v_admin)
+  ) then
+    raise exception 'Test 1 FAILED: payment verified must not notify non-submitting residents or admins';
+  end if;
+
+  update public.payment_submissions
+  set status = 'rejected',
+      rejection_reason = 'Bukti tidak jelas',
+      rejected_at = now(),
+      rejected_by = v_admin,
+      verified_at = null,
+      verified_by = null
+  where id = v_submission_a;
+
+  if not exists (
+    select 1 from public.get_payment_event_telegram_recipients('resident_payment_rejected', v_submission_a)
+    where profile_id = v_resident_a
+      and template_vars->>'reason' = 'Bukti tidak jelas'
+  ) then
+    raise exception 'Test 1 FAILED: submitting resident must receive payment rejected notification with DB reason';
   end if;
 
   -- ============================================================

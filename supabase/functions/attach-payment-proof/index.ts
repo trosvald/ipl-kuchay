@@ -12,6 +12,15 @@ import {
   createServiceRoleClient,
   createUserClient,
 } from "../_shared/supabase.ts";
+import { sendTelegramMessage } from "../_shared/telegram.ts";
+import {
+  getPaymentEventRecipients,
+  getTemplate,
+  logDelivery,
+  renderTemplate,
+  type EligibleRecipient,
+  type TemplateVariables,
+} from "../_shared/notifications.ts";
 
 interface AttachProofRequest {
   submissionId?: string;
@@ -161,6 +170,63 @@ async function verifyProofObjectExists(input: {
   }
 }
 
+async function notifyPendingSubmission(input: {
+  serviceClient: ReturnType<typeof createServiceRoleClient>;
+  submissionId: string;
+}): Promise<void> {
+  const templateCode = "admin_pending_submission";
+  const template = await getTemplate(input.serviceClient, templateCode);
+  if (!template) {
+    return;
+  }
+
+  const recipients = await getPaymentEventRecipients(input.serviceClient, templateCode, input.submissionId);
+  for (const recipient of recipients) {
+    await sendNotificationToRecipient(input.serviceClient, templateCode, template.body_template, recipient);
+  }
+}
+
+async function sendNotificationToRecipient(
+  serviceClient: ReturnType<typeof createServiceRoleClient>,
+  templateCode: string,
+  bodyTemplate: string,
+  recipient: EligibleRecipient,
+): Promise<void> {
+  const vars: TemplateVariables = recipient.template_vars as TemplateVariables ?? {};
+  const messageText = renderTemplate(bodyTemplate, vars);
+
+  try {
+    const sendResult = await sendTelegramMessage(recipient.telegram_chat_id, messageText);
+
+    await logDelivery(serviceClient, {
+      templateCode,
+      profileId: recipient.profile_id,
+      telegramChatId: recipient.telegram_chat_id,
+      status: sendResult.ok ? "sent" : "failed",
+      messageText,
+      relatedInvoiceId: recipient.related_invoice_id,
+      relatedSubmissionId: recipient.related_submission_id,
+      telegramMessageId: sendResult.message_id,
+      errorMessage: sendResult.ok ? undefined : sendResult.error ?? "Unknown Telegram error",
+    });
+  } catch (error) {
+    try {
+      await logDelivery(serviceClient, {
+        templateCode,
+        profileId: recipient.profile_id,
+        telegramChatId: recipient.telegram_chat_id,
+        status: "failed",
+        messageText,
+        relatedInvoiceId: recipient.related_invoice_id,
+        relatedSubmissionId: recipient.related_submission_id,
+        errorMessage: String(error),
+      });
+    } catch {
+      // Notification failure must not block proof metadata attachment.
+    }
+  }
+}
+
 async function handleAttachProof(request: Request): Promise<Response> {
   const authHeader = request.headers.get("Authorization");
   const userClient = createUserClient(authHeader);
@@ -245,6 +311,11 @@ async function handleAttachProof(request: Request): Promise<Response> {
   if (recalcError) {
     throw new HttpError(500, recalcError.message);
   }
+
+  await notifyPendingSubmission({
+    serviceClient,
+    submissionId: submissionRow.id,
+  }).catch(() => {});
 
   return jsonResponse(200, {
     success: true,

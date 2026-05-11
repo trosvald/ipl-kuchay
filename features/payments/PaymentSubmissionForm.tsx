@@ -214,17 +214,6 @@ export function PaymentSubmissionForm({
 
       submissionId = createRes.data.submissionId;
 
-      // D-06: notify admin-like users about the new pending submission (fire-and-forget, T-05-14)
-      client.functions
-        .invoke("send-telegram-notification", {
-          body: {
-            template_code: "admin_pending_submission",
-            related_invoice_id: invoiceId,
-            related_submission_id: submissionId,
-          },
-        })
-        .catch(() => {});
-
       const proofPath = buildPaymentProofPath({
         authUserId: preparedInput.authUserId,
         invoiceId,

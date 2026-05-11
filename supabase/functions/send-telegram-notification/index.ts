@@ -1,15 +1,29 @@
 // @ts-expect-error Node TypeScript cannot resolve Deno npm: specifiers in editor mode.
 import { createServiceRoleClient, createUserClient } from "../_shared/supabase.ts";
-import { jsonResponse, optionsResponse } from "../_shared/responses.ts";
+import { getCallerProfile, type AppRole } from "../_shared/auth.ts";
+import {
+  HttpError,
+  jsonResponse,
+  methodNotAllowed,
+  optionsResponse,
+} from "../_shared/responses.ts";
 import { sendTelegramMessage } from "../_shared/telegram.ts";
 import {
   renderTemplate,
   getTemplate,
   getEligibleRecipients,
+  getPaymentEventRecipients,
   logDelivery,
   isValidTemplateCode,
+  type EligibleRecipient,
+  type NotificationTemplateCode,
   type TemplateVariables,
 } from "../_shared/notifications.ts";
+import {
+  acceptsClientTemplateVars,
+  canDispatchTelegramTemplate,
+  isPaymentEventTemplate,
+} from "../../../lib/telegramNotificationDispatchPolicy.ts";
 
 /**
  * send-telegram-notification
@@ -33,20 +47,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-async function requireAuth(req: Request): Promise<string> {
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    throw new Error("Authentication required");
-  }
-  // Validate JWT via Supabase and return the authenticated user's ID
-  const userClient = createUserClient(authHeader);
-  const { data: { user }, error } = await userClient.auth.getUser();
-  if (error || !user) {
-    throw new Error("Authentication required");
-  }
-  return user.id;
-}
-
 interface SendPayload {
   template_code: string;
   template_vars?: Record<string, string>;
@@ -54,16 +54,38 @@ interface SendPayload {
   related_submission_id?: string;
 }
 
+function assertDispatchAllowed(
+  callerRole: AppRole,
+  templateCode: NotificationTemplateCode,
+  body: SendPayload,
+): void {
+  if (!canDispatchTelegramTemplate(callerRole, templateCode)) {
+    throw new HttpError(403, "Forbidden");
+  }
+
+  if (isPaymentEventTemplate(templateCode)) {
+    if (!body.related_submission_id) {
+      throw new HttpError(400, "related_submission_id is required");
+    }
+
+    if (!acceptsClientTemplateVars(templateCode) && body.template_vars) {
+      throw new HttpError(400, "template_vars are not accepted for payment event templates");
+    }
+
+    return;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return optionsResponse();
 
   if (req.method !== "POST") {
-    return jsonResponse(405, { error: "Method not allowed" });
+    return methodNotAllowed();
   }
 
   try {
-    // Auth gate: require authenticated JWT
-    await requireAuth(req);
+    const userClient = createUserClient(req.headers.get("Authorization"));
+    const caller = await getCallerProfile(req, userClient);
 
     const body: SendPayload = await req.json();
 
@@ -73,16 +95,21 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    const templateCode = body.template_code;
+    assertDispatchAllowed(caller.role, templateCode, body);
+
     const client = createServiceRoleClient();
 
     // 1. Fetch the template
-    const template = await getTemplate(client, body.template_code);
+    const template = await getTemplate(client, templateCode);
     if (!template) {
       return jsonResponse(404, { error: "Template not found or inactive" });
     }
 
     // 2. Resolve eligible recipients from DB truth (T-05-08)
-    const recipients = await getEligibleRecipients(client, body.template_code);
+    const recipients: EligibleRecipient[] = isPaymentEventTemplate(templateCode)
+      ? await getPaymentEventRecipients(client, templateCode, body.related_submission_id as string)
+      : await getEligibleRecipients(client, templateCode);
 
     if (recipients.length === 0) {
       return jsonResponse(200, {
@@ -94,7 +121,7 @@ Deno.serve(async (req: Request) => {
 
     // 3. Build template variables (merge DB vars with override)
     const overrideVars: TemplateVariables = {};
-    if (body.template_vars) {
+    if (!isPaymentEventTemplate(templateCode) && body.template_vars) {
       for (const [key, value] of Object.entries(body.template_vars)) {
         (overrideVars as Record<string, string>)[key] = value;
       }
@@ -126,13 +153,13 @@ Deno.serve(async (req: Request) => {
 
         if (sendResult.ok) {
           const deliveryId = await logDelivery(client, {
-            templateCode: body.template_code,
+            templateCode,
             profileId: recipient.profile_id,
             telegramChatId: recipient.telegram_chat_id,
             status: "sent",
             messageText,
-            relatedInvoiceId: body.related_invoice_id,
-            relatedSubmissionId: body.related_submission_id,
+            relatedInvoiceId: recipient.related_invoice_id ?? body.related_invoice_id,
+            relatedSubmissionId: recipient.related_submission_id ?? body.related_submission_id,
             telegramMessageId: sendResult.message_id,
           });
 
@@ -143,13 +170,13 @@ Deno.serve(async (req: Request) => {
           });
         } else {
           const deliveryId = await logDelivery(client, {
-            templateCode: body.template_code,
+            templateCode,
             profileId: recipient.profile_id,
             telegramChatId: recipient.telegram_chat_id,
             status: "failed",
             messageText,
-            relatedInvoiceId: body.related_invoice_id,
-            relatedSubmissionId: body.related_submission_id,
+            relatedInvoiceId: recipient.related_invoice_id ?? body.related_invoice_id,
+            relatedSubmissionId: recipient.related_submission_id ?? body.related_submission_id,
             errorMessage: sendResult.error ?? "Unknown Telegram error",
           });
 
@@ -164,13 +191,13 @@ Deno.serve(async (req: Request) => {
         // Catch-and-log: never throw to upstream (T-05-14)
         try {
           await logDelivery(client, {
-            templateCode: body.template_code,
+            templateCode,
             profileId: recipient.profile_id,
             telegramChatId: recipient.telegram_chat_id,
             status: "failed",
             messageText: template.body_template,
-            relatedInvoiceId: body.related_invoice_id,
-            relatedSubmissionId: body.related_submission_id,
+            relatedInvoiceId: recipient.related_invoice_id ?? body.related_invoice_id,
+            relatedSubmissionId: recipient.related_submission_id ?? body.related_submission_id,
             errorMessage: String(err),
           });
         } catch {
@@ -193,8 +220,8 @@ Deno.serve(async (req: Request) => {
       results,
     });
   } catch (err) {
-    if (err instanceof Error && err.message === "Authentication required") {
-      return jsonResponse(401, { error: "Unauthorized" });
+    if (err instanceof HttpError) {
+      return jsonResponse(err.status, { error: err.message });
     }
     return jsonResponse(500, { error: String(err) });
   }

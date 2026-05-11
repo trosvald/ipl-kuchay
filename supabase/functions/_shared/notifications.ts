@@ -39,6 +39,7 @@ export const VALID_TEMPLATE_CODES: NotificationTemplateCode[] = [
  * All values are strings for substitution; optional keys are {string | undefined}.
  */
 export interface TemplateVariables {
+  title?: string;
   name?: string;
   period_label?: string;
   kavling_code?: string;
@@ -65,6 +66,7 @@ export function renderTemplate(
   let result = bodyTemplate;
 
   const knownKeys: (keyof TemplateVariables)[] = [
+    "title",
     "name",
     "period_label",
     "kavling_code",
@@ -156,6 +158,30 @@ export async function getEligibleRecipients(
 
   const { data, error } = await sb.rpc("get_linked_telegram_recipients", {
     p_template_code: templateCode,
+  });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data as EligibleRecipient[];
+}
+
+/**
+ * Fetch payment event recipients from submission context.
+ */
+export async function getPaymentEventRecipients(
+  client: ReturnType<typeof createServiceRoleClient>,
+  templateCode: string,
+  submissionId: string,
+): Promise<EligibleRecipient[]> {
+  // @ts-expect-error Deno runtime compat
+  // deno-lint-ignore no-explicit-any
+  const sb = client as any;
+
+  const { data, error } = await sb.rpc("get_payment_event_telegram_recipients", {
+    p_template_code: templateCode,
+    p_submission_id: submissionId,
   });
 
   if (error || !data) {
