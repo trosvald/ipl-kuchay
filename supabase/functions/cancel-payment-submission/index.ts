@@ -15,6 +15,7 @@ import {
 
 interface CancelSubmissionRequest {
   submissionId?: string;
+  proofPath?: string;
   reason?: string;
 }
 
@@ -36,6 +37,7 @@ function isUuid(value: unknown): value is string {
 
 async function parseRequest(request: Request): Promise<{
   submissionId: string;
+  proofPath: string | null;
   reason: string;
 }> {
   let body: CancelSubmissionRequest;
@@ -51,11 +53,50 @@ async function parseRequest(request: Request): Promise<{
   }
 
   const reason = typeof body.reason === "string" ? body.reason.trim() : "upload_failed";
+  const proofPath = typeof body.proofPath === "string" ? body.proofPath.trim() : null;
 
   return {
     submissionId: body.submissionId,
+    proofPath: proofPath || null,
     reason: reason || "upload_failed",
   };
+}
+
+function isExpectedProofPath(path: string, row: SubmissionRow): boolean {
+  const escapedSubmittedBy = row.submitted_by.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedInvoiceId = row.invoice_id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedSubmissionId = row.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const expected = new RegExp(
+    `^proofs/${escapedSubmittedBy}/${escapedInvoiceId}/${escapedSubmissionId}\\.(jpg|png|webp|pdf)$`,
+    "i",
+  );
+
+  return expected.test(path);
+}
+
+async function cleanupProofObject(
+  serviceClient: ReturnType<typeof createServiceRoleClient>,
+  row: SubmissionRow,
+  requestedProofPath: string | null,
+): Promise<string | null> {
+  const proofPath = row.proof_path ?? requestedProofPath;
+  if (!proofPath) {
+    return null;
+  }
+
+  if (!isExpectedProofPath(proofPath, row)) {
+    throw new HttpError(400, "Invalid proofPath");
+  }
+
+  const { error } = await serviceClient.storage
+    .from("payment-proofs")
+    .remove([proofPath]);
+
+  if (error) {
+    throw new HttpError(500, error.message);
+  }
+
+  return proofPath;
 }
 
 async function handleCancelSubmission(request: Request): Promise<Response> {
@@ -92,11 +133,20 @@ async function handleCancelSubmission(request: Request): Promise<Response> {
     return jsonResponse(200, { success: true, skipped: true });
   }
 
+  const cleanedProofPath = await cleanupProofObject(serviceClient, row, input.proofPath);
+
   if (row.proof_path) {
-    await serviceClient.from("payment_submissions").update({
+    const { error: updateError } = await serviceClient.from("payment_submissions").update({
       status: "cancelled",
+      proof_path: null,
+      proof_mime_type: null,
+      proof_size_bytes: null,
       note: `Cancelled: ${input.reason}`,
     }).eq("id", row.id);
+
+    if (updateError) {
+      throw new HttpError(500, updateError.message);
+    }
   } else {
     const { error: deleteError } = await serviceClient
       .from("payment_submissions")
@@ -118,6 +168,7 @@ async function handleCancelSubmission(request: Request): Promise<Response> {
 
   return jsonResponse(200, {
     success: true,
+    cleanedProofPath,
   });
 }
 

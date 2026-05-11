@@ -202,6 +202,7 @@ export function PaymentSubmissionForm({
     setSuccessMessage(null);
 
     let submissionId: string | null = null;
+    let proofPath: string | null = null;
 
     try {
       const createRes = await client.functions.invoke<CreateSubmissionResponse>("create-payment-submission", {
@@ -214,7 +215,7 @@ export function PaymentSubmissionForm({
 
       submissionId = createRes.data.submissionId;
 
-      const proofPath = buildPaymentProofPath({
+      proofPath = buildPaymentProofPath({
         authUserId: preparedInput.authUserId,
         invoiceId,
         submissionId,
@@ -254,6 +255,7 @@ export function PaymentSubmissionForm({
         await client.functions.invoke("cancel-payment-submission", {
           body: {
             submissionId,
+            proofPath,
             reason: "upload_failed",
           },
         });

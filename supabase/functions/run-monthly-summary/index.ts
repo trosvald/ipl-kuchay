@@ -35,17 +35,15 @@ function requireSecret(req: Request): void {
   }
 }
 
-interface MonthlyStats {
-  period_label: string;
-  paid_count: number;
-  total_count: number;
-  total_paid: number;
-  total_unpaid: number;
-}
-
 interface AdminRecipient {
   profile_id: string;
   telegram_chat_id: number;
+}
+
+interface InvoiceSummaryRow {
+  status: string;
+  amount_due: number | null;
+  amount_paid: number | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -74,7 +72,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: periodData, error: periodError } = await sb
       .from("billing_periods")
-      .select("label, month, year")
+      .select("id, label, month, year")
       .eq("status", "open")
       .order("year", { ascending: false })
       .order("month", { ascending: false })
@@ -92,80 +90,31 @@ Deno.serve(async (req: Request) => {
     const { data: invoices, error: invoicesError } = await sb
       .from("invoices")
       .select("status, amount_due, amount_paid")
-      .eq("billing_period_id", (await sb
-        .from("billing_periods")
-        .select("id")
-        .eq("month", periodData.month)
-        .eq("year", periodData.year)
-        .limit(1)
-        .single()).data?.id);
+      .eq("billing_period_id", periodData.id);
 
-    // Simpler approach: use raw count queries
-    const { count: totalCount } = await sb
-      .from("invoices")
-      .select("*", { count: "exact", head: true })
-      .eq("billing_period_id", (
-        await sb.from("billing_periods")
-          .select("id")
-          .eq("month", periodData.month)
-          .eq("year", periodData.year)
-          .limit(1)
-          .single()
-      ).data?.id);
+    if (invoicesError) {
+      return jsonResponse(500, { error: invoicesError.message });
+    }
 
-    const { count: paidCount } = await sb
-      .from("invoices")
-      .select("*", { count: "exact", head: true })
-      .eq("billing_period_id", (
-        await sb.from("billing_periods")
-          .select("id")
-          .eq("month", periodData.month)
-          .eq("year", periodData.year)
-          .limit(1)
-          .single()
-      ).data?.id)
-      .eq("status", "paid");
-
-    const { data: totalPaidData } = await sb
-      .from("invoices")
-      .select("amount_paid")
-      .eq("billing_period_id", (
-        await sb.from("billing_periods")
-          .select("id")
-          .eq("month", periodData.month)
-          .eq("year", periodData.year)
-          .limit(1)
-          .single()
-      ).data?.id);
-
-    const totalPaid = totalPaidData?.reduce(
-      (sum: number, row: { amount_paid: number }) => sum + (row.amount_paid || 0),
+    const invoiceRows = (invoices ?? []) as InvoiceSummaryRow[];
+    const totalCount = invoiceRows.length;
+    const paidCount = invoiceRows.filter((row) => row.status === "paid").length;
+    const totalPaid = invoiceRows.reduce(
+      (sum, row) => sum + (row.amount_paid ?? 0),
       0,
-    ) || 0;
+    );
+    const totalUnpaid = invoiceRows
+      .filter((row) => ["unpaid", "overdue", "partial"].includes(row.status))
+      .reduce(
+        (sum, row) => sum + Math.max((row.amount_due ?? 0) - (row.amount_paid ?? 0), 0),
+        0,
+      );
 
-    const { data: totalUnpaidData } = await sb
-      .from("invoices")
-      .select("amount_due")
-      .eq("billing_period_id", (
-        await sb.from("billing_periods")
-          .select("id")
-          .eq("month", periodData.month)
-          .eq("year", periodData.year)
-          .limit(1)
-          .single()
-      ).data?.id)
-      .in("status", ["unpaid", "overdue", "partial"]);
-
-    const totalUnpaid = totalUnpaidData?.reduce(
-      (sum: number, row: { amount_due: number }) => sum + (row.amount_due || 0),
-      0,
-    ) || 0;
-
-    // 4. Get Admin-like linked Telegram recipients
+    // 4. Get admin-like linked Telegram recipients through the preference-aware RPC.
     const { data: adminRecipients, error: adminError } = await sb
-      .from("telegram_accounts")
-      .select("profile_id, telegram_chat_id")
-      .eq("allows_notifications", true);
+      .rpc("get_linked_telegram_recipients", {
+        p_template_code: "admin_monthly_summary",
+      });
 
     if (adminError || !adminRecipients || adminRecipients.length === 0) {
       return jsonResponse(200, {
@@ -174,26 +123,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5. Filter to admin-like roles only
-    const profileIds = adminRecipients.map((r: AdminRecipient) => r.profile_id);
-    const { data: profiles } = await sb
-      .from("profiles")
-      .select("id, role")
-      .in("id", profileIds)
-      .in("role", ["admin", "super_admin", "treasurer"])
-      .eq("is_active", true);
-
-    if (!profiles || profiles.length === 0) {
-      return jsonResponse(200, {
-        success: true,
-        message: "No active admin-like Telegram accounts",
-      });
-    }
-
-    const adminIds = new Set(profiles.map((p: { id: string }) => p.id));
-    const filteredRecipients = adminRecipients.filter(
-      (r: AdminRecipient) => adminIds.has(r.profile_id),
-    );
+    const filteredRecipients = adminRecipients as AdminRecipient[];
 
     // 6. Send summary to each admin-like recipient
     const messageText = renderTemplate(template.body_template, {

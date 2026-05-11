@@ -6,11 +6,19 @@ vi.mock("next/link", () => ({
   default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children),
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => "/admin/residents",
+}));
+
 vi.mock("@/features/auth/authHooks", () => ({
   useAuth: () => ({
-    session: { access_token: "token" },
-    profile: { id: "admin-1", role: "admin" },
+    session: { access_token: "token", user: { id: "admin-1" } },
+    profile: { id: "admin-1", role: "admin", is_active: true },
+    accessState: "active-mapped",
+    loading: false,
   }),
+  useIsOperatorRole: () => true,
 }));
 
 vi.mock("@/lib/supabaseClient", () => ({

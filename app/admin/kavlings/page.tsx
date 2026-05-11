@@ -1,5 +1,10 @@
+import { RequireOperatorRole } from "@/features/auth/RequireOperatorRole";
 import { KavlingListPage } from "@/features/kavlings/KavlingListPage";
 
 export default function AdminKavlingsPage() {
-  return <KavlingListPage />;
+  return (
+    <RequireOperatorRole>
+      <KavlingListPage />
+    </RequireOperatorRole>
+  );
 }

@@ -1,5 +1,10 @@
+import { RequireOperatorRole } from "@/features/auth/RequireOperatorRole";
 import { AdminTelegramPage } from "@/features/telegram/AdminTelegramPage";
 
 export default function TelegramAdminRoute() {
-  return <AdminTelegramPage />;
+  return (
+    <RequireOperatorRole>
+      <AdminTelegramPage />
+    </RequireOperatorRole>
+  );
 }

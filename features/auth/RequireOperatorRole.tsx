@@ -27,7 +27,7 @@ function OperatorGate({ children }: Readonly<{ children: ReactNode }>) {
               <span className="rounded-md border border-slate-200 bg-slate-50 p-2 text-slate-700">
                 <ShieldX className="size-4" />
               </span>
-              <span>Aksesoperator diperlukan</span>
+              <span>Akses operator diperlukan</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate-600">

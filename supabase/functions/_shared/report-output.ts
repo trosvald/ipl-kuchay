@@ -157,13 +157,14 @@ export async function loadResidentReceiptData(
     notes: string | null;
     verified_by: string | null;
     invoice_id: string;
+    payment_submission_id: string | null;
   } | null = null;
 
   if (paymentId) {
     // Load exact payment row by id + invoice_id pair
     const { data } = await client
       .from("payments")
-      .select("id, amount, method, paid_at, notes, verified_by, invoice_id")
+      .select("id, amount, method, paid_at, notes, verified_by, invoice_id, payment_submission_id")
       .eq("id", paymentId)
       .eq("invoice_id", invoiceId)
       .single();
@@ -172,7 +173,7 @@ export async function loadResidentReceiptData(
     // Fallback: load first verified payment for this invoice
     const { data } = await client
       .from("payments")
-      .select("id, amount, method, paid_at, notes, verified_by, invoice_id")
+      .select("id, amount, method, paid_at, notes, verified_by, invoice_id, payment_submission_id")
       .eq("invoice_id", invoiceId)
       .not("verified_by", "is", null)
       .order("paid_at", { ascending: false })
@@ -211,23 +212,76 @@ export async function loadResidentReceiptData(
 
   const periodLabel = period?.label ?? "Unknown Period";
 
-  // Load resident name from kavling_residents
-  const { data: resident } = await client
-    .from("kavling_residents")
-    .select(`profile_id, profiles!inner(full_name, display_name)`)
-    .eq("kavling_id", (invoice as { kavling_id: string }).kavling_id)
-    .eq("active", true)
-    .limit(1)
-    .single();
-
-  let residentName = "Unknown Resident";
-  if (resident && (resident as { profiles?: { full_name?: string; display_name?: string } }).profiles) {
-    const profile = (resident as { profiles: { full_name?: string; display_name?: string } }).profiles;
-    residentName = profile.display_name?.trim() || profile.full_name || "Unknown Resident";
-  }
-
   const kavlingId = (invoice as { kavling_id: string }).kavling_id;
   const kavlingCode = ((invoice as { kavlings?: { code?: string } }).kavlings as { code?: string })?.code || "UNKNOWN";
+
+  function displayNameFromProfile(profile?: { full_name?: string | null; display_name?: string | null }): string | null {
+    if (!profile) {
+      return null;
+    }
+
+    const displayName = profile.display_name?.trim();
+    if (displayName) {
+      return displayName;
+    }
+
+    const fullName = profile.full_name?.trim();
+    return fullName || null;
+  }
+
+  async function loadSubmitterName(paymentSubmissionId: string): Promise<string | null> {
+    const { data } = await client
+      .from("payment_submissions")
+      .select("submitted_by, profiles!inner(full_name, display_name)")
+      .eq("id", paymentSubmissionId)
+      .maybeSingle();
+
+    const profile = (data as { profiles?: { full_name?: string | null; display_name?: string | null } } | null)?.profiles;
+    return displayNameFromProfile(profile);
+  }
+
+  async function loadOccupantNameAtPaymentTime(): Promise<string | null> {
+    const paidDate = paymentRow.paid_at.slice(0, 10);
+    const baseSelection = "profile_id, is_primary, started_at, profiles!inner(full_name, display_name)";
+
+    const { data: datedResident } = await client
+      .from("kavling_residents")
+      .select(baseSelection)
+      .eq("kavling_id", kavlingId)
+      .lte("started_at", paidDate)
+      .or(`ended_at.is.null,ended_at.gte.${paidDate}`)
+      .order("is_primary", { ascending: false })
+      .order("started_at", { ascending: false })
+      .order("profile_id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const datedProfile = (datedResident as { profiles?: { full_name?: string | null; display_name?: string | null } } | null)?.profiles;
+    const datedName = displayNameFromProfile(datedProfile);
+    if (datedName) {
+      return datedName;
+    }
+
+    const { data: activeResident } = await client
+      .from("kavling_residents")
+      .select(baseSelection)
+      .eq("kavling_id", kavlingId)
+      .eq("active", true)
+      .order("is_primary", { ascending: false })
+      .order("started_at", { ascending: false })
+      .order("profile_id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const activeProfile = (activeResident as { profiles?: { full_name?: string | null; display_name?: string | null } } | null)?.profiles;
+    return displayNameFromProfile(activeProfile);
+  }
+
+  let residentName = "Unknown Resident";
+  const submitterName = paymentRow.payment_submission_id
+    ? await loadSubmitterName(paymentRow.payment_submission_id)
+    : null;
+  residentName = submitterName ?? await loadOccupantNameAtPaymentTime() ?? residentName;
 
   return {
     invoiceId: invoice.id,
