@@ -35,6 +35,13 @@ const allowedMimeTypes = new Set([
   "application/pdf",
 ]);
 
+const mimeToExtension: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+};
+
 const maxSizeBytes = 5 * 1024 * 1024;
 
 function isUuid(value: unknown): value is string {
@@ -92,8 +99,66 @@ async function parseRequest(request: Request): Promise<{
   };
 }
 
-function buildExpectedProofPath(callerId: string, invoiceId: string, submissionId: string): RegExp {
-  return new RegExp(String.raw`^proofs/${callerId}/${invoiceId}/${submissionId}\.(jpg|png|webp|pdf)$`, "i");
+function buildExpectedProofPath(callerId: string, invoiceId: string, submissionId: string, mimeType: string): string {
+  return `proofs/${callerId}/${invoiceId}/${submissionId}.${mimeToExtension[mimeType]}`;
+}
+
+function readMetadataString(metadata: unknown, keys: string[]): string | null {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const record = metadata as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+
+  return null;
+}
+
+async function verifyProofObjectExists(input: {
+  serviceClient: ReturnType<typeof createServiceRoleClient>;
+  proofPath: string;
+  mimeType: string;
+  sizeBytes: number;
+}): Promise<void> {
+  const pathSegments = input.proofPath.split("/");
+  const fileName = pathSegments.pop();
+  const directory = pathSegments.join("/");
+
+  if (!fileName || directory.length === 0) {
+    throw new HttpError(400, "Invalid proofPath");
+  }
+
+  const { data, error } = await input.serviceClient.storage
+    .from("payment-proofs")
+    .list(directory, {
+      limit: 100,
+      search: fileName,
+    });
+
+  if (error) {
+    throw new HttpError(500, error.message);
+  }
+
+  const proofObject = data?.find((item) => item.name === fileName);
+  if (!proofObject) {
+    throw new HttpError(400, "Proof object not found");
+  }
+
+  const objectMimeType = readMetadataString(proofObject.metadata, ["mimetype", "mimeType", "contentType"]);
+  const objectSizeBytes = Number(readMetadataString(proofObject.metadata, ["size"]));
+
+  if (objectMimeType !== input.mimeType || !Number.isInteger(objectSizeBytes) || objectSizeBytes !== input.sizeBytes) {
+    throw new HttpError(400, "Proof object metadata does not match request");
+  }
 }
 
 async function handleAttachProof(request: Request): Promise<Response> {
@@ -148,10 +213,17 @@ async function handleAttachProof(request: Request): Promise<Response> {
     throw new HttpError(400, "Proof metadata already attached");
   }
 
-  const expectedPattern = buildExpectedProofPath(caller.id, submissionRow.invoice_id, submissionRow.id);
-  if (!expectedPattern.test(input.proofPath)) {
+  const expectedPath = buildExpectedProofPath(caller.id, submissionRow.invoice_id, submissionRow.id, input.mimeType);
+  if (input.proofPath !== expectedPath) {
     throw new HttpError(400, "proofPath does not match expected pattern");
   }
+
+  await verifyProofObjectExists({
+    serviceClient,
+    proofPath: input.proofPath,
+    mimeType: input.mimeType,
+    sizeBytes: input.sizeBytes,
+  });
 
   const { error: updateError } = await serviceClient
     .from("payment_submissions")

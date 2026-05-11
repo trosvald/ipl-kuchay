@@ -19,6 +19,7 @@ declare
   v_invoice_status public.invoice_status;
   v_amount_paid integer;
   v_expected_message text;
+  v_proof_path text;
 begin
   insert into auth.users (id, aud, role, email, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
   values
@@ -292,6 +293,21 @@ begin
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice_invariant, v_resident, 100000, 'submitted')
   returning id into v_submission_invariant_a;
+
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice_invariant, v_submission_invariant_a);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_invariant_a;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values (
+    'payment-proofs',
+    v_proof_path,
+    v_resident,
+    v_resident::text,
+    jsonb_build_object('mimetype', 'application/pdf', 'size', 1024)
+  );
 
   begin
     insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)

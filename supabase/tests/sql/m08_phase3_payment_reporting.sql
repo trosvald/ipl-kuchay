@@ -16,6 +16,7 @@ declare
   v_before_data jsonb;
   v_after_data jsonb;
   v_audit_row public.audit_logs%rowtype;
+  v_proof_path text;
 begin
   -- ----------------------------------------------------------------
   -- Setup: admin + treasurer + resident users
@@ -93,6 +94,15 @@ begin
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice, v_resident, 500000, 'submitted')
   returning id into v_submission_verify;
+
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice, v_submission_verify);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_verify;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values ('payment-proofs', v_proof_path, v_resident, v_resident::text, jsonb_build_object('mimetype', 'application/pdf', 'size', 1024));
 
   perform set_config('request.jwt.claim.sub', v_treasurer::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
@@ -274,6 +284,15 @@ begin
   values (v_invoice, v_resident, 100000, 'submitted')
   returning id into v_submission_verify;
 
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice, v_submission_verify);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_verify;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values ('payment-proofs', v_proof_path, v_resident, v_resident::text, jsonb_build_object('mimetype', 'application/pdf', 'size', 1024));
+
   perform set_config('request.jwt.claim.sub', v_admin::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
@@ -299,6 +318,15 @@ begin
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice, v_resident, 100000, 'submitted')
   returning id into v_submission_verify;
+
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice, v_submission_verify);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_verify;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values ('payment-proofs', v_proof_path, v_resident, v_resident::text, jsonb_build_object('mimetype', 'application/pdf', 'size', 1024));
 
   v_payment_id := public.verify_payment_submission(v_submission_verify, 'treasurer verify');
   if v_payment_id is null then
@@ -347,6 +375,15 @@ begin
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice, v_resident, 250000, 'submitted')
   returning id into v_submission_verify;
+
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice, v_submission_verify);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_verify;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values ('payment-proofs', v_proof_path, v_resident, v_resident::text, jsonb_build_object('mimetype', 'application/pdf', 'size', 1024));
 
   perform set_config('request.jwt.claim.sub', v_treasurer::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
@@ -417,6 +454,15 @@ begin
   values (v_invoice, v_resident, 100000, 'submitted')
   returning id into v_submission_verify;
 
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice, v_submission_verify);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_verify;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values ('payment-proofs', v_proof_path, v_resident, v_resident::text, jsonb_build_object('mimetype', 'application/pdf', 'size', 1024));
+
   perform public.verify_payment_submission(v_submission_verify, 'partial');
 
   v_invoice_status := public.recalculate_invoice_status(v_invoice);
@@ -432,6 +478,15 @@ begin
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice, v_resident, 100000, 'submitted')
   returning id into v_submission_verify;
+
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice, v_submission_verify);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_verify;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values ('payment-proofs', v_proof_path, v_resident, v_resident::text, jsonb_build_object('mimetype', 'application/pdf', 'size', 1024));
 
   perform public.verify_payment_submission(v_submission_verify, 'complete');
 

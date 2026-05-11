@@ -15,6 +15,7 @@ declare
   v_invoice_status public.invoice_status;
   v_amount_paid integer;
   v_audit_count integer;
+  v_proof_path text;
 begin
   insert into auth.users (id, aud, role, email, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
   values
@@ -116,6 +117,21 @@ begin
   values (v_invoice_verify, v_resident, 100000, 'submitted')
   returning id into v_submission_1;
 
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice_verify, v_submission_1);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_1;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values (
+    'payment-proofs',
+    v_proof_path,
+    v_resident,
+    v_resident::text,
+    jsonb_build_object('mimetype', 'application/pdf', 'size', 1024)
+  );
+
   v_payment_id := public.verify_payment_submission(v_submission_1, 'partial approval');
   if v_payment_id is null then
     raise exception 'verify_payment_submission returned null payment id';
@@ -143,6 +159,21 @@ begin
   insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status)
   values (v_invoice_verify, v_resident, 200000, 'submitted')
   returning id into v_submission_2;
+
+  v_proof_path := format('proofs/%s/%s/%s.pdf', v_resident, v_invoice_verify, v_submission_2);
+  update public.payment_submissions
+  set proof_path = v_proof_path,
+      proof_mime_type = 'application/pdf',
+      proof_size_bytes = 1024
+  where id = v_submission_2;
+  insert into storage.objects (bucket_id, name, owner, owner_id, metadata)
+  values (
+    'payment-proofs',
+    v_proof_path,
+    v_resident,
+    v_resident::text,
+    jsonb_build_object('mimetype', 'application/pdf', 'size', 1024)
+  );
 
   perform public.verify_payment_submission(v_submission_2, null);
 
