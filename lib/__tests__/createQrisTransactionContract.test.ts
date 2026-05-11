@@ -146,6 +146,8 @@ function createQrisServiceClientMock(input: {
   gatewayConfig?: unknown;
   activeTransaction?: unknown;
   insertedRow?: unknown;
+  updatedRow?: unknown;
+  updateError?: { message: string };
 }) {
   return {
     rpc(fn: string) {
@@ -176,6 +178,24 @@ function createQrisServiceClientMock(input: {
             select() {
               return {
                 single: async () => ({ data: input.insertedRow ?? null, error: null }),
+              };
+            },
+          };
+        },
+        update(payload: unknown) {
+          input.log.push({ table, op: "update", payload });
+          return {
+            eq(field: string, value: unknown) {
+              input.log.push({ table, op: "eq", field, value });
+              return {
+                select() {
+                  return {
+                    single: async () => ({
+                      data: input.updateError ? null : input.updatedRow ?? input.insertedRow ?? null,
+                      error: input.updateError ?? null,
+                    }),
+                  };
+                },
               };
             },
           };
@@ -304,6 +324,14 @@ describe("create QRIS transaction contract", () => {
         insertedRow: {
           id: "txn-2",
           provider_order_id: "IPL-QRIS-ORDER-1",
+          status: "created",
+          payment_type: "qris",
+          qr_string: null,
+          qr_image_url: null,
+        },
+        updatedRow: {
+          id: "txn-2",
+          provider_order_id: "IPL-QRIS-ORDER-1",
           status: "pending",
           payment_type: "qris",
           qr_string: "qr-content",
@@ -331,6 +359,9 @@ describe("create QRIS transaction contract", () => {
     expect(harness.createQrisCharge).toHaveBeenCalledWith(
       expect.objectContaining({ grossAmount: 70000 }),
     );
+    expect(log.findIndex((entry) => entry.op === "insert")).toBeLessThan(
+      log.findIndex((entry) => entry.op === "update"),
+    );
     expect(log).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -339,12 +370,76 @@ describe("create QRIS transaction contract", () => {
           payload: expect.objectContaining({
             invoice_id: "33333333-3333-4333-8333-333333333333",
             amount: 70000,
+            status: "created",
+            provider_order_id: expect.stringMatching(/^IPL-QRIS-/),
+          }),
+        }),
+        expect.objectContaining({
+          table: "payment_gateway_transactions",
+          op: "update",
+          payload: expect.objectContaining({
             status: "pending",
             provider_transaction_id: "mid-1",
             qr_string: "qr-content",
             qr_image_url: "https://midtrans.test/qr.png",
           }),
         }),
+      ]),
+    );
+  });
+
+  it("keeps the reserved provider order tracked if the post-provider update fails", async () => {
+    const harness = loadHandleCreateQris();
+    const log: Operation[] = [];
+    harness.createQrisCharge.mockResolvedValue({
+      transaction_status: "pending",
+      transaction_id: "mid-fail-update",
+      payment_type: "qris",
+      qr_string: "qr-content",
+      actions: [{ name: "generate-qr-code", url: "https://midtrans.test/qr.png" }],
+    });
+    harness.setClients({
+      userClient: createQrisUserClientMock({
+        invoice: {
+          id: "55555555-5555-4555-8555-555555555555",
+          amount_due: 100000,
+          amount_paid: 0,
+          status: "unpaid",
+        },
+      }),
+      serviceClient: createQrisServiceClientMock({
+        log,
+        insertedRow: {
+          id: "txn-reserved",
+          provider_order_id: "IPL-QRIS-ORDER-RESERVED",
+          status: "created",
+          payment_type: "qris",
+          qr_string: null,
+          qr_image_url: null,
+        },
+        updateError: { message: "database update failed" },
+      }),
+    });
+
+    await expect(
+      harness.handleCreateQris(
+        new Request("http://localhost/create-qris-transaction", {
+          method: "POST",
+          body: JSON.stringify({ invoiceId: "55555555-5555-4555-8555-555555555555" }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      status: 500,
+      message: "QRIS provider charge was created but failed to update reserved transaction",
+    });
+
+    expect(harness.createQrisCharge).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: "IPL-QRIS-ORDER-RESERVED" }),
+    );
+    expect(log).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ table: "payment_gateway_transactions", op: "insert" }),
+        expect.objectContaining({ table: "payment_gateway_transactions", op: "update" }),
       ]),
     );
   });

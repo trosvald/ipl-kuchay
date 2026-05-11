@@ -20,6 +20,8 @@ declare
   v_amount_paid integer;
   v_expected_message text;
   v_proof_path text;
+  v_qris_active_a uuid;
+  v_qris_active_b uuid;
 begin
   insert into auth.users (id, aud, role, email, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
   values
@@ -97,6 +99,61 @@ begin
   delete from public.payments where invoice_id = v_invoice_invariant;
   delete from public.payment_submissions where invoice_id = v_invoice_invariant;
   delete from public.payment_gateway_transactions where invoice_id = v_invoice_invariant;
+
+  -- Active QRIS invariant: one created/pending transaction per invoice.
+  insert into public.payment_gateway_transactions (
+    invoice_id,
+    provider,
+    provider_order_id,
+    amount,
+    status,
+    payment_type,
+    created_by
+  )
+  values (
+    v_invoice_invariant,
+    'midtrans',
+    'ORDER-M08-ACTIVE-A',
+    50000,
+    'created',
+    'qris',
+    v_resident
+  )
+  returning id into v_qris_active_a;
+
+  begin
+    insert into public.payment_gateway_transactions (
+      invoice_id,
+      provider,
+      provider_order_id,
+      amount,
+      status,
+      payment_type,
+      created_by
+    )
+    values (
+      v_invoice_invariant,
+      'midtrans',
+      'ORDER-M08-ACTIVE-B',
+      50000,
+      'pending',
+      'qris',
+      v_resident
+    )
+    returning id into v_qris_active_b;
+    raise exception 'second active QRIS transaction must fail';
+  exception
+    when others then
+      get stacked diagnostics v_expected_message = message_text;
+      if position('active' in lower(coalesce(v_expected_message, ''))) = 0
+         and position('duplicate' in lower(coalesce(v_expected_message, ''))) = 0 then
+        raise exception 'unexpected active QRIS uniqueness error: %', v_expected_message;
+      end if;
+  end;
+
+  update public.payment_gateway_transactions
+  set status = 'expire'
+  where id = v_qris_active_a;
 
   insert into public.payment_gateway_transactions (
     invoice_id,

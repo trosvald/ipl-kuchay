@@ -21,6 +21,15 @@ interface PaymentGatewayConfig {
   qris_enabled?: boolean;
 }
 
+interface GatewayTransactionRow {
+  id: string;
+  provider_order_id: string;
+  status: string;
+  payment_type: string;
+  qr_string: string | null;
+  qr_image_url: string | null;
+}
+
 function isUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -53,6 +62,11 @@ function resolveQrUrl(actions: Array<{ name?: string; url?: string }> | undefine
 
   const action = actions.find((item) => item.name === "generate-qr-code" && typeof item.url === "string");
   return action?.url ?? null;
+}
+
+function isReservationConflict(error: { code?: string; message?: string } | null): boolean {
+  const message = error?.message?.toLowerCase() ?? "";
+  return error?.code === "23505" || message.includes("duplicate") || message.includes("active") || message.includes("reservable");
 }
 
 async function requireQrisEnabled(serviceClient: ReturnType<typeof createServiceRoleClient>): Promise<void> {
@@ -117,10 +131,48 @@ async function handleCreateQris(request: Request): Promise<Response> {
   }
 
   const providerOrderId = buildProviderOrderId(invoiceRow.id);
-  const chargeResponse = await createQrisCharge({
-    orderId: providerOrderId,
-    grossAmount: outstandingAmount,
-  });
+  const { data: reservedRow, error: reserveError } = await serviceClient
+    .from("payment_gateway_transactions")
+    .insert({
+      invoice_id: invoiceRow.id,
+      provider: "midtrans",
+      provider_order_id: providerOrderId,
+      amount: outstandingAmount,
+      status: "created",
+      payment_type: "qris",
+      created_by: caller.id,
+    })
+    .select("id, provider_order_id, status, payment_type, qr_string, qr_image_url")
+    .single();
+
+  if (reserveError || !reservedRow) {
+    if (isReservationConflict(reserveError)) {
+      throw new HttpError(409, "Invoice already has an active QRIS transaction");
+    }
+
+    throw new HttpError(500, reserveError?.message ?? "Failed to reserve QRIS transaction");
+  }
+
+  const reservedTransaction = reservedRow as GatewayTransactionRow;
+  let chargeResponse;
+
+  try {
+    chargeResponse = await createQrisCharge({
+      orderId: reservedTransaction.provider_order_id,
+      grossAmount: outstandingAmount,
+    });
+  } catch (error) {
+    await serviceClient
+      .from("payment_gateway_transactions")
+      .update({
+        status: "failure",
+        raw_create_response: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      .eq("id", reservedTransaction.id);
+    throw error;
+  }
 
   const gatewayStatus = (chargeResponse.transaction_status ?? "pending") as
     | "created"
@@ -136,35 +188,33 @@ async function handleCreateQris(request: Request): Promise<Response> {
 
   const qrImageUrl = resolveQrUrl(chargeResponse.actions);
 
-  const { data: insertedRow, error: insertError } = await serviceClient
+  const { data: updatedRow, error: updateError } = await serviceClient
     .from("payment_gateway_transactions")
-    .insert({
-      invoice_id: invoiceRow.id,
-      provider: "midtrans",
-      provider_order_id: providerOrderId,
+    .update({
       provider_transaction_id: chargeResponse.transaction_id ?? null,
-      amount: outstandingAmount,
       status: gatewayStatus,
       payment_type: chargeResponse.payment_type ?? "qris",
       qr_string: chargeResponse.qr_string ?? null,
       qr_image_url: qrImageUrl,
       raw_create_response: chargeResponse,
-      created_by: caller.id,
     })
+    .eq("id", reservedTransaction.id)
     .select("id, provider_order_id, status, payment_type, qr_string, qr_image_url")
     .single();
 
-  if (insertError || !insertedRow) {
-    throw new HttpError(500, insertError?.message ?? "Failed to persist QRIS transaction");
+  if (updateError || !updatedRow) {
+    throw new HttpError(500, "QRIS provider charge was created but failed to update reserved transaction");
   }
 
+  const qrisTransaction = updatedRow as GatewayTransactionRow;
+
   return jsonResponse(200, {
-    transactionId: insertedRow.id,
-    providerOrderId: insertedRow.provider_order_id,
-    status: insertedRow.status,
-    paymentType: insertedRow.payment_type,
-    qrString: insertedRow.qr_string,
-    qrImageUrl: insertedRow.qr_image_url,
+    transactionId: qrisTransaction.id,
+    providerOrderId: qrisTransaction.provider_order_id,
+    status: qrisTransaction.status,
+    paymentType: qrisTransaction.payment_type,
+    qrString: qrisTransaction.qr_string,
+    qrImageUrl: qrisTransaction.qr_image_url,
     rawResponse: chargeResponse,
   });
 }
