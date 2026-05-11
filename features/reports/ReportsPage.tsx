@@ -26,7 +26,8 @@ import {
   type ReceiptCandidateRow,
 } from "@/features/reports/reportQueries";
 import { generateReportOutputArtifact, openReportOutputArtifact } from "@/features/reports/reportOutputClient";
-import { toCsvRows, toArrearsCsvRows, serializeCsv, downloadCsv } from "@/features/reports/reportCsv";
+import { toCsvRows, toArrearsCsvRows, serializeCsv } from "@/features/reports/reportCsv";
+import { downloadAuditedFinanceCsv } from "@/features/reports/reportCsvAudit";
 import type {
   CollectionSummaryRow,
   ArrearsRow,
@@ -220,7 +221,14 @@ export function ReportsPage() {
       const csvContent = serializeCsv(toCsvRows(summaryRows));
       const periodLabel = selectedPeriod?.label ?? "laporan";
       const filename = `Laporan_Keuangan_${periodLabel.replace(/\s+/g, "_")}.csv`;
-      downloadCsv(csvContent, filename);
+      await downloadAuditedFinanceCsv({
+        csvContent,
+        filename,
+        exportType: "collection_summary",
+        billingPeriodId: selectedPeriodId,
+        billingPeriodLabel: periodLabel,
+        rowCount: summaryRows.length,
+      });
       setActionSuccess("CSV berhasil diunduh.");
     } catch (err) {
       setErrorMessage("Gagal mengekspor CSV.");
@@ -237,7 +245,14 @@ export function ReportsPage() {
       const csvContent = serializeCsv(toArrearsCsvRows(arrearsRows));
       const periodLabel = selectedPeriod?.label ?? "laporan";
       const filename = `Daftar_Tunggakan_${periodLabel.replace(/\s+/g, "_")}.csv`;
-      downloadCsv(csvContent, filename);
+      await downloadAuditedFinanceCsv({
+        csvContent,
+        filename,
+        exportType: "arrears",
+        billingPeriodId: selectedPeriodId,
+        billingPeriodLabel: periodLabel,
+        rowCount: arrearsRows.length,
+      });
       setActionSuccess("Daftar tunggakan berhasil diunduh.");
     } catch (err) {
       setErrorMessage("Gagal mengekspor daftar tunggakan.");

@@ -6,10 +6,10 @@
 
 do $$
 declare
-  v_super_admin uuid := '81000000-0000-0000-0000-000000000001'::uuid;
-  v_admin uuid := '81000000-0000-0000-0000-000000000002'::uuid;
-  v_treasurer uuid := '81000000-0000-0000-0000-000000000003'::uuid;
-  v_resident uuid := '81000000-0000-0000-0000-000000000004'::uuid;
+  v_super_admin uuid := '89000000-0000-0000-0000-000000000001'::uuid;
+  v_admin uuid := '89000000-0000-0000-0000-000000000002'::uuid;
+  v_treasurer uuid := '89000000-0000-0000-0000-000000000003'::uuid;
+  v_resident uuid := '89000000-0000-0000-0000-000000000004'::uuid;
   v_kav1 uuid;
   v_kav2 uuid;
   v_period1 uuid;
@@ -56,6 +56,35 @@ begin
   if v_kav1 is null then
     raise exception 'no kavling found in seed data';
   end if;
+
+  insert into public.kavling_residents (
+    kavling_id,
+    profile_id,
+    relation,
+    relation_type,
+    relation_label,
+    is_primary,
+    active,
+    started_at,
+    ended_at
+  ) values (
+    v_kav1,
+    v_resident,
+    'owner',
+    'owner',
+    null,
+    false,
+    true,
+    date '2025-01-01',
+    null
+  ) on conflict (kavling_id, profile_id) do update
+  set relation = excluded.relation,
+      relation_type = excluded.relation_type,
+      relation_label = excluded.relation_label,
+      is_primary = excluded.is_primary,
+      active = excluded.active,
+      started_at = excluded.started_at,
+      ended_at = excluded.ended_at;
 
   -- Create two test periods (same month, different years to avoid conflicts)
   insert into public.billing_periods (year, month, label, due_date, status)
@@ -129,6 +158,32 @@ begin
 
   if v_arrears_count < 1 then
     raise exception 'TEST 2 FAILED: period2 arrears count must be >= 1, got %', v_arrears_count;
+  end if;
+
+  -- ----------------------------------------------------------------
+  -- TEST 2B: resident RLS cannot read other-kavling finance export source data
+  -- ----------------------------------------------------------------
+  perform set_config('request.jwt.claim.sub', v_resident::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+
+  execute 'set local role authenticated';
+  execute 'select count(*) from public.invoices where id = $1'
+    into v_count
+    using v_invoice1;
+  execute 'reset role';
+
+  if v_count <> 1 then
+    raise exception 'TEST 2B FAILED: resident should read their own invoice history source row';
+  end if;
+
+  execute 'set local role authenticated';
+  execute 'select count(*) from public.invoices where id = $1'
+    into v_count
+    using v_invoice2;
+  execute 'reset role';
+
+  if v_count <> 0 then
+    raise exception 'TEST 2B FAILED: resident must not read finance export source rows for another kavling';
   end if;
 
   -- ----------------------------------------------------------------

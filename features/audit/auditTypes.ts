@@ -23,7 +23,8 @@ export type AuditAction =
   | "billing_period.apply_penalties"
   | "billing_period.status_open"
   | "billing_period.status_closed"
-  | "billing_period.status_archived";
+  | "billing_period.status_archived"
+  | "report.export_csv";
 
 export type BillingPeriodStatusForAudit = "draft" | "open" | "closed" | "archived";
 
@@ -45,7 +46,7 @@ export function resolveBillingPeriodStatusAuditAction(status: BillingPeriodStatu
 
 export interface AuditLogInput {
   action: AuditAction;
-  entityTable: "kavlings" | "profiles" | "kavling_residents" | "fee_types" | "kavling_fee_overrides" | "billing_periods";
+  entityTable: "kavlings" | "profiles" | "kavling_residents" | "fee_types" | "kavling_fee_overrides" | "billing_periods" | "reports";
   entityId: string;
   beforeData?: unknown;
   afterData?: unknown;
