@@ -1,4 +1,3 @@
-<!-- GSD:project-start source:PROJECT.md -->
 ## Project
 
 **IPL Jatiloka Residence**
@@ -17,9 +16,7 @@ IPL Jatiloka Residence is a neighborhood operations app for managing resident bi
 - **Delivery Quality**: Use pragmatic TDD project-wide, with stricter test-first practice for critical and security-sensitive flows
 - **Rollout**: Target is a real full rollout for neighborhood use, not just an internal prototype or pilot
 - **UX Language**: User-facing copy should fit the neighborhood context and use Indonesian where appropriate
-<!-- GSD:project-end -->
 
-<!-- GSD:stack-start source:codebase/STACK.md -->
 ## Technology Stack
 
 ## Languages
@@ -64,9 +61,7 @@ IPL Jatiloka Residence is a neighborhood operations app for managing resident bi
 - Supabase CLI required for SQL tests and local functions, referenced in `package.json`
 - Hosting target for the web app is not declared in code, but `PANDUAN-DEPLOY.md` documents Vercel for the frontend and Supabase for backend services
 - External dependencies assume hosted Supabase project for auth, Postgres, storage, and Edge Functions
-<!-- GSD:stack-end -->
 
-<!-- GSD:conventions-start source:CONVENTIONS.md -->
 ## Conventions
 
 ## Naming Patterns
@@ -96,7 +91,6 @@ IPL Jatiloka Residence is a neighborhood operations app for managing resident bi
 ## Comments
 - Comments are sparse in app code
 - Use comments mainly for environment/runtime quirks, such as the Deno import note in `supabase/functions/*/index.ts`
-- Not used
 ## Function Design
 - Simple shared helpers stay small in `lib/*.ts`
 - Page components are allowed to be large and contain load/mutate/render logic together, such as `features/billing/BillingPeriodsPage.tsx` and `features/payments/AdminSubmissionsPage.tsx`
@@ -107,15 +101,12 @@ IPL Jatiloka Residence is a neighborhood operations app for managing resident bi
 ## Module Design
 - Prefer named exports across the codebase, for example `export function BillingPeriodsPage()` and `export const billingPeriodFormSchema = ...`
 - Default exports are mostly reserved for Next.js route/layout files in `app/`
-- Not detected
 ## Prescriptive Patterns to Match
 - Put route logic in `features/**` and keep `app/**/page.tsx` thin
 - Reuse `@/*` imports instead of long relative paths
 - Validate form payloads with `zod` schemas from `lib/validation.ts`
 - Keep admin mutations auditable through `features/audit/writeAuditLog.ts` or the SQL audit functions
-<!-- GSD:conventions-end -->
 
-<!-- GSD:architecture-start source:ARCHITECTURE.md -->
 ## Architecture
 
 ## Pattern Overview
@@ -188,32 +179,3 @@ IPL Jatiloka Residence is a neighborhood operations app for managing resident bi
 - Edge Functions throw `HttpError` and serialize errors through `jsonResponse` from `supabase/functions/_shared/responses.ts`
 - Browser auth bootstrap swallows failures into loading fallback in `features/auth/AuthProvider.tsx`
 ## Cross-Cutting Concerns
-<!-- GSD:architecture-end -->
-
-<!-- GSD:skills-start source:skills/ -->
-## Project Skills
-
-No project skills found. Add skills to any of: `.OpenCode/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.
-<!-- GSD:skills-end -->
-
-<!-- GSD:workflow-start source:GSD defaults -->
-## GSD Workflow Enforcement
-
-Before using edit, write, or other file-changing tools, start work through a GSD command so planning artifacts and execution context stay in sync.
-
-Use these entry points:
-- `/gsd-quick` for small fixes, doc updates, and ad-hoc tasks
-- `/gsd-debug` for investigation and bug fixing
-- `/gsd-execute-phase` for planned phase work
-
-Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
-<!-- GSD:workflow-end -->
-
-
-
-<!-- GSD:profile-start -->
-## Developer Profile
-
-> Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
-> This section is managed by `generate-OpenCode-profile` -- do not edit manually.
-<!-- GSD:profile-end -->
