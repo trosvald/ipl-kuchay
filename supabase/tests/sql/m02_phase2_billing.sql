@@ -202,10 +202,71 @@ begin
     raise exception 'second generation must be idempotent and create 0 invoices, got %', v_created_second;
   end if;
 
-  -- Prepare open/closed/archived invoices for resident visibility checks.
+  -- Prepare open invoices and verify generation is blocked after close/archive.
   perform public.generate_invoices_for_period(v_period_open);
-  perform public.generate_invoices_for_period(v_period_closed);
-  perform public.generate_invoices_for_period(v_period_archived);
+
+  begin
+    perform public.generate_invoices_for_period(v_period_closed);
+    raise exception 'closed billing periods must not allow invoice generation';
+  exception
+    when others then
+      if sqlerrm <> 'closed billing periods must not allow invoice generation'
+         and position('draft/open' in sqlerrm) = 0 then
+        raise;
+      end if;
+      if sqlerrm = 'closed billing periods must not allow invoice generation' then
+        raise;
+      end if;
+  end;
+
+  begin
+    perform public.generate_invoices_for_period(v_period_archived);
+    raise exception 'archived billing periods must not allow invoice generation';
+  exception
+    when others then
+      if sqlerrm <> 'archived billing periods must not allow invoice generation'
+         and position('draft/open' in sqlerrm) = 0 then
+        raise;
+      end if;
+      if sqlerrm = 'archived billing periods must not allow invoice generation' then
+        raise;
+      end if;
+  end;
+
+  -- Manually seed closed/archived historical invoices for resident visibility checks.
+  insert into public.invoices (billing_period_id, kavling_id, invoice_number, amount_due, amount_paid, due_date, status)
+  values (
+    v_period_closed,
+    v_kavling_a,
+    public.generate_invoice_number(2026, 9, 'A-01'),
+    0,
+    0,
+    date '2026-09-10',
+    'unpaid'
+  )
+  on conflict (billing_period_id, kavling_id) do update
+  set invoice_number = excluded.invoice_number,
+      amount_due = excluded.amount_due,
+      amount_paid = excluded.amount_paid,
+      due_date = excluded.due_date,
+      status = excluded.status;
+
+  insert into public.invoices (billing_period_id, kavling_id, invoice_number, amount_due, amount_paid, due_date, status)
+  values (
+    v_period_archived,
+    v_kavling_a,
+    public.generate_invoice_number(2026, 10, 'A-01'),
+    0,
+    0,
+    date '2026-10-10',
+    'unpaid'
+  )
+  on conflict (billing_period_id, kavling_id) do update
+  set invoice_number = excluded.invoice_number,
+      amount_due = excluded.amount_due,
+      amount_paid = excluded.amount_paid,
+      due_date = excluded.due_date,
+      status = excluded.status;
 
   -- Test 3: resident visibility by billing lifecycle.
   perform set_config('request.jwt.claim.sub', v_resident::text, true);

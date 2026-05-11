@@ -22,7 +22,26 @@ export type AuditAction =
   | "billing_period.generate_invoices"
   | "billing_period.apply_penalties"
   | "billing_period.status_open"
-  | "billing_period.status_closed";
+  | "billing_period.status_closed"
+  | "billing_period.status_archived";
+
+export type BillingPeriodStatusForAudit = "draft" | "open" | "closed" | "archived";
+
+export function resolveBillingPeriodStatusAuditAction(status: BillingPeriodStatusForAudit): AuditAction {
+  if (status === "open") {
+    return "billing_period.status_open";
+  }
+
+  if (status === "closed") {
+    return "billing_period.status_closed";
+  }
+
+  if (status === "archived") {
+    return "billing_period.status_archived";
+  }
+
+  throw new Error(`Unsupported billing period status action: ${status}`);
+}
 
 export interface AuditLogInput {
   action: AuditAction;

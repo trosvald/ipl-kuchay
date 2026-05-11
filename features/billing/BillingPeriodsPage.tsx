@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { resolveBillingPeriodStatusAuditAction } from "@/features/audit/auditTypes";
 import { writeAuditLog } from "@/features/audit/writeAuditLog";
 import { useAuth } from "@/features/auth/authHooks";
 import { formatMonthYearId, formatBillingPeriodStatusLabel, formatDateId, formatRupiah, statusToBadgeVariant } from "@/lib/format";
@@ -315,13 +316,8 @@ export function BillingPeriodsPage() {
       return;
     }
 
-    const action =
-      nextStatus === "open"
-        ? "billing_period.status_open"
-        : "billing_period.status_closed";
-
     await writeAuditLog({
-      action,
+      action: resolveBillingPeriodStatusAuditAction(nextStatus),
       entityTable: "billing_periods",
       entityId: row.id,
       beforeData: row,
