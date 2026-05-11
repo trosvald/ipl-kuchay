@@ -143,10 +143,15 @@ function createQrisUserClientMock(input: { invoice: unknown }) {
 
 function createQrisServiceClientMock(input: {
   log: Operation[];
+  gatewayConfig?: unknown;
   activeTransaction?: unknown;
   insertedRow?: unknown;
 }) {
   return {
+    rpc(fn: string) {
+      input.log.push({ table: "rpc", op: fn });
+      return Promise.resolve({ data: input.gatewayConfig ?? { qris_enabled: true }, error: null });
+    },
     from(table: string) {
       return {
         select(columns: string) {
@@ -181,6 +186,39 @@ function createQrisServiceClientMock(input: {
 }
 
 describe("create QRIS transaction contract", () => {
+  it("rejects QRIS creation when the server-side feature flag is disabled", async () => {
+    const harness = loadHandleCreateQris();
+    const log: Operation[] = [];
+    harness.setClients({
+      userClient: createQrisUserClientMock({
+        invoice: {
+          id: "44444444-4444-4444-8444-444444444444",
+          amount_due: 100000,
+          amount_paid: 0,
+          status: "unpaid",
+        },
+      }),
+      serviceClient: createQrisServiceClientMock({
+        log,
+        gatewayConfig: { qris_enabled: false },
+      }),
+    });
+
+    await expect(
+      harness.handleCreateQris(
+        new Request("http://localhost/create-qris-transaction", {
+          method: "POST",
+          body: JSON.stringify({ invoiceId: "44444444-4444-4444-8444-444444444444" }),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      status: 403,
+      message: "QRIS payment is disabled",
+    });
+    expect(harness.createQrisCharge).not.toHaveBeenCalled();
+    expect(log).toEqual([expect.objectContaining({ table: "rpc", op: "get_resident_payment_gateway_config" })]);
+  });
+
   it("blocks QRIS creation when an active transaction already exists", async () => {
     const harness = loadHandleCreateQris();
     const log: Operation[] = [];

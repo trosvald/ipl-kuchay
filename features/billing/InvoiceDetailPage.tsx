@@ -67,6 +67,10 @@ interface InvoiceItemRow {
   sort_order: number;
 }
 
+interface ResidentPaymentGatewayConfig {
+  qris_enabled?: boolean;
+}
+
 function normalizeOne<T>(value: T | T[] | null): T | null {
   if (Array.isArray(value)) {
     return value[0] ?? null;
@@ -118,7 +122,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
         .eq("invoice_id", invoiceId)
         .order("sort_order", { ascending: true })
         .order("description", { ascending: true }),
-      client.from("app_settings").select("value").eq("key", "payment_gateway").maybeSingle(),
+      client.rpc("get_resident_payment_gateway_config"),
     ]);
 
     if (invoiceRes.error || itemsRes.error) {
@@ -134,10 +138,9 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
     }
 
     const gatewayEnabled =
-      (gatewayRes.data?.value &&
-        typeof gatewayRes.data.value === "object" &&
-        (gatewayRes.data.value as { enabled?: unknown }).enabled === true) ||
-      false;
+      gatewayRes.data &&
+      typeof gatewayRes.data === "object" &&
+      (gatewayRes.data as ResidentPaymentGatewayConfig).qris_enabled === true;
     setPaymentGatewayEnabled(gatewayEnabled);
 
     const invoiceData = invoiceRes.data as InvoiceDetail | null;

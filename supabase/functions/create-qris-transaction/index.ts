@@ -17,6 +17,10 @@ interface InvoiceRow {
   status: string;
 }
 
+interface PaymentGatewayConfig {
+  qris_enabled?: boolean;
+}
+
 function isUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -51,6 +55,19 @@ function resolveQrUrl(actions: Array<{ name?: string; url?: string }> | undefine
   return action?.url ?? null;
 }
 
+async function requireQrisEnabled(serviceClient: ReturnType<typeof createServiceRoleClient>): Promise<void> {
+  const { data, error } = await serviceClient.rpc("get_resident_payment_gateway_config");
+
+  if (error) {
+    throw new HttpError(500, error.message);
+  }
+
+  const config = data as PaymentGatewayConfig | null;
+  if (config?.qris_enabled !== true) {
+    throw new HttpError(403, "QRIS payment is disabled");
+  }
+}
+
 async function handleCreateQris(request: Request): Promise<Response> {
   const authHeader = request.headers.get("Authorization");
   const userClient = createUserClient(authHeader);
@@ -60,6 +77,7 @@ async function handleCreateQris(request: Request): Promise<Response> {
   requireRole(caller, ["resident", "treasurer", "admin", "super_admin"]);
 
   const input = await parseRequest(request);
+  await requireQrisEnabled(serviceClient);
 
   const { data: invoice, error: invoiceError } = await userClient
     .from("invoices")
