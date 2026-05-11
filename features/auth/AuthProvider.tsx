@@ -101,6 +101,44 @@ async function fetchHasActiveKavlingMapping(
   return (count ?? 0) > 0;
 }
 
+interface AuthDerivedStateLoaders {
+  fetchProfile: (userId: string) => Promise<Profile | null>;
+  fetchHasActiveKavlingMapping: (profileId: string) => Promise<boolean>;
+}
+
+export interface AuthDerivedState {
+  profile: Profile | null;
+  hasActiveKavlingMapping: boolean;
+}
+
+function clearedAuthDerivedState(): AuthDerivedState {
+  return {
+    profile: null,
+    hasActiveKavlingMapping: false,
+  };
+}
+
+export async function resolveAuthDerivedState(
+  userId: string,
+  loaders: AuthDerivedStateLoaders,
+): Promise<AuthDerivedState> {
+  try {
+    const nextProfile = await loaders.fetchProfile(userId);
+
+    if (!nextProfile) {
+      return clearedAuthDerivedState();
+    }
+
+    const nextHasActiveMapping = await loaders.fetchHasActiveKavlingMapping(nextProfile.id);
+    return {
+      profile: nextProfile,
+      hasActiveKavlingMapping: nextHasActiveMapping,
+    };
+  } catch {
+    return clearedAuthDerivedState();
+  }
+}
+
 export function AuthProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
@@ -110,24 +148,23 @@ export function AuthProvider({
   const [hasActiveKavlingMapping, setHasActiveKavlingMapping] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const applyAuthDerivedState = useCallback((nextState: AuthDerivedState) => {
+    setProfile(nextState.profile);
+    setHasActiveKavlingMapping(nextState.hasActiveKavlingMapping);
+  }, []);
+
   const refreshProfile = useCallback(async () => {
-    if (!client || !session?.user) {
-      setProfile(null);
-      setHasActiveKavlingMapping(false);
+    if (!client || !session?.user?.id) {
+      applyAuthDerivedState(clearedAuthDerivedState());
       return;
     }
 
-    const nextProfile = await fetchProfile(client, session.user.id);
-    setProfile(nextProfile);
-
-    if (!nextProfile) {
-      setHasActiveKavlingMapping(false);
-      return;
-    }
-
-    const nextHasActiveMapping = await fetchHasActiveKavlingMapping(client, nextProfile.id);
-    setHasActiveKavlingMapping(nextHasActiveMapping);
-  }, [client, session?.user]);
+    const nextState = await resolveAuthDerivedState(session.user.id, {
+      fetchProfile: (userId) => fetchProfile(client, userId),
+      fetchHasActiveKavlingMapping: (profileId) => fetchHasActiveKavlingMapping(client, profileId),
+    });
+    applyAuthDerivedState(nextState);
+  }, [applyAuthDerivedState, client, session?.user?.id]);
 
   const signIn = useCallback(
     async ({ email, password }: SignInInput) => {
@@ -148,7 +185,7 @@ export function AuthProvider({
         return;
       }
 
-      const redirectTo = `${globalThis.location.origin}/app`;
+      const redirectTo = `${globalThis.location.origin}/login`;
       const { error } = await client.auth.signInWithOtp({
         email,
         options: {
@@ -167,8 +204,7 @@ export function AuthProvider({
   const signOut = useCallback(async () => {
     if (!client) {
       setSession(null);
-      setProfile(null);
-      setHasActiveKavlingMapping(false);
+      applyAuthDerivedState(clearedAuthDerivedState());
       return;
     }
 
@@ -178,9 +214,8 @@ export function AuthProvider({
     }
 
     setSession(null);
-    setProfile(null);
-    setHasActiveKavlingMapping(false);
-  }, [client]);
+    applyAuthDerivedState(clearedAuthDerivedState());
+  }, [applyAuthDerivedState, client]);
 
   useEffect(() => {
     if (!client) {
@@ -199,8 +234,7 @@ export function AuthProvider({
 
       if (error) {
         setSession(null);
-        setProfile(null);
-        setHasActiveKavlingMapping(false);
+        applyAuthDerivedState(clearedAuthDerivedState());
         setLoading(false);
         return;
       }
@@ -209,31 +243,21 @@ export function AuthProvider({
       setSession(nextSession);
 
       if (!nextSession?.user) {
-        setProfile(null);
-        setHasActiveKavlingMapping(false);
+        applyAuthDerivedState(clearedAuthDerivedState());
         setLoading(false);
         return;
       }
 
       try {
-        const nextProfile = await fetchProfile(client, nextSession.user.id);
+        const nextState = await resolveAuthDerivedState(nextSession.user.id, {
+          fetchProfile: (userId) => fetchProfile(client, userId),
+          fetchHasActiveKavlingMapping: (profileId) => fetchHasActiveKavlingMapping(client, profileId),
+        });
         if (!isMounted) {
           return;
         }
 
-        setProfile(nextProfile);
-
-        if (!nextProfile) {
-          setHasActiveKavlingMapping(false);
-          return;
-        }
-
-        const nextHasActiveMapping = await fetchHasActiveKavlingMapping(client, nextProfile.id);
-        if (!isMounted) {
-          return;
-        }
-
-        setHasActiveKavlingMapping(nextHasActiveMapping);
+        applyAuthDerivedState(nextState);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -253,35 +277,24 @@ export function AuthProvider({
       setSession(nextSession);
 
       if (!nextSession?.user) {
-        setProfile(null);
-        setHasActiveKavlingMapping(false);
+        applyAuthDerivedState(clearedAuthDerivedState());
         setLoading(false);
         return;
       }
 
       setLoading(true);
-      fetchProfile(client, nextSession.user.id)
-        .then(async (nextProfile) => {
+      applyAuthDerivedState(clearedAuthDerivedState());
+
+      resolveAuthDerivedState(nextSession.user.id, {
+        fetchProfile: (userId) => fetchProfile(client, userId),
+        fetchHasActiveKavlingMapping: (profileId) => fetchHasActiveKavlingMapping(client, profileId),
+      })
+        .then((nextState) => {
           if (!isMounted) {
             return;
           }
 
-          setProfile(nextProfile);
-
-          if (!nextProfile) {
-            setHasActiveKavlingMapping(false);
-            return;
-          }
-
-          const nextHasActiveMapping = await fetchHasActiveKavlingMapping(
-            client,
-            nextProfile.id,
-          );
-          if (!isMounted) {
-            return;
-          }
-
-          setHasActiveKavlingMapping(nextHasActiveMapping);
+          applyAuthDerivedState(nextState);
         })
         .finally(() => {
           if (isMounted) {
@@ -294,7 +307,7 @@ export function AuthProvider({
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [client]);
+  }, [applyAuthDerivedState, client]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

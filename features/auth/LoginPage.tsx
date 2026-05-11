@@ -15,13 +15,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { APP_NAME } from "@/lib/constants";
-import { useAuth, useIsAdminLike } from "./authHooks";
+import { useAuth } from "./authHooks";
+import { canRedirectAfterAuthResolution, getAuthenticatedLandingPath } from "./authRouting";
 
 export function LoginPage({
   reason,
 }: Readonly<{ reason?: string }>) {
-  const { accessState, session, signIn } = useAuth();
-  const isAdminLike = useIsAdminLike();
+  const { accessState, loading: authLoading, role, session, signIn } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -38,10 +38,14 @@ export function LoginPage({
   }, [reason]);
 
   useEffect(() => {
-    if (session && accessState !== "inactive" && accessState !== "missing-profile") {
-      router.replace(isAdminLike ? "/admin" : "/app");
+    if (canRedirectAfterAuthResolution({
+      loading: authLoading,
+      hasSession: Boolean(session),
+      accessState,
+    })) {
+      router.replace(getAuthenticatedLandingPath(role));
     }
-  }, [accessState, isAdminLike, router, session]);
+  }, [accessState, authLoading, role, router, session]);
 
   const onSubmitPassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -51,7 +55,6 @@ export function LoginPage({
 
     try {
       await signIn({ email: email.trim(), password });
-      router.push(isAdminLike ? "/admin" : "/app");
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Login password gagal.",
