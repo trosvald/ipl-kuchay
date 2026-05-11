@@ -10,6 +10,9 @@ declare
   v_period_new uuid;
   v_invoice_old uuid;
   v_invoice_new uuid;
+  v_report_old uuid;
+  v_report_new uuid;
+  v_visible_count integer;
 begin
   if to_regclass('public.notification_preferences') is null then
     raise exception 'notification_preferences table is required';
@@ -231,6 +234,38 @@ begin
       invoice_number = excluded.invoice_number
   returning id into v_invoice_new;
 
+  insert into public.reports (
+    report_type,
+    billing_period_id,
+    kavling_id,
+    title,
+    metadata,
+    generated_by
+  ) values (
+    'receipt',
+    v_period_old,
+    v_kav,
+    'Bukti Bayar - Riwayat M07',
+    jsonb_build_object('invoice_id', v_invoice_old::text, 'kavling_code', 'M07'),
+    v_treasurer
+  ) returning id into v_report_old;
+
+  insert into public.reports (
+    report_type,
+    billing_period_id,
+    kavling_id,
+    title,
+    metadata,
+    generated_by
+  ) values (
+    'receipt',
+    v_period_new,
+    v_kav,
+    'Bukti Bayar - Aktif M07',
+    jsonb_build_object('invoice_id', v_invoice_new::text, 'kavling_code', 'M07'),
+    v_treasurer
+  ) returning id into v_report_new;
+
   perform set_config('request.jwt.claim.sub', v_resident_old::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
@@ -242,6 +277,40 @@ begin
     raise exception 'former resident must not access future invoice outside ended_at window';
   end if;
 
+  begin
+    execute 'set local role authenticated';
+    execute 'insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status) values ($1, $2, 100000, ''submitted'')'
+      using v_invoice_old, v_resident_old;
+    execute 'reset role';
+    raise exception 'former resident must not create payment submissions for inactive historical invoices';
+  exception
+    when others then
+      execute 'reset role';
+      if sqlstate <> '42501' then
+        raise;
+      end if;
+  end;
+
+  execute 'set local role authenticated';
+  execute 'select count(*) from public.reports where id = $1'
+    into v_visible_count
+    using v_report_old;
+  execute 'reset role';
+
+  if v_visible_count <> 1 then
+    raise exception 'former resident must read receipt reports for allowed historical invoices';
+  end if;
+
+  execute 'set local role authenticated';
+  execute 'select count(*) from public.reports where id = $1'
+    into v_visible_count
+    using v_report_new;
+  execute 'reset role';
+
+  if v_visible_count <> 0 then
+    raise exception 'former resident must not read receipt reports outside historical invoice access';
+  end if;
+
   perform set_config('request.jwt.claim.sub', v_resident_new::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
 
@@ -251,6 +320,21 @@ begin
 
   if not public.can_access_invoice_history(v_invoice_new) then
     raise exception 'active resident must access current kavling invoices';
+  end if;
+
+  execute 'set local role authenticated';
+  execute 'insert into public.payment_submissions (invoice_id, submitted_by, amount_submitted, status) values ($1, $2, 100000, ''submitted'')'
+    using v_invoice_new, v_resident_new;
+  execute 'reset role';
+
+  execute 'set local role authenticated';
+  execute 'select count(*) from public.reports where id in ($1, $2)'
+    into v_visible_count
+    using v_report_old, v_report_new;
+  execute 'reset role';
+
+  if v_visible_count <> 2 then
+    raise exception 'active resident must read receipt reports for accessible kavling invoice history';
   end if;
 
   perform set_config('request.jwt.claim.sub', v_treasurer::text, true);
