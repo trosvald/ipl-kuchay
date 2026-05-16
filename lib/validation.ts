@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isValidBillingMonth, parseIsoDateInput } from "./date";
+import { isValidBillingMonth, parseIsoDateInput } from "./date.ts";
 
 export const uuidSchema = z.uuid();
 export const appRoleSchema = z.enum(["resident", "treasurer", "admin", "super_admin"]);
