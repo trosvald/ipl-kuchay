@@ -1,0 +1,43 @@
+name: Deploy Frontend to Vercel
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_prod:
+        description: "Deploy to production (promotes to live URL)"
+        type: boolean
+        default: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy to Vercel
+        run: |
+          PROD_FLAG=""
+          if [ "${{ inputs.deploy_prod }}" = "true" ]; then
+            PROD_FLAG="--prod"
+          fi
+
+          npx vercel deploy \
+            --token="${{ secrets.VERCEL_TOKEN }}" \
+            $PROD_FLAG \
+            --env NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
