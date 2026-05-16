@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Calendar, FilePlus2, MapPin, RefreshCw, X } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -104,6 +104,8 @@ export function AdminEventsPage() {
   // Cancel confirmation
   const [confirmCancel, setConfirmCancel] = useState<{ id: string; title: string; note: string } | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const loadEvents = useCallback(async () => {
     if (!client) {
@@ -163,12 +165,30 @@ export function AdminEventsPage() {
     });
   }, [loadEvents]);
 
-  const filteredItems = items.filter((item) => {
+  const filteredItems = useMemo(() => items.filter((item) => {
     const now = new Date();
     if (activeTab === "cancelled") return item.status === "cancelled";
     if (activeTab === "past") return item.status === "scheduled" && new Date(item.starts_at) < now;
     return item.status === "scheduled" && new Date(item.starts_at) >= now;
-  });
+  }), [activeTab, items]);
+  const totalRows = filteredItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const pagedItems = useMemo(
+    () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
+    [filteredItems, page, pageSize],
+  );
+  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalRows);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(parseTab(value));
@@ -348,22 +368,80 @@ export function AdminEventsPage() {
           ) : filteredItems.length === 0 ? (
             <p className="text-sm text-slate-600">Tidak ada acara pada tab ini.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Judul</TableHead>
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Lokasi</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>RSVP Hadir</TableHead>
-                    <TableHead>RSVP Tidak Hadir</TableHead>
-                    <TableHead>Belum Menjawab</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((row) => {
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.map((row) => {
+                  const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
+                  const isPast = new Date(row.starts_at) < new Date();
+                  return (
+                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{row.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{formatDateId(row.starts_at)}</p>
+                        </div>
+                        <Badge variant={statusBadgeVariant(row.status)} className="shrink-0">
+                          {isPast && row.status === "scheduled" ? "Selesai" : formatEventStatusLabel(row.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 flex items-center gap-1 text-sm text-slate-700">
+                        <MapPin className="size-3" />
+                        {row.location}
+                      </p>
+                      {row.description ? (
+                        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.description}</p>
+                      ) : null}
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Hadir</p>
+                          <p className="font-semibold text-foreground">{rsvp.attending}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Tidak</p>
+                          <p className="font-semibold text-foreground">{rsvp.not_attending}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Belum</p>
+                          <p className="font-semibold text-foreground">{rsvp.no_response}</p>
+                        </div>
+                      </div>
+                      {row.status === "scheduled" && !isPast ? (
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <Button size="sm" variant="outline" className="w-full" onClick={() => openEditEditor(row)} disabled={workingId === row.id}>
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="w-full"
+                            onClick={() => setConfirmCancel({ id: row.id, title: row.title, note: "" })}
+                            disabled={workingId === row.id}
+                          >
+                            Batalkan
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Judul</TableHead>
+                      <TableHead>Waktu</TableHead>
+                      <TableHead>Lokasi</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>RSVP Hadir</TableHead>
+                      <TableHead>RSVP Tidak Hadir</TableHead>
+                      <TableHead>Belum Menjawab</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((row) => {
                     const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
                     const isPast = new Date(row.starts_at) < new Date();
                     return (
@@ -429,11 +507,51 @@ export function AdminEventsPage() {
                         </TableCell>
                       </TableRow>
                     );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
+
+          {!loading && filteredItems.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1">
+                  <span>Rows</span>
+                  <select
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                    value={String(pageSize)}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+                  Prev
+                </Button>
+                <span className="text-xs">
+                  Page {page}/{totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

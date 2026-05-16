@@ -57,7 +57,7 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
 
   const loadPeriodDetail = useCallback(async () => {
     if (!client) {
@@ -208,21 +208,64 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
           {loading ? (
             <p className="text-sm text-slate-600">Memuat invoice...</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[920px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>No Invoice</TableHead>
-                    <TableHead>Kavling</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tagihan</TableHead>
-                    <TableHead>Dibayar</TableHead>
-                    <TableHead>Sisa</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedInvoices.map((item) => {
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedInvoices.length === 0 ? (
+                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                    Tidak ada invoice pada filter ini.
+                  </p>
+                ) : null}
+                {pagedInvoices.map((item) => {
+                  const kavling = normalizeOne(item.kavlings);
+                  const outstanding = Math.max(item.amount_due - item.amount_paid, 0);
+
+                  return (
+                    <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{item.invoice_number}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Kavling {kavling?.code ?? "-"} - due {formatDateId(item.due_date)}
+                          </p>
+                        </div>
+                        <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0">
+                          {formatInvoiceStatusLabel(item.status)}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Tagihan</p>
+                          <p className="font-semibold text-foreground">{formatRupiah(item.amount_due)}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Dibayar</p>
+                          <p className="font-semibold text-green-700">{formatRupiah(item.amount_paid)}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Sisa</p>
+                          <p className="font-semibold text-orange-700">{formatRupiah(outstanding)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[920px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>No Invoice</TableHead>
+                      <TableHead>Kavling</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Tagihan</TableHead>
+                      <TableHead>Dibayar</TableHead>
+                      <TableHead>Sisa</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedInvoices.map((item) => {
                     const kavling = normalizeOne(item.kavlings);
                     const outstanding = Math.max(item.amount_due - item.amount_paid, 0);
 
@@ -239,17 +282,18 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
                         <TableCell className="text-slate-700">{formatRupiah(outstanding)}</TableCell>
                       </TableRow>
                     );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
           {!loading ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-1">
                   <span>Rows</span>
                   <select

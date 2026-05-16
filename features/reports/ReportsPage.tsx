@@ -35,7 +35,7 @@ import type {
 } from "@/features/reports/reportSchemas";
 
 export function ReportsPage() {
-  const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+  const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const;
   const client = getSupabaseBrowserClient();
   const { role } = useAuth();
 
@@ -56,9 +56,9 @@ export function ReportsPage() {
   const [outputError, setOutputError] = useState<string | null>(null);
   const [generatingReceiptId, setGeneratingReceiptId] = useState<string | null>(null);
   const [summaryPage, setSummaryPage] = useState(1);
-  const [summaryPageSize, setSummaryPageSize] = useState<number>(10);
+  const [summaryPageSize, setSummaryPageSize] = useState<number>(5);
   const [arrearsPage, setArrearsPage] = useState(1);
-  const [arrearsPageSize, setArrearsPageSize] = useState<number>(10);
+  const [arrearsPageSize, setArrearsPageSize] = useState<number>(5);
 
   // Period summaries for dropdown
   const loadPeriodSummaries = useCallback(async () => {
@@ -471,12 +471,12 @@ export function ReportsPage() {
           ) : summaryRows.length === 0 ? (
             <p className="text-sm text-slate-600">Belum ada data untuk periode ini.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div>
+              <div className="mb-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <span>
                   Menampilkan {summaryStart}-{summaryEnd} dari {summaryRows.length} kavling
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span>Limit:</span>
                   <Select
                     value={String(summaryPageSize)}
@@ -489,45 +489,82 @@ export function ReportsPage() {
                   </Select>
                 </div>
               </div>
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Kode Kavling</TableHead>
-                    <TableHead>Pemilik</TableHead>
-                    <TableHead className="text-right">Total Tagihan</TableHead>
-                    <TableHead className="text-right">Sudah Dibayar</TableHead>
-                    <TableHead className="text-right">Menunggu</TableHead>
-                    <TableHead className="text-right">Sisa Bayar</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedSummaryRows.map((row) => (
-                    <TableRow key={row.kavling_id}>
-                      <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
-                      <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
-                      <TableCell className="text-right text-slate-700">
-                        {formatRupiah(row.total_invoiced)}
-                      </TableCell>
-                      <TableCell className="text-right text-green-600">
-                        {formatRupiah(row.total_paid)}
-                      </TableCell>
-                      <TableCell className="text-right text-orange-600">
-                        {formatRupiah(row.total_pending)}
-                      </TableCell>
-                      <TableCell className="text-right text-slate-700">
-                        {formatRupiah(row.remaining_balance)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusToBadgeVariant(row.remaining_balance === 0 ? "paid" : "partial")}>
-                          {row.remaining_balance === 0 ? "Lunas" : "Belum"}
-                        </Badge>
-                      </TableCell>
+
+              <div className="space-y-2 md:hidden">
+                {pagedSummaryRows.map((row) => (
+                  <div key={row.kavling_id} className="rounded-lg border bg-background px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-foreground">{row.kavling_code}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{row.owner_name ?? "-"}</p>
+                      </div>
+                      <Badge variant={statusToBadgeVariant(row.remaining_balance === 0 ? "paid" : "partial")} className="shrink-0">
+                        {row.remaining_balance === 0 ? "Lunas" : "Belum"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Tagihan</p>
+                        <p className="font-semibold text-foreground">{formatRupiah(row.total_invoiced)}</p>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Dibayar</p>
+                        <p className="font-semibold text-green-700">{formatRupiah(row.total_paid)}</p>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Menunggu</p>
+                        <p className="font-semibold text-orange-700">{formatRupiah(row.total_pending)}</p>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Sisa</p>
+                        <p className="font-semibold text-foreground">{formatRupiah(row.remaining_balance)}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Kode Kavling</TableHead>
+                      <TableHead>Pemilik</TableHead>
+                      <TableHead className="text-right">Total Tagihan</TableHead>
+                      <TableHead className="text-right">Sudah Dibayar</TableHead>
+                      <TableHead className="text-right">Menunggu</TableHead>
+                      <TableHead className="text-right">Sisa Bayar</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <div className="mt-3 flex items-center justify-end gap-2">
+                  </TableHeader>
+                  <TableBody>
+                    {pagedSummaryRows.map((row) => (
+                      <TableRow key={row.kavling_id}>
+                        <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
+                        <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
+                        <TableCell className="text-right text-slate-700">
+                          {formatRupiah(row.total_invoiced)}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600">
+                          {formatRupiah(row.total_paid)}
+                        </TableCell>
+                        <TableCell className="text-right text-orange-600">
+                          {formatRupiah(row.total_pending)}
+                        </TableCell>
+                        <TableCell className="text-right text-slate-700">
+                          {formatRupiah(row.remaining_balance)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusToBadgeVariant(row.remaining_balance === 0 ? "paid" : "partial")}>
+                            {row.remaining_balance === 0 ? "Lunas" : "Belum"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -562,12 +599,12 @@ export function ReportsPage() {
           ) : arrearsRows.length === 0 ? (
             <p className="text-sm text-slate-600">Tidak ada tunggakan untuk periode ini.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div>
+              <div className="mb-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <span>
                   Menampilkan {arrearsStart}-{arrearsEnd} dari {arrearsRows.length} item tunggakan
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span>Limit:</span>
                   <Select
                     value={String(arrearsPageSize)}
@@ -580,49 +617,90 @@ export function ReportsPage() {
                   </Select>
                 </div>
               </div>
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Kode Kavling</TableHead>
-                    <TableHead>Pemilik</TableHead>
-                    <TableHead>Periode</TableHead>
-                    <TableHead className="text-right">Jumlah</TableHead>
-                    <TableHead className="text-right">Sudah Bayar</TableHead>
-                    <TableHead className="text-right">Sisa</TableHead>
-                    <TableHead className="text-center">Hari Tertunda</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedArrearsRows.map((row) => (
-                    <TableRow key={row.kavling_id}>
-                      <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
-                      <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
-                      <TableCell className="text-slate-700">{row.period_label}</TableCell>
-                      <TableCell className="text-right text-slate-700">
-                        {formatRupiah(row.amount_due)}
-                      </TableCell>
-                      <TableCell className="text-right text-green-600">
-                        {formatRupiah(row.amount_paid)}
-                      </TableCell>
-                      <TableCell className="text-right text-orange-600">
-                        {formatRupiah(row.amount_due - row.amount_paid)}
-                      </TableCell>
-                      <TableCell className="text-center">
+
+              <div className="space-y-2 md:hidden">
+                {pagedArrearsRows.map((row) => (
+                  <div key={row.kavling_id} className="rounded-lg border bg-background px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-foreground">{row.kavling_code}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {row.owner_name ?? "-"} - {row.period_label}
+                        </p>
+                      </div>
+                      <Badge variant={statusToBadgeVariant(row.invoice_status)} className="shrink-0">
+                        {formatInvoiceStatusLabel(row.invoice_status)}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Jumlah</p>
+                        <p className="font-semibold text-foreground">{formatRupiah(row.amount_due)}</p>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Dibayar</p>
+                        <p className="font-semibold text-green-700">{formatRupiah(row.amount_paid)}</p>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Sisa</p>
+                        <p className="font-semibold text-orange-700">{formatRupiah(row.amount_due - row.amount_paid)}</p>
+                      </div>
+                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                        <p className="text-muted-foreground">Tertunda</p>
                         <Badge variant={row.days_overdue > 30 ? "destructive" : "outline"}>
                           {row.days_overdue} hari
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusToBadgeVariant(row.invoice_status)}>
-                          {formatInvoiceStatusLabel(row.invoice_status)}
-                        </Badge>
-                      </TableCell>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Kode Kavling</TableHead>
+                      <TableHead>Pemilik</TableHead>
+                      <TableHead>Periode</TableHead>
+                      <TableHead className="text-right">Jumlah</TableHead>
+                      <TableHead className="text-right">Sudah Bayar</TableHead>
+                      <TableHead className="text-right">Sisa</TableHead>
+                      <TableHead className="text-center">Hari Tertunda</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <div className="mt-3 flex items-center justify-end gap-2">
+                  </TableHeader>
+                  <TableBody>
+                    {pagedArrearsRows.map((row) => (
+                      <TableRow key={row.kavling_id}>
+                        <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
+                        <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
+                        <TableCell className="text-slate-700">{row.period_label}</TableCell>
+                        <TableCell className="text-right text-slate-700">
+                          {formatRupiah(row.amount_due)}
+                        </TableCell>
+                        <TableCell className="text-right text-green-600">
+                          {formatRupiah(row.amount_paid)}
+                        </TableCell>
+                        <TableCell className="text-right text-orange-600">
+                          {formatRupiah(row.amount_due - row.amount_paid)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={row.days_overdue > 30 ? "destructive" : "outline"}>
+                            {row.days_overdue} hari
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusToBadgeVariant(row.invoice_status)}>
+                            {formatInvoiceStatusLabel(row.invoice_status)}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -676,7 +754,7 @@ export function ReportsPage() {
           ) : (
             <div className="space-y-3">
               {outputRows.map((row) => (
-                <div key={row.id} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2">
+                <div key={row.id} className="flex flex-col gap-3 rounded-md border border-slate-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium text-slate-900">{row.title}</span>
                     <span className="text-xs text-slate-500">
@@ -712,40 +790,66 @@ export function ReportsPage() {
               Belum ada kandidat bukti bayar untuk periode ini.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[600px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Kavling</TableHead>
-                    <TableHead>No. Invoice</TableHead>
-                    <TableHead className="text-right">Jumlah Bayar</TableHead>
-                    <TableHead>Tanggal Bayar</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {receiptCandidates.map((candidate) => (
-                    <TableRow key={candidate.payment_id}>
-                      <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
-                      <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>
-                      <TableCell className="text-right text-green-600">{formatRupiah(candidate.amount_paid)}</TableCell>
-                      <TableCell className="text-slate-700">{formatDateId(candidate.payment_date)}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGenerateResidentReceipt(candidate)}
-                          disabled={generatingReceiptId === candidate.payment_id}
-                        >
-                          <Receipt className="size-3 mr-1" />
-                          {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
-                        </Button>
-                      </TableCell>
+            <>
+              <div className="space-y-2 md:hidden">
+                {receiptCandidates.map((candidate) => (
+                  <div key={candidate.payment_id} className="rounded-lg border bg-background px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-foreground">{candidate.kavling_code}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{candidate.invoice_number}</p>
+                      </div>
+                      <p className="shrink-0 text-sm font-semibold text-green-700">{formatRupiah(candidate.amount_paid)}</p>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">Tanggal bayar: {formatDateId(candidate.payment_date)}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 w-full"
+                      onClick={() => handleGenerateResidentReceipt(candidate)}
+                      disabled={generatingReceiptId === candidate.payment_id}
+                    >
+                      <Receipt className="size-3 mr-1" />
+                      {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[600px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Kavling</TableHead>
+                      <TableHead>No. Invoice</TableHead>
+                      <TableHead className="text-right">Jumlah Bayar</TableHead>
+                      <TableHead>Tanggal Bayar</TableHead>
+                      <TableHead>Aksi</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {receiptCandidates.map((candidate) => (
+                      <TableRow key={candidate.payment_id}>
+                        <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
+                        <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>
+                        <TableCell className="text-right text-green-600">{formatRupiah(candidate.amount_paid)}</TableCell>
+                        <TableCell className="text-slate-700">{formatDateId(candidate.payment_date)}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGenerateResidentReceipt(candidate)}
+                            disabled={generatingReceiptId === candidate.payment_id}
+                          >
+                            <Receipt className="size-3 mr-1" />
+                            {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

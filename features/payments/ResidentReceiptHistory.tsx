@@ -88,40 +88,60 @@ export function ResidentReceiptHistory({ invoiceId, reloadToken = 0 }: Readonly<
             Belum ada bukti bayar untuk invoice ini.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[480px]">
-              <TableHeader>
-                <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                  <TableHead>Judul</TableHead>
-                  <TableHead>Dibuat</TableHead>
-                  <TableHead>Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.report_id}>
-                    <TableCell className="text-slate-700 font-medium">
-                      {item.title}
-                    </TableCell>
-                    <TableCell className="text-slate-700">
-                      {formatDateId(item.generated_at)}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenReceipt(item.report_id)}
-                        disabled={openingId === item.report_id}
-                      >
-                        <ExternalLink className="size-3 mr-1" />
-                        {openingId === item.report_id ? "Membuka..." : "Buka Bukti Bayar"}
-                      </Button>
-                    </TableCell>
+          <>
+            <div className="space-y-2 md:hidden">
+              {items.map((item) => (
+                <div key={item.report_id} className="rounded-lg border bg-background px-3 py-3">
+                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{formatDateId(item.generated_at)}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 w-full"
+                    onClick={() => handleOpenReceipt(item.report_id)}
+                    disabled={openingId === item.report_id}
+                  >
+                    <ExternalLink className="size-3 mr-1" />
+                    {openingId === item.report_id ? "Membuka..." : "Buka Bukti Bayar"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <Table className="min-w-[480px]">
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Judul</TableHead>
+                    <TableHead>Dibuat</TableHead>
+                    <TableHead>Aksi</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.report_id}>
+                      <TableCell className="text-slate-700 font-medium">
+                        {item.title}
+                      </TableCell>
+                      <TableCell className="text-slate-700">
+                        {formatDateId(item.generated_at)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenReceipt(item.report_id)}
+                          disabled={openingId === item.report_id}
+                        >
+                          <ExternalLink className="size-3 mr-1" />
+                          {openingId === item.report_id ? "Membuka..." : "Buka Bukti Bayar"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

@@ -3,9 +3,37 @@
 //
 // Usage: node scripts/seed-users.mjs
 
+import { readFileSync } from "node:fs";
+
+function readDotEnvLocal() {
+  try {
+    return Object.fromEntries(
+      readFileSync(".env.local", "utf8")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith("#") && line.includes("="))
+        .map((line) => {
+          const index = line.indexOf("=");
+          return [line.slice(0, index), line.slice(index + 1).replace(/^["']|["']$/g, "")];
+        }),
+    );
+  } catch {
+    return {};
+  }
+}
+
+const dotEnvLocal = readDotEnvLocal();
 const SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_SECRET_KEY ??
+  dotEnvLocal.SUPABASE_SERVICE_ROLE_KEY ??
+  dotEnvLocal.SUPABASE_SECRET_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-const SUPABASE_URL = "http://127.0.0.1:54321";
+const SUPABASE_URL =
+  process.env.SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  dotEnvLocal.NEXT_PUBLIC_SUPABASE_URL ??
+  "http://127.0.0.1:55431";
 const PASSWORD = "password123";
 
 const adminHeaders = (serviceRole = true) => ({
@@ -259,6 +287,10 @@ async function seed() {
           console.log(`  • ${period.label}: already generated`);
           continue;
         }
+        if (text.includes("billing period must be draft/open")) {
+          console.log(`  • ${period.label}: skipped (${period.status} periods cannot generate invoices)`);
+          continue;
+        }
         throw new Error(text.slice(0, 200));
       }
       const count = await resp.json();
@@ -266,6 +298,8 @@ async function seed() {
     } catch (err) {
       if (err.message.includes("already")) {
         console.log(`  • ${period.label}: already generated`);
+      } else if (err.message.includes("billing period must be draft/open")) {
+        console.log(`  • ${period.label}: skipped (${period.status} periods cannot generate invoices)`);
       } else {
         throw err;
       }

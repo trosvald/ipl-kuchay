@@ -32,7 +32,7 @@ export function PublicDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
 
   const loadPublicSummary = useCallback(async () => {
     if (!client) {
@@ -181,41 +181,80 @@ export function PublicDashboardPage() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Memuat periode...</p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="min-w-[860px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-muted-foreground">
-                      <TableHead>Periode</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Paid</TableHead>
-                      <TableHead>Belum Lunas</TableHead>
-                      <TableHead>Total Tagihan</TableHead>
-                      <TableHead>Total Dibayar</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedRows.map((item) => (
-                      <TableRow key={item.billing_period_id}>
-                        <TableCell className="font-medium text-foreground">{formatMonthYearId(item.year, item.month)} ({item.label})</TableCell>
-                        <TableCell>{formatDateId(item.due_date)}</TableCell>
-                        <TableCell>{item.total_invoices}</TableCell>
-                        <TableCell>{item.paid_count}</TableCell>
-                        <TableCell>{item.unpaid_count}</TableCell>
-                        <TableCell>{formatRupiah(item.total_amount_due)}</TableCell>
-                        <TableCell>{formatRupiah(item.total_amount_paid)}</TableCell>
+              <>
+                <div className="space-y-2 md:hidden">
+                  {pagedRows.length === 0 ? (
+                    <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                      Belum ada ringkasan periode.
+                    </p>
+                  ) : null}
+                  {pagedRows.map((item) => (
+                    <div key={item.billing_period_id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{formatMonthYearId(item.year, item.month)}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{item.label} - due {formatDateId(item.due_date)}</p>
+                        </div>
+                        <p className="shrink-0 text-xs text-muted-foreground">{item.total_invoices} invoice</p>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Paid</p>
+                          <p className="font-semibold text-green-700">{item.paid_count}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Belum</p>
+                          <p className="font-semibold text-orange-700">{item.unpaid_count}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Tagihan</p>
+                          <p className="font-semibold text-foreground">{formatRupiah(item.total_amount_due)}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Dibayar</p>
+                          <p className="font-semibold text-foreground">{formatRupiah(item.total_amount_paid)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <Table className="min-w-[860px]">
+                    <TableHeader>
+                      <TableRow className="text-xs uppercase tracking-wide text-muted-foreground">
+                        <TableHead>Periode</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Invoice</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Belum Lunas</TableHead>
+                        <TableHead>Total Tagihan</TableHead>
+                        <TableHead>Total Dibayar</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {pagedRows.map((item) => (
+                        <TableRow key={item.billing_period_id}>
+                          <TableCell className="font-medium text-foreground">{formatMonthYearId(item.year, item.month)} ({item.label})</TableCell>
+                          <TableCell>{formatDateId(item.due_date)}</TableCell>
+                          <TableCell>{item.total_invoices}</TableCell>
+                          <TableCell>{item.paid_count}</TableCell>
+                          <TableCell>{item.unpaid_count}</TableCell>
+                          <TableCell>{formatRupiah(item.total_amount_due)}</TableCell>
+                          <TableCell>{formatRupiah(item.total_amount_paid)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
             {!loading ? (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+              <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <p>
                   Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="inline-flex items-center gap-1">
                     <span>Rows</span>
                     <select

@@ -104,6 +104,8 @@ export function AdminAnnouncementsPage() {
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null);
   const [confirmUnpublish, setConfirmUnpublish] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const loadAnnouncements = useCallback(async () => {
     if (!client) {
@@ -158,6 +160,24 @@ export function AdminAnnouncementsPage() {
   const filteredItems = useMemo(() => {
     return items.filter((item) => item.status === activeTab);
   }, [items, activeTab]);
+  const totalRows = filteredItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const pagedItems = useMemo(
+    () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
+    [filteredItems, page, pageSize],
+  );
+  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalRows);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(parseTab(value));
@@ -436,20 +456,100 @@ export function AdminAnnouncementsPage() {
           ) : filteredItems.length === 0 ? (
             <p className="text-sm text-slate-600">Tidak ada pengumuman pada tab ini.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Judul</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Lampiran</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((row) => {
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.map((row) => {
+                  const attachCount = attachmentCounts[row.id] ?? 0;
+                  return (
+                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{row.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{formatDateId(row.published_at ?? row.created_at)}</p>
+                        </div>
+                        <Badge variant={statusBadgeVariant(row.status)} className="shrink-0">
+                          {formatAnnouncementStatusLabel(row.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.body}</p>
+                      <div className="mt-3 flex flex-wrap gap-1">
+                        {row.is_urgent ? <Badge variant="destructive" className="text-xs">Penting</Badge> : null}
+                        {row.is_pinned ? <Badge variant="outline" className="text-xs">Pinned</Badge> : null}
+                        {attachCount > 0 ? (
+                          <Badge variant="secondary" className="text-xs">
+                            <Paperclip className="mr-1 size-3" /> {attachCount}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => openEditEditor(row)}
+                          disabled={workingId === row.id}
+                        >
+                          Edit
+                        </Button>
+                        {row.status === "published" ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="w-full"
+                            onClick={() => setConfirmArchive(row.id)}
+                            disabled={workingId === row.id}
+                          >
+                            Arsipkan
+                          </Button>
+                        ) : null}
+                        {row.status === "draft" ? (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="w-full"
+                            onClick={async () => {
+                              setWorkingId(row.id);
+                              await handleUpdateFields(row.id, {
+                                status: "published",
+                                published_at: new Date().toISOString(),
+                              });
+                            }}
+                            disabled={workingId === row.id}
+                          >
+                            Publikasikan
+                          </Button>
+                        ) : null}
+                        {row.status === "published" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => setConfirmUnpublish(row.id)}
+                            disabled={workingId === row.id}
+                          >
+                            Tarik
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Judul</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Label</TableHead>
+                      <TableHead>Lampiran</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((row) => {
                     const attachCount = attachmentCounts[row.id] ?? 0;
                     return (
                       <TableRow key={row.id}>
@@ -534,11 +634,51 @@ export function AdminAnnouncementsPage() {
                         </TableCell>
                       </TableRow>
                     );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
+
+          {!loading && filteredItems.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1">
+                  <span>Rows</span>
+                  <select
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                    value={String(pageSize)}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+                  Prev
+                </Button>
+                <span className="text-xs">
+                  Page {page}/{totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

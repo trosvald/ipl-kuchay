@@ -104,9 +104,46 @@ export function SubmissionHistory({ invoiceId, reloadToken = 0 }: Readonly<Submi
     content = <p className="text-sm text-slate-600">Belum ada submission untuk invoice ini.</p>;
   } else {
     content = (
-      <div className="overflow-x-auto">
-        <Table className="min-w-[860px]">
-          <TableHeader>
+      <>
+        <div className="space-y-2 md:hidden">
+          {visibleItems.map((item) => {
+            const bankAccount = normalizeOne(item.bank_accounts);
+            const nextStep =
+              item.status === "rejected"
+                ? buildRejectionGuidance(item.status, item.rejection_reason ?? "") ??
+                  formatSubmissionNextStep(item.status) ??
+                  "-"
+                : item.status === "submitted"
+                  ? formatSubmissionNextStep(item.status) ?? "-"
+                  : "-";
+
+            return (
+              <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{formatRupiah(item.amount_submitted)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{formatDateId(item.created_at)}</p>
+                  </div>
+                  <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)} className="shrink-0">
+                    {formatSubmissionStatus(item.status)}
+                  </Badge>
+                </div>
+                <div className="mt-3 space-y-2 text-xs text-slate-600">
+                  <p>Rekening: {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}</p>
+                  <p className="break-words">
+                    Catatan: {item.status === "rejected" ? item.rejection_reason ?? item.note ?? "-" : item.note ?? "-"}
+                  </p>
+                  <p>Bukti: {item.proof_path ? "Tersimpan privat" : "Belum ada"}</p>
+                  <p className="break-words">Langkah: {nextStep}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <Table className="min-w-[860px]">
+            <TableHeader>
               <TableRow className="text-xs uppercase tracking-wide text-slate-500">
               <TableHead>Tanggal</TableHead>
               <TableHead>Nominal</TableHead>
@@ -116,47 +153,48 @@ export function SubmissionHistory({ invoiceId, reloadToken = 0 }: Readonly<Submi
               <TableHead>Bukti</TableHead>
               <TableHead>Langkah</TableHead>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleItems.map((item) => {
-              const bankAccount = normalizeOne(item.bank_accounts);
-              return (
-                <TableRow key={item.id}>
-                  <TableCell className="text-slate-700">{formatDateId(item.created_at)}</TableCell>
-                  <TableCell className="font-medium text-slate-900">{formatRupiah(item.amount_submitted)}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)}>
-                      {formatSubmissionStatus(item.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-slate-700">
-                    {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}
-                  </TableCell>
-                  <TableCell className="text-slate-700">
-                    {item.status === "rejected"
-                      ? item.rejection_reason ?? item.note ?? "-"
-                      : item.note ?? "-"}
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-600">
-                    {item.proof_path
-                      ? "Tersimpan privat"
-                      : "Belum ada"}
-                  </TableCell>
-                  <TableCell className="text-xs text-slate-600">
-                    {item.status === "rejected"
-                      ? buildRejectionGuidance(item.status, item.rejection_reason ?? "") ??
-                        formatSubmissionNextStep(item.status) ??
-                        "-"
-                      : item.status === "submitted"
-                        ? formatSubmissionNextStep(item.status) ?? "-"
-                        : "-"}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {visibleItems.map((item) => {
+                const bankAccount = normalizeOne(item.bank_accounts);
+                return (
+                  <TableRow key={item.id}>
+                    <TableCell className="text-slate-700">{formatDateId(item.created_at)}</TableCell>
+                    <TableCell className="font-medium text-slate-900">{formatRupiah(item.amount_submitted)}</TableCell>
+                    <TableCell>
+                      <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)}>
+                        {formatSubmissionStatus(item.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-slate-700">
+                      {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}
+                    </TableCell>
+                    <TableCell className="text-slate-700">
+                      {item.status === "rejected"
+                        ? item.rejection_reason ?? item.note ?? "-"
+                        : item.note ?? "-"}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600">
+                      {item.proof_path
+                        ? "Tersimpan privat"
+                        : "Belum ada"}
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-600">
+                      {item.status === "rejected"
+                        ? buildRejectionGuidance(item.status, item.rejection_reason ?? "") ??
+                          formatSubmissionNextStep(item.status) ??
+                          "-"
+                        : item.status === "submitted"
+                          ? formatSubmissionNextStep(item.status) ?? "-"
+                          : "-"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </>
     );
   }
 

@@ -18,6 +18,7 @@ export type AuditAction =
   | "fee_override.create"
   | "fee_override.update"
   | "fee_override.end"
+  | "fee_override.delete"
   | "billing_period.create"
   | "billing_period.generate_invoices"
   | "billing_period.apply_penalties"

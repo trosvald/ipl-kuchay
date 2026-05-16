@@ -87,7 +87,7 @@ export function BillingPeriodsPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
 
   // Invoice preview dialog
   const [previewPeriod, setPreviewPeriod] = useState<BillingPeriodRow | null>(null);
@@ -400,6 +400,72 @@ export function BillingPeriodsPage() {
     await loadPeriods();
   };
 
+  const renderPeriodActions = (row: BillingPeriodRow, count: number, layout: "desktop" | "mobile" = "desktop") => {
+    const buttonClassName = layout === "mobile" ? "w-full" : undefined;
+    const wrapperClassName = layout === "mobile" ? "grid grid-cols-1 gap-2 sm:grid-cols-2" : "flex flex-wrap gap-2";
+
+    return (
+      <div className={wrapperClassName}>
+        <Button asChild size="sm" variant="outline" className={buttonClassName}>
+          <Link href={`/admin/billing/${row.id}`}>
+            Detail <ArrowUpRight className="size-4" />
+          </Link>
+        </Button>
+        <Button
+          size="sm"
+          variant={count > 0 ? "ghost" : "secondary"}
+          className={buttonClassName}
+          disabled={saving || count > 0 || row.status === "closed" || row.status === "archived"}
+          onClick={() => handlePreviewInvoices(row)}
+        >
+          {count > 0 ? "Tagihan Sudah Ada" : "Pratinjau Tagihan"}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          className={buttonClassName}
+          disabled={saving || row.status === "draft" || row.status === "archived"}
+          onClick={() => handlePreviewPenalties(row)}
+        >
+          Pratinjau Denda
+        </Button>
+        {row.status === "draft" ? (
+          <Button size="sm" variant="ghost" className={buttonClassName} disabled={saving} onClick={() => handleStatusChange(row, "open")}>
+            Buka Periode
+          </Button>
+        ) : null}
+        {row.status === "open" ? (
+          <Button size="sm" variant="ghost" className={buttonClassName} disabled={saving} onClick={() => handleStatusChange(row, "closed")}>
+            Tutup Periode
+          </Button>
+        ) : null}
+        {row.status === "closed" ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            className={buttonClassName}
+            disabled={saving}
+            onClick={() => handleStatusChange(row, "archived")}
+          >
+            Arsipkan Periode
+          </Button>
+        ) : null}
+        {row.status === "closed" ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className={buttonClassName}
+            disabled={saving || !canReopenClosed}
+            onClick={() => handleStatusChange(row, "open")}
+            title={canReopenClosed ? "Buka ulang periode" : "Hanya admin/super_admin"}
+          >
+            Buka Ulang Periode
+          </Button>
+        ) : null}
+      </div>
+    );
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -477,20 +543,56 @@ export function BillingPeriodsPage() {
           {loading ? (
             <p className="text-sm text-slate-600">Memuat data...</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[980px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Periode</TableHead>
-                    <TableHead>Label</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedItems.map((row) => {
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.length === 0 ? (
+                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                    Belum ada periode billing.
+                  </p>
+                ) : null}
+                {pagedItems.map((row) => {
+                  const count = invoiceCounts[row.id] ?? 0;
+                  return (
+                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{formatMonthYearId(row.year, row.month)}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{row.label} - due {formatDateId(row.due_date)}</p>
+                        </div>
+                        <Badge variant={statusToBadgeVariant(row.status)} className="shrink-0">
+                          {formatBillingPeriodStatusLabel(row.status)}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-xs text-muted-foreground">Invoice</p>
+                          <p className="font-semibold text-foreground">{count}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-xs text-muted-foreground">Status</p>
+                          <p className="font-semibold text-foreground">{formatBillingPeriodStatusLabel(row.status)}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3">{renderPeriodActions(row, count, "mobile")}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[980px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Periode</TableHead>
+                      <TableHead>Label</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((row) => {
                     const count = invoiceCounts[row.id] ?? 0;
                     return (
                       <TableRow key={row.id}>
@@ -502,74 +604,22 @@ export function BillingPeriodsPage() {
                         </TableCell>
                         <TableCell className="text-slate-700">{count}</TableCell>
                         <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button asChild size="sm" variant="outline">
-                              <Link href={`/admin/billing/${row.id}`}>
-                                Detail <ArrowUpRight className="size-4" />
-                              </Link>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant={count > 0 ? "ghost" : "secondary"}
-                              disabled={saving || count > 0 || row.status === "closed" || row.status === "archived"}
-                              onClick={() => handlePreviewInvoices(row)}
-                            >
-                              {count > 0 ? "Tagihan Sudah Ada" : "Pratinjau Tagihan"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={saving || row.status === "draft" || row.status === "archived"}
-                              onClick={() => handlePreviewPenalties(row)}
-                            >
-                              Pratinjau Denda
-                            </Button>
-                            {row.status === "draft" ? (
-                              <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleStatusChange(row, "open")}>
-                                Buka Periode
-                              </Button>
-                            ) : null}
-                            {row.status === "open" ? (
-                              <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleStatusChange(row, "closed")}>
-                                Tutup Periode
-                              </Button>
-                            ) : null}
-                            {row.status === "closed" ? (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                disabled={saving}
-                                onClick={() => handleStatusChange(row, "archived")}
-                              >
-                                Arsipkan Periode
-                              </Button>
-                            ) : null}
-                            {row.status === "closed" ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={saving || !canReopenClosed}
-                                onClick={() => handleStatusChange(row, "open")}
-                                title={canReopenClosed ? "Buka ulang periode" : "Hanya admin/super_admin"}
-                              >
-                                Buka Ulang Periode
-                              </Button>
-                            ) : null}
-                          </div>
+                          {renderPeriodActions(row, count)}
                         </TableCell>
                       </TableRow>
                     );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
           {!loading ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-1">
                   <span>Rows</span>
                   <select

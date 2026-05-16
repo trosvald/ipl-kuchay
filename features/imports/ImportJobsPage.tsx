@@ -219,24 +219,39 @@ export function ImportJobsPage() {
             </div>
 
             {preview.errors.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Baris</TableHead>
-                    <TableHead>Field</TableHead>
-                    <TableHead>Pesan</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="space-y-2 md:hidden">
                   {preview.errors.map((error: ImportPreviewError, index) => (
-                    <TableRow key={`${error.rowNumber}-${error.field}-${index}`}>
-                      <TableCell>{error.rowNumber}</TableCell>
-                      <TableCell>{error.field}</TableCell>
-                      <TableCell>{error.message}</TableCell>
-                    </TableRow>
+                    <div key={`${error.rowNumber}-${error.field}-${index}`} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3 text-sm">
+                        <p className="font-semibold text-foreground">Baris {error.rowNumber}</p>
+                        <p className="shrink-0 text-xs text-muted-foreground">{error.field}</p>
+                      </div>
+                      <p className="mt-2 break-words text-sm text-slate-700">{error.message}</p>
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Baris</TableHead>
+                        <TableHead>Field</TableHead>
+                        <TableHead>Pesan</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {preview.errors.map((error: ImportPreviewError, index) => (
+                        <TableRow key={`${error.rowNumber}-${error.field}-${index}`}>
+                          <TableCell>{error.rowNumber}</TableCell>
+                          <TableCell>{error.field}</TableCell>
+                          <TableCell>{error.message}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             ) : (
               <p className="text-sm text-emerald-700">Semua baris valid. Anda bisa melanjutkan apply.</p>
             )}

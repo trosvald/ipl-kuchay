@@ -40,7 +40,7 @@ export function FeeTypesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
 
   const currentEditing = useMemo(() => items.find((item) => item.id === editingId) ?? null, [editingId, items]);
   const totalRows = items.length;
@@ -294,77 +294,125 @@ export function FeeTypesPage() {
           {loading ? (
             <p className="text-sm text-slate-600">Memuat data...</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[840px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Kode</TableHead>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Nominal</TableHead>
-                    <TableHead>Tipe</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedItems.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium text-slate-900">{row.code}</TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-slate-900">{row.name}</p>
-                          {row.description ? <p className="text-xs text-slate-500">{row.description}</p> : null}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-slate-700">{formatRupiah(row.default_amount)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Badge variant={row.is_recurring ? "success" : "secondary"}>
-                            {row.is_recurring ? "Recurring" : "One-off"}
-                          </Badge>
-                          {row.is_recurring ? (
-                            <Badge variant="outline">
-                              {row.billing_cycle === "yearly"
-                                ? `Yearly (bulan ${row.charge_month ?? "-"})`
-                                : "Monthly"}
-                            </Badge>
-                          ) : null}
-                          <Badge variant={row.is_penalty ? "outline" : "secondary"}>{row.is_penalty ? "Penalty" : "Reguler"}</Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={row.active ? "success" : "secondary"}>{row.active ? "Aktif" : "Nonaktif"}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={saving}
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setCreating(false);
-                            }}
-                          >
-                            <SquarePen className="size-4" /> Edit
-                          </Button>
-                          <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleToggleActive(row)}>
-                            {row.active ? "Nonaktifkan" : "Aktifkan"}
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.map((row) => (
+                  <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-foreground">{row.name}</p>
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">{row.code}</p>
+                      </div>
+                      <Badge variant={row.active ? "success" : "secondary"} className="shrink-0">
+                        {row.active ? "Aktif" : "Nonaktif"}
+                      </Badge>
+                    </div>
+                    <p className="mt-2 text-lg font-semibold text-foreground">{formatRupiah(row.default_amount)}</p>
+                    {row.description ? <p className="mt-1 break-words text-sm text-slate-700">{row.description}</p> : null}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <Badge variant={row.is_recurring ? "success" : "secondary"}>
+                        {row.is_recurring ? "Recurring" : "One-off"}
+                      </Badge>
+                      {row.is_recurring ? (
+                        <Badge variant="outline">
+                          {row.billing_cycle === "yearly" ? `Yearly bulan ${row.charge_month ?? "-"}` : "Monthly"}
+                        </Badge>
+                      ) : null}
+                      <Badge variant={row.is_penalty ? "outline" : "secondary"}>{row.is_penalty ? "Penalty" : "Reguler"}</Badge>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        disabled={saving}
+                        onClick={() => {
+                          setEditingId(row.id);
+                          setCreating(false);
+                        }}
+                      >
+                        <SquarePen className="size-4" /> Edit
+                      </Button>
+                      <Button size="sm" variant="ghost" className="w-full" disabled={saving} onClick={() => handleToggleActive(row)}>
+                        {row.active ? "Nonaktifkan" : "Aktifkan"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[840px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Kode</TableHead>
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Nominal</TableHead>
+                      <TableHead>Tipe</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Aksi</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium text-slate-900">{row.code}</TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-slate-900">{row.name}</p>
+                            {row.description ? <p className="text-xs text-slate-500">{row.description}</p> : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-slate-700">{formatRupiah(row.default_amount)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Badge variant={row.is_recurring ? "success" : "secondary"}>
+                              {row.is_recurring ? "Recurring" : "One-off"}
+                            </Badge>
+                            {row.is_recurring ? (
+                              <Badge variant="outline">
+                                {row.billing_cycle === "yearly"
+                                  ? `Yearly (bulan ${row.charge_month ?? "-"})`
+                                  : "Monthly"}
+                              </Badge>
+                            ) : null}
+                            <Badge variant={row.is_penalty ? "outline" : "secondary"}>{row.is_penalty ? "Penalty" : "Reguler"}</Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={row.active ? "success" : "secondary"}>{row.active ? "Aktif" : "Nonaktif"}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={saving}
+                              onClick={() => {
+                                setEditingId(row.id);
+                                setCreating(false);
+                              }}
+                            >
+                              <SquarePen className="size-4" /> Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleToggleActive(row)}>
+                              {row.active ? "Nonaktifkan" : "Aktifkan"}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
           {!loading ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-1">
                   <span>Rows</span>
                   <select

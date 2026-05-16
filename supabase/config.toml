@@ -63,8 +63,8 @@ max_indexes = 5
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:5173"
-additional_redirect_urls = ["http://127.0.0.1:5173"]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
@@ -73,4 +73,3 @@ enable_anonymous_sign_ins = false
 enable_manual_linking = false
 minimum_password_length = 6
 password_requirements = ""
-

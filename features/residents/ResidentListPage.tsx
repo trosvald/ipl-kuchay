@@ -51,7 +51,7 @@ export function ResidentListPage() {
   const client = getSupabaseBrowserClient();
   const [items, setItems] = useState<ResidentRow[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -376,95 +376,167 @@ export function ResidentListPage() {
             <p className="text-sm text-slate-600">Memuat data resident...</p>
           ) : (
             <div className="space-y-3">
-              <Table className="min-w-[860px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Telepon</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Mapping</TableHead>
-                    <TableHead>Kelola Mapping</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedItems.map((item) => {
-                    const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
-                    const isExpanded = expandedResidentId === item.id;
+              <div className="space-y-2 md:hidden">
+                {pagedItems.length === 0 ? (
+                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                    Belum ada data resident.
+                  </p>
+                ) : null}
+                {pagedItems.map((item) => {
+                  const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
+                  const isExpanded = expandedResidentId === item.id;
+                  const status = getMappingStatusLabel(item.id);
 
-                    return (
-                      <TableRow key={item.id} className="align-top">
-                        <TableCell>
-                          <p className="font-medium text-slate-900">{item.full_name}</p>
-                          <p className="text-xs text-slate-500">{item.display_name ?? "-"}</p>
-                        </TableCell>
-                        <TableCell className="text-slate-700">{item.email ?? "-"}</TableCell>
-                        <TableCell className="text-slate-700">{item.phone ?? "-"}</TableCell>
-                        <TableCell className="text-slate-700">{item.role}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.is_active ? "success" : "default"}>
-                            {item.is_active ? "Aktif" : "Nonaktif"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const status = getMappingStatusLabel(item.id);
-                            return <Badge variant={status.variant}>{status.text}</Badge>;
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setExpandedResidentId(isExpanded ? null : item.id)}
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="size-3.5" />
-                            ) : (
-                              <ChevronRight className="size-3.5" />
-                            )}
-                            {isExpanded ? "Tutup" : "Kelola"}
-                          </Button>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
+                  return (
+                    <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{item.full_name}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">{item.email ?? "Email belum diisi"}</p>
+                        </div>
+                        <Badge variant={item.is_active ? "success" : "default"} className="shrink-0">
+                          {item.is_active ? "Aktif" : "Nonaktif"}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <Badge variant="outline">{item.role}</Badge>
+                        <Badge variant={status.variant}>{status.text}</Badge>
+                        {item.phone ? <Badge variant="secondary">{item.phone}</Badge> : null}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="w-full"
+                          disabled={!canEditSuperAdmin}
+                          onClick={() => {
+                            setCreating(false);
+                            setEditingId(item.id);
+                          }}
+                        >
+                          <SquarePen className="size-3.5" /> Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setExpandedResidentId(isExpanded ? null : item.id)}
+                        >
+                          {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                          {isExpanded ? "Tutup" : "Mapping"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="w-full"
+                          disabled={!item.is_active || saving || !canEditSuperAdmin}
+                          onClick={() => handleDeactivate(item)}
+                        >
+                          Nonaktif
+                        </Button>
+                      </div>
+
+                      {canEditSuperAdmin ? null : (
+                        <p className="mt-2 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[860px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Nama</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Telepon</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Mapping</TableHead>
+                      <TableHead>Kelola Mapping</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((item) => {
+                      const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
+                      const isExpanded = expandedResidentId === item.id;
+
+                      return (
+                        <TableRow key={item.id} className="align-top">
+                          <TableCell>
+                            <p className="font-medium text-slate-900">{item.full_name}</p>
+                            <p className="text-xs text-slate-500">{item.display_name ?? "-"}</p>
+                          </TableCell>
+                          <TableCell className="text-slate-700">{item.email ?? "-"}</TableCell>
+                          <TableCell className="text-slate-700">{item.phone ?? "-"}</TableCell>
+                          <TableCell className="text-slate-700">{item.role}</TableCell>
+                          <TableCell>
+                            <Badge variant={item.is_active ? "success" : "default"}>
+                              {item.is_active ? "Aktif" : "Nonaktif"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const status = getMappingStatusLabel(item.id);
+                              return <Badge variant={status.variant}>{status.text}</Badge>;
+                            })()}
+                          </TableCell>
+                          <TableCell>
                             <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={!canEditSuperAdmin}
-                              onClick={() => {
-                                setCreating(false);
-                                setEditingId(item.id);
-                              }}
-                            >
-                              <SquarePen className="size-3.5" /> Edit
-                            </Button>
-                            <Button
-                              size="sm"
                               variant="ghost"
-                              disabled={!item.is_active || saving || !canEditSuperAdmin}
-                              onClick={() => handleDeactivate(item)}
+                              size="sm"
+                              onClick={() => setExpandedResidentId(isExpanded ? null : item.id)}
                             >
-                              Nonaktifkan
+                              {isExpanded ? (
+                                <ChevronDown className="size-3.5" />
+                              ) : (
+                                <ChevronRight className="size-3.5" />
+                              )}
+                              {isExpanded ? "Tutup" : "Kelola"}
                             </Button>
-                          </div>
-                          {canEditSuperAdmin ? null : (
-                            <p className="mt-1 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={!canEditSuperAdmin}
+                                onClick={() => {
+                                  setCreating(false);
+                                  setEditingId(item.id);
+                                }}
+                              >
+                                <SquarePen className="size-3.5" /> Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!item.is_active || saving || !canEditSuperAdmin}
+                                onClick={() => handleDeactivate(item)}
+                              >
+                                Nonaktifkan
+                              </Button>
+                            </div>
+                            {canEditSuperAdmin ? null : (
+                              <p className="mt-1 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <p>
                   Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="inline-flex items-center gap-1">
                     <span>Rows</span>
                     <select

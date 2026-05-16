@@ -93,7 +93,7 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
   const [submissionReloadToken, setSubmissionReloadToken] = useState(0);
   const [hasActiveKavlingAccess, setHasActiveKavlingAccess] = useState(true);
   const [paymentGatewayEnabled, setPaymentGatewayEnabled] = useState(false);
@@ -417,11 +417,11 @@ export function InvoiceDetailPage({ invoiceId, backHref = "/app/invoices", backL
             </div>
           )}
           {!loading && totalRows > pageSize ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-1">
                   <span>Rows</span>
                   <select

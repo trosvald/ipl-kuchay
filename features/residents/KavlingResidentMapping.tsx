@@ -289,28 +289,21 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
     );
   } else {
     mappingContent = (
-      <Table className="min-w-[640px]">
-        <TableHeader>
-          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-            <TableHead>Kavling</TableHead>
-            <TableHead>Relasi</TableHead>
-            <TableHead>Primary</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Aksi</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <>
+        <div className="space-y-2 md:hidden">
           {pagedMappings.map((mapping) => (
-            <TableRow key={mapping.id}>
-              <TableCell className="font-medium text-slate-900">{mapping.kavlings?.code ?? "-"}</TableCell>
-              <TableCell className="text-slate-700">{formatRelationLabel(mapping)}</TableCell>
-              <TableCell className="text-slate-700">{mapping.is_primary ? "Ya" : "Tidak"}</TableCell>
-              <TableCell>
-                <Badge variant={mapping.active ? "success" : "default"}>
+            <div key={mapping.id} className="rounded-lg border bg-background px-3 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-foreground">{mapping.kavlings?.code ?? "-"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{formatRelationLabel(mapping)}</p>
+                </div>
+                <Badge variant={mapping.active ? "success" : "default"} className="shrink-0">
                   {mapping.active ? "Aktif" : "Nonaktif"}
                 </Badge>
-              </TableCell>
-              <TableCell>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+                <span className="text-muted-foreground">Primary: {mapping.is_primary ? "Ya" : "Tidak"}</span>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -319,11 +312,49 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
                 >
                   Unlink
                 </Button>
-              </TableCell>
-            </TableRow>
+              </div>
+            </div>
           ))}
-        </TableBody>
-      </Table>
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
+          <Table className="min-w-[640px]">
+            <TableHeader>
+              <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                <TableHead>Kavling</TableHead>
+                <TableHead>Relasi</TableHead>
+                <TableHead>Primary</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Aksi</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagedMappings.map((mapping) => (
+                <TableRow key={mapping.id}>
+                  <TableCell className="font-medium text-slate-900">{mapping.kavlings?.code ?? "-"}</TableCell>
+                  <TableCell className="text-slate-700">{formatRelationLabel(mapping)}</TableCell>
+                  <TableCell className="text-slate-700">{mapping.is_primary ? "Ya" : "Tidak"}</TableCell>
+                  <TableCell>
+                    <Badge variant={mapping.active ? "success" : "default"}>
+                      {mapping.active ? "Aktif" : "Nonaktif"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!mapping.active || saving}
+                      onClick={() => handleDeactivate(mapping)}
+                    >
+                      Unlink
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </>
     );
   }
 
@@ -395,11 +426,11 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
       {mappingContent}
 
       {!loading ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p>
             Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex items-center gap-1">
               <span>Rows</span>
               <select

@@ -122,6 +122,8 @@ export function AdminSubmissionsPage() {
   const [reviewMode, setReviewMode] = useState<"approve" | "reject">("approve");
   const [reviewTarget, setReviewTarget] = useState<SubmissionReviewTarget | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const loadSubmissions = useCallback(async () => {
     if (!client) {
@@ -235,6 +237,24 @@ export function AdminSubmissionsPage() {
       return haystack.includes(keyword);
     });
   }, [items, profileMap, searchText]);
+  const totalRows = filteredItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const pagedItems = useMemo(
+    () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
+    [filteredItems, page, pageSize],
+  );
+  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalRows);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, searchText, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const switchTab = (tab: SubmissionTab) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -310,6 +330,23 @@ export function AdminSubmissionsPage() {
     await loadSubmissions();
   };
 
+  const renderReviewActions = (item: SubmissionRow, layout: "desktop" | "mobile" = "desktop") => {
+    if (item.status !== "submitted") {
+      return <span className="text-xs text-slate-500">Selesai</span>;
+    }
+
+    return (
+      <div className={layout === "mobile" ? "grid grid-cols-2 gap-2" : "flex gap-2"}>
+        <Button size="sm" variant="default" className={layout === "mobile" ? "w-full" : undefined} onClick={() => openReview("approve", item)} disabled={working}>
+          Approve
+        </Button>
+        <Button size="sm" variant="destructive" className={layout === "mobile" ? "w-full" : undefined} onClick={() => openReview("reject", item)} disabled={working}>
+          Reject
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -356,26 +393,91 @@ export function AdminSubmissionsPage() {
           ) : filteredItems.length === 0 ? (
             <p className="text-sm text-slate-600">Tidak ada submission pada tab ini.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1320px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Kavling</TableHead>
-                    <TableHead>Nominal</TableHead>
-                    <TableHead>Status Submission</TableHead>
-                    <TableHead>Status Invoice</TableHead>
-                    <TableHead>Pengirim</TableHead>
-                    <TableHead>Rekening Tujuan</TableHead>
-                    <TableHead>Duplikat Pending</TableHead>
-                    <TableHead>Bukti</TableHead>
-                    <TableHead>Catatan</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((item) => {
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.map((item) => {
+                  const invoice = normalizeOne(item.invoices);
+                  const kavling = normalizeOne(invoice?.kavlings ?? null);
+                  const period = normalizeOne(invoice?.billing_periods ?? null);
+                  const bankAccount = normalizeOne(item.bank_accounts);
+                  const reviewerId = item.verified_by ?? item.rejected_by;
+                  const reviewTime = item.verified_at ?? item.rejected_at;
+                  const pendingDuplicates = pendingByInvoice[item.invoice_id] ?? 0;
+
+                  return (
+                    <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{invoice?.invoice_number ?? "-"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {kavling ? `${kavling.code}${kavling.block ? ` / Blok ${kavling.block}` : ""}` : "-"} - {period ? period.label : "-"}
+                          </p>
+                        </div>
+                        <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)} className="shrink-0">
+                          {formatSubmissionStatus(item.status)}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Nominal</p>
+                          <p className="font-semibold text-foreground">{formatRupiah(item.amount_submitted)}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Invoice</p>
+                          <Badge variant={statusToBadgeVariant(invoice?.status ?? "unpaid")} className="mt-1">
+                            {formatInvoiceStatusLabel(invoice?.status ?? "unpaid")}
+                          </Badge>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Pengirim</p>
+                          <p className="font-medium text-foreground">{profileDisplayName(profileMap[item.submitted_by])}</p>
+                        </div>
+                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
+                          <p className="text-muted-foreground">Duplikat</p>
+                          <Badge variant={pendingDuplicates > 1 ? "destructive" : "secondary"} className="mt-1">
+                            {pendingDuplicates > 1 ? `${pendingDuplicates} pending` : pendingDuplicates}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2 text-xs text-slate-600">
+                        <p>Waktu: {formatDateId(item.created_at)}</p>
+                        {reviewTime ? <p>Review: {formatDateId(reviewTime)}</p> : null}
+                        {reviewerId ? <p>Reviewer: {profileDisplayName(profileMap[reviewerId])}</p> : null}
+                        <p>Rekening: {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}</p>
+                        <p className="break-words">Catatan: {item.status === "rejected" ? item.rejection_reason ?? item.note ?? "-" : item.note ?? "-"}</p>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {item.proof_path ? <ProofPreviewButton submissionId={item.id} disabled={working} /> : <span className="text-xs text-slate-500">Belum ada bukti</span>}
+                      </div>
+                      <div className="mt-3">{renderReviewActions(item, "mobile")}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[1320px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Waktu</TableHead>
+                      <TableHead>Invoice</TableHead>
+                      <TableHead>Kavling</TableHead>
+                      <TableHead>Nominal</TableHead>
+                      <TableHead>Status Submission</TableHead>
+                      <TableHead>Status Invoice</TableHead>
+                      <TableHead>Pengirim</TableHead>
+                      <TableHead>Rekening Tujuan</TableHead>
+                      <TableHead>Duplikat Pending</TableHead>
+                      <TableHead>Bukti</TableHead>
+                      <TableHead>Catatan</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((item) => {
                     const invoice = normalizeOne(item.invoices);
                     const kavling = normalizeOne(invoice?.kavlings ?? null);
                     const period = normalizeOne(invoice?.billing_periods ?? null);
@@ -431,26 +533,55 @@ export function AdminSubmissionsPage() {
                           </p>
                         </TableCell>
                         <TableCell>
-                          {item.status === "submitted" ? (
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="default" onClick={() => openReview("approve", item)} disabled={working}>
-                                Approve
-                              </Button>
-                              <Button size="sm" variant="destructive" onClick={() => openReview("reject", item)} disabled={working}>
-                                Reject
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-500">Selesai</span>
-                          )}
+                          {renderReviewActions(item)}
                         </TableCell>
                       </TableRow>
                     );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
+
+          {!loading && filteredItems.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1">
+                  <span>Rows</span>
+                  <select
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                    value={String(pageSize)}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+                  Prev
+                </Button>
+                <span className="text-xs">
+                  Page {page}/{totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

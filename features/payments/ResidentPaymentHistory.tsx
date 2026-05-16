@@ -77,40 +77,62 @@ export function ResidentPaymentHistory({ invoiceId, reloadToken = 0 }: Readonly<
             Belum ada pembayaran terverifikasi untuk invoice ini.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table className="min-w-[640px]">
-              <TableHeader>
-                <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                  <TableHead>Tanggal Verifikasi</TableHead>
-                  <TableHead>Nominal</TableHead>
-                  <TableHead>Metode</TableHead>
-                  <TableHead>Diverifikasi Oleh</TableHead>
-                  <TableHead>Catatan</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="text-slate-700">
-                      {item.verified_at ? formatDateId(item.verified_at) : "-"}
-                    </TableCell>
-                    <TableCell className="font-medium text-slate-900">
-                      {formatRupiah(item.amount)}
-                    </TableCell>
-                    <TableCell className="text-slate-700">
-                      {item.payment_method ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-slate-700">
-                      {item.verified_by_name ?? "-"}
-                    </TableCell>
-                    <TableCell className="text-slate-700 text-xs max-w-[200px] truncate">
-                      {item.note ?? "-"}
-                    </TableCell>
+          <>
+            <div className="space-y-2 md:hidden">
+              {items.map((item) => (
+                <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{formatRupiah(item.amount)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.verified_at ? formatDateId(item.verified_at) : "-"}
+                      </p>
+                    </div>
+                    <Badge variant={statusToBadgeVariant("paid")} className="shrink-0">Terverifikasi</Badge>
+                  </div>
+                  <div className="mt-3 space-y-1 text-xs text-slate-600">
+                    <p>Metode: {item.payment_method ?? "-"}</p>
+                    <p>Diverifikasi: {item.verified_by_name ?? "-"}</p>
+                    <p className="break-words">Catatan: {item.note ?? "-"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <Table className="min-w-[640px]">
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Tanggal Verifikasi</TableHead>
+                    <TableHead>Nominal</TableHead>
+                    <TableHead>Metode</TableHead>
+                    <TableHead>Diverifikasi Oleh</TableHead>
+                    <TableHead>Catatan</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="text-slate-700">
+                        {item.verified_at ? formatDateId(item.verified_at) : "-"}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-900">
+                        {formatRupiah(item.amount)}
+                      </TableCell>
+                      <TableCell className="text-slate-700">
+                        {item.payment_method ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-slate-700">
+                        {item.verified_by_name ?? "-"}
+                      </TableCell>
+                      <TableCell className="text-slate-700 text-xs max-w-[200px] truncate">
+                        {item.note ?? "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

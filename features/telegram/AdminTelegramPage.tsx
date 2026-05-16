@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +73,8 @@ export function AdminTelegramPage() {
   // Filters
   const [filterTemplate, setFilterTemplate] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   // Template editor
   const [editingTemplate, setEditingTemplate] = useState<TemplateRow | null>(null);
@@ -118,11 +120,29 @@ export function AdminTelegramPage() {
     loadData().catch(() => setLoading(false));
   }, [loadData]);
 
-  const filteredDeliveries = deliveries.filter((d) => {
+  const filteredDeliveries = useMemo(() => deliveries.filter((d) => {
     if (filterTemplate && d.template_code !== filterTemplate) return false;
     if (filterStatus && d.status !== filterStatus) return false;
     return true;
-  });
+  }), [deliveries, filterStatus, filterTemplate]);
+  const totalRows = filteredDeliveries.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const pagedDeliveries = useMemo(
+    () => filteredDeliveries.slice((page - 1) * pageSize, page * pageSize),
+    [filteredDeliveries, page, pageSize],
+  );
+  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalRows);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterTemplate, filterStatus, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const failedCount = deliveries.filter((d) => d.status === "failed").length;
   const sentCount = deliveries.filter((d) => d.status === "sent").length;
@@ -291,46 +311,112 @@ export function AdminTelegramPage() {
           ) : filteredDeliveries.length === 0 ? (
             <p className="text-sm text-slate-500">Belum ada pengiriman.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[700px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Template</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Pesan</TableHead>
-                    <TableHead>Error</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredDeliveries.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-xs text-slate-600">
-                        {TEMPLATE_CODE_LABELS[row.template_code] ?? row.template_code}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={statusBadgeVariant(row.status)} className="text-xs">
-                          {row.status === "sent" ? <CheckCircle className="mr-1 size-3 inline" /> : null}
-                          {row.status === "failed" ? <XCircle className="mr-1 size-3 inline" /> : null}
-                          {row.status === "queued" ? <AlertTriangle className="mr-1 size-3 inline" /> : null}
-                          {row.status === "sent" ? "Terkirim" : row.status === "failed" ? "Gagal" : "Antrian"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs text-xs text-slate-700 truncate">
-                        {row.message_text}
-                      </TableCell>
-                      <TableCell className="max-w-xs text-xs text-red-500 truncate">
-                        {row.error_message ?? "-"}
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500">
-                        {formatDate(row.sent_at ?? row.created_at)}
-                      </TableCell>
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedDeliveries.map((row) => (
+                  <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {TEMPLATE_CODE_LABELS[row.template_code] ?? row.template_code}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">{formatDate(row.sent_at ?? row.created_at)}</p>
+                      </div>
+                      <Badge variant={statusBadgeVariant(row.status)} className="shrink-0 text-xs">
+                        {row.status === "sent" ? <CheckCircle className="mr-1 inline size-3" /> : null}
+                        {row.status === "failed" ? <XCircle className="mr-1 inline size-3" /> : null}
+                        {row.status === "queued" ? <AlertTriangle className="mr-1 inline size-3" /> : null}
+                        {row.status === "sent" ? "Terkirim" : row.status === "failed" ? "Gagal" : "Antrian"}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 line-clamp-3 text-xs text-slate-700">{row.message_text}</p>
+                    {row.error_message ? (
+                      <p className="mt-2 break-words text-xs text-red-600">{row.error_message}</p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[700px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Template</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Pesan</TableHead>
+                      <TableHead>Error</TableHead>
+                      <TableHead>Tanggal</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedDeliveries.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="text-xs text-slate-600">
+                          {TEMPLATE_CODE_LABELS[row.template_code] ?? row.template_code}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={statusBadgeVariant(row.status)} className="text-xs">
+                            {row.status === "sent" ? <CheckCircle className="mr-1 size-3 inline" /> : null}
+                            {row.status === "failed" ? <XCircle className="mr-1 size-3 inline" /> : null}
+                            {row.status === "queued" ? <AlertTriangle className="mr-1 size-3 inline" /> : null}
+                            {row.status === "sent" ? "Terkirim" : row.status === "failed" ? "Gagal" : "Antrian"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs text-xs text-slate-700 truncate">
+                          {row.message_text}
+                        </TableCell>
+                        <TableCell className="max-w-xs text-xs text-red-500 truncate">
+                          {row.error_message ?? "-"}
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500">
+                          {formatDate(row.sent_at ?? row.created_at)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
+
+          {!loading && filteredDeliveries.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1">
+                  <span>Rows</span>
+                  <select
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                    value={String(pageSize)}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+                  Prev
+                </Button>
+                <span className="text-xs">
+                  Page {page}/{totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

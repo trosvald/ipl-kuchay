@@ -54,7 +54,15 @@ export function LoginPage({
     setSuccessMessage(null);
 
     try {
-      await signIn({ email: email.trim(), password });
+      const formData = new FormData(event.currentTarget);
+      const submittedEmail = String(formData.get("email") ?? "").trim();
+      const submittedPassword = String(formData.get("password") ?? "");
+
+      if (!submittedEmail || !submittedPassword) {
+        throw new Error("Email dan password wajib diisi.");
+      }
+
+      await signIn({ email: submittedEmail, password: submittedPassword });
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Login password gagal.",
@@ -118,6 +126,7 @@ export function LoginPage({
               </label>
               <Input
                 id="login-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.currentTarget.value)}
@@ -130,6 +139,7 @@ export function LoginPage({
               </label>
               <Input
                 id="login-password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.currentTarget.value)}

@@ -1,8 +1,18 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, SquarePen } from "lucide-react";
+import { Plus, RefreshCw, SquarePen, Trash2 } from "lucide-react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -122,10 +132,11 @@ export function FeeOverridesPage() {
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<OverrideRow | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
 
   const [kavlingId, setKavlingId] = useState("");
   const [feeTypeId, setFeeTypeId] = useState("");
@@ -382,6 +393,54 @@ export function FeeOverridesPage() {
     await loadAll();
   };
 
+  const handleDeleteOverride = async () => {
+    if (!client || !profile || !confirmDelete) {
+      return;
+    }
+
+    const row = confirmDelete;
+
+    setSaving(true);
+    setErrorMessage(null);
+
+    const { error } = await client
+      .from("kavling_fee_overrides")
+      .delete()
+      .eq("id", row.id);
+
+    if (error) {
+      setErrorMessage(error.message || "Gagal menghapus override.");
+      setSaving(false);
+      return;
+    }
+
+    try {
+      await writeAuditLog({
+        action: "fee_override.delete",
+        entityTable: "kavling_fee_overrides",
+        entityId: row.id,
+        beforeData: row,
+        afterData: null,
+        actorId: profile.id,
+        actorRole: profile.role,
+      });
+    } catch (auditError) {
+      setErrorMessage(
+        auditError instanceof Error
+          ? `Override terhapus, tetapi audit gagal: ${auditError.message}`
+          : "Override terhapus, tetapi audit gagal.",
+      );
+    }
+
+    setConfirmDelete(null);
+    if (editingId === row.id) {
+      setEditingId(null);
+      resetForm();
+    }
+    setSaving(false);
+    await loadAll();
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -518,74 +577,147 @@ export function FeeOverridesPage() {
           {loading ? (
             <p className="text-sm text-slate-600">Memuat data...</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Kavling</TableHead>
-                    <TableHead>Jenis Biaya</TableHead>
-                    <TableHead>Nominal</TableHead>
-                    <TableHead>Rentang Aktif</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pagedItems.map((row) => {
-                    const kavling = normalizeOne(row.kavlings);
-                    const feeType = normalizeOne(row.fee_types);
-                    const ended = isOverrideEnded(row.active_until);
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.map((row) => {
+                  const kavling = normalizeOne(row.kavlings);
+                  const feeType = normalizeOne(row.fee_types);
+                  const ended = isOverrideEnded(row.active_until);
 
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium text-slate-900">{kavling?.code ?? "-"}</TableCell>
-                        <TableCell>
-                          <p className="font-medium text-slate-900">{feeType?.name ?? "-"}</p>
-                          <p className="text-xs text-slate-500">{feeType?.code ?? "-"}</p>
-                        </TableCell>
-                        <TableCell className="text-slate-700">{formatRupiah(row.amount)}</TableCell>
-                        <TableCell className="text-sm text-slate-700">
-                          {row.active_from ? formatDateId(row.active_from) : "-"} - {row.active_until ? formatDateId(row.active_until) : "terbuka"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={ended ? "secondary" : "success"}>{ended ? "Berakhir" : "Aktif"}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={saving}
-                              onClick={() => {
-                                setCreating(false);
-                                setEditingId(row.id);
-                              }}
-                            >
-                              <SquarePen className="size-4" /> Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={saving || Boolean(row.active_until)}
-                              onClick={() => handleEndOverrideNow(row)}
-                            >
-                              Akhiri Hari Ini
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                  return (
+                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-foreground">{kavling?.code ?? "-"}</p>
+                          <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {feeType?.name ?? "-"} ({feeType?.code ?? "-"})
+                          </p>
+                        </div>
+                        <Badge variant={ended ? "secondary" : "success"} className="shrink-0">
+                          {ended ? "Berakhir" : "Aktif"}
+                        </Badge>
+                      </div>
+
+                      <p className="mt-2 text-lg font-semibold text-foreground">{formatRupiah(row.amount)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {row.active_from ? formatDateId(row.active_from) : "-"} - {row.active_until ? formatDateId(row.active_until) : "terbuka"}
+                      </p>
+                      {row.notes ? <p className="mt-2 break-words text-sm text-slate-700">{row.notes}</p> : null}
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          disabled={saving}
+                          onClick={() => {
+                            setCreating(false);
+                            setEditingId(row.id);
+                          }}
+                        >
+                          <SquarePen className="size-4" /> Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="w-full"
+                          disabled={saving || Boolean(row.active_until)}
+                          onClick={() => handleEndOverrideNow(row)}
+                        >
+                          Akhiri
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="w-full"
+                          disabled={saving}
+                          onClick={() => setConfirmDelete(row)}
+                        >
+                          <Trash2 className="size-4" /> Hapus
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Kavling</TableHead>
+                      <TableHead>Jenis Biaya</TableHead>
+                      <TableHead>Nominal</TableHead>
+                      <TableHead>Rentang Aktif</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((row) => {
+                      const kavling = normalizeOne(row.kavlings);
+                      const feeType = normalizeOne(row.fee_types);
+                      const ended = isOverrideEnded(row.active_until);
+
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell className="font-medium text-slate-900">{kavling?.code ?? "-"}</TableCell>
+                          <TableCell>
+                            <p className="font-medium text-slate-900">{feeType?.name ?? "-"}</p>
+                            <p className="text-xs text-slate-500">{feeType?.code ?? "-"}</p>
+                          </TableCell>
+                          <TableCell className="text-slate-700">{formatRupiah(row.amount)}</TableCell>
+                          <TableCell className="text-sm text-slate-700">
+                            {row.active_from ? formatDateId(row.active_from) : "-"} - {row.active_until ? formatDateId(row.active_until) : "terbuka"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={ended ? "secondary" : "success"}>{ended ? "Berakhir" : "Aktif"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={saving}
+                                onClick={() => {
+                                  setCreating(false);
+                                  setEditingId(row.id);
+                                }}
+                              >
+                                <SquarePen className="size-4" /> Edit
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={saving || Boolean(row.active_until)}
+                                onClick={() => handleEndOverrideNow(row)}
+                              >
+                                Akhiri Hari Ini
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={saving}
+                                onClick={() => setConfirmDelete(row)}
+                              >
+                                <Trash2 className="size-4" /> Hapus
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
           {!loading ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <p>
                 Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex items-center gap-1">
                   <span>Rows</span>
                   <select
@@ -620,6 +752,23 @@ export function FeeOverridesPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      <AlertDialog open={Boolean(confirmDelete)} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus override?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Override ini akan dihapus dari daftar dan tidak dipakai untuk tagihan berikutnya. Gunakan Akhiri Hari Ini jika ingin menyimpan riwayat rentang aktif.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Batal</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteOverride} disabled={saving}>
+              {saving ? "Menghapus..." : "Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

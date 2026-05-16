@@ -46,6 +46,8 @@ export function AuditLogPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionFilter, setActionFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
   const isFinanceOnlyScope = role === "treasurer";
 
   const loadAuditLogs = useCallback(async () => {
@@ -122,6 +124,24 @@ export function AuditLogPage() {
       return true;
     });
   }, [actionFilter, entityFilter, items]);
+  const totalRows = filteredItems.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const pagedItems = useMemo(
+    () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
+    [filteredItems, page, pageSize],
+  );
+  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize, totalRows);
+
+  useEffect(() => {
+    setPage(1);
+  }, [actionFilter, entityFilter, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <section className="space-y-4">
@@ -171,41 +191,107 @@ export function AuditLogPage() {
           ) : filteredItems.length === 0 ? (
             <p className="text-sm text-slate-600">Belum ada data audit yang cocok.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1080px]">
-                <TableHeader>
-                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Aktor</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Entity</TableHead>
-                    <TableHead>Request ID</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-slate-700">{formatDateId(row.created_at)}</TableCell>
-                      <TableCell className="text-slate-700">
-                        <p>{profileName(row.actor_id ? profileMap[row.actor_id] : undefined)}</p>
-                        {row.actor_id ? <p className="text-xs text-slate-500">{row.actor_id}</p> : null}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{row.actor_role ?? "-"}</Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs text-slate-800">{row.action}</TableCell>
-                      <TableCell className="text-slate-700">
-                        <p className="font-medium text-slate-900">{row.entity_table}</p>
-                        <p className="font-mono text-xs text-slate-500">{row.entity_id}</p>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs text-slate-600">{row.request_id ?? "-"}</TableCell>
+            <>
+              <div className="space-y-2 md:hidden">
+                {pagedItems.map((row) => (
+                  <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-xs font-semibold text-foreground">{row.action}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{formatDateId(row.created_at)}</p>
+                      </div>
+                      <Badge variant="secondary" className="shrink-0">{row.actor_role ?? "-"}</Badge>
+                    </div>
+                    <div className="mt-3 space-y-2 text-xs text-slate-600">
+                      <p>
+                        Aktor: {profileName(row.actor_id ? profileMap[row.actor_id] : undefined)}
+                        {row.actor_id ? <span className="block break-all font-mono text-slate-500">{row.actor_id}</span> : null}
+                      </p>
+                      <p>
+                        Entity: <span className="font-medium text-slate-900">{row.entity_table}</span>
+                        <span className="block break-all font-mono text-slate-500">{row.entity_id}</span>
+                      </p>
+                      <p className="break-all font-mono">Request: {row.request_id ?? "-"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <Table className="min-w-[1080px]">
+                  <TableHeader>
+                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                      <TableHead>Waktu</TableHead>
+                      <TableHead>Aktor</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Entity</TableHead>
+                      <TableHead>Request ID</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedItems.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="text-slate-700">{formatDateId(row.created_at)}</TableCell>
+                        <TableCell className="text-slate-700">
+                          <p>{profileName(row.actor_id ? profileMap[row.actor_id] : undefined)}</p>
+                          {row.actor_id ? <p className="text-xs text-slate-500">{row.actor_id}</p> : null}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{row.actor_role ?? "-"}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-slate-800">{row.action}</TableCell>
+                        <TableCell className="text-slate-700">
+                          <p className="font-medium text-slate-900">{row.entity_table}</p>
+                          <p className="font-mono text-xs text-slate-500">{row.entity_id}</p>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-slate-600">{row.request_id ?? "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
+
+          {!loading && filteredItems.length > 0 ? (
+            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <p>
+                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-1">
+                  <span>Rows</span>
+                  <select
+                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                    value={String(pageSize)}
+                    onChange={(event) => {
+                      setPageSize(Number(event.target.value));
+                      setPage(1);
+                    }}
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                  </select>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+                  Prev
+                </Button>
+                <span className="text-xs">
+                  Page {page}/{totalPages}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </section>

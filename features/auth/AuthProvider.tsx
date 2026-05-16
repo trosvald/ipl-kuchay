@@ -101,6 +101,14 @@ async function fetchHasActiveKavlingMapping(
   return (count ?? 0) > 0;
 }
 
+async function clearLocalAuthSession(client: SupabaseClient): Promise<void> {
+  try {
+    await client.auth.signOut({ scope: "local" });
+  } catch {
+    // A stale local refresh token should not block rendering the login page.
+  }
+}
+
 interface AuthDerivedStateLoaders {
   fetchProfile: (userId: string) => Promise<Profile | null>;
   fetchHasActiveKavlingMapping: (profileId: string) => Promise<boolean>;
@@ -127,6 +135,13 @@ export async function resolveAuthDerivedState(
 
     if (!nextProfile) {
       return clearedAuthDerivedState();
+    }
+
+    if (nextProfile.role !== "resident") {
+      return {
+        profile: nextProfile,
+        hasActiveKavlingMapping: true,
+      };
     }
 
     const nextHasActiveMapping = await loaders.fetchHasActiveKavlingMapping(nextProfile.id);
@@ -233,6 +248,7 @@ export function AuthProvider({
       }
 
       if (error) {
+        await clearLocalAuthSession(client);
         setSession(null);
         applyAuthDerivedState(clearedAuthDerivedState());
         setLoading(false);
@@ -267,6 +283,7 @@ export function AuthProvider({
 
     bootstrap().catch(() => {
       if (isMounted) {
+        clearLocalAuthSession(client).catch(() => undefined);
         setLoading(false);
       }
     });
