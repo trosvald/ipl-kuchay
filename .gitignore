@@ -13,3 +13,4 @@ coverage/
 supabase/functions/.env
 supabase/.branches
 supabase/.temp/
+.gstack/
