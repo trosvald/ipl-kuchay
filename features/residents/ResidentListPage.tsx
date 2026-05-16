@@ -113,25 +113,29 @@ export function ResidentListPage() {
 
     const nextMappingStatus: Record<string, MappingStatus> = {};
     if (residentIds.length > 0) {
-      const { data: mappings, error: mappingsError } = await client
-        .from("kavling_residents")
-        .select("profile_id, active")
-        .in("profile_id", residentIds);
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < residentIds.length; i += BATCH_SIZE) {
+        const chunk = residentIds.slice(i, i + BATCH_SIZE);
+        const { data: mappings, error: mappingsError } = await client
+          .from("kavling_residents")
+          .select("profile_id, active")
+          .in("profile_id", chunk);
 
-      if (mappingsError) {
-        setErrorMessage(mappingsError.message);
-        setLoading(false);
-        return;
-      }
-
-      for (const mapping of mappings ?? []) {
-        const existing = nextMappingStatus[mapping.profile_id] ?? { activeCount: 0, historyOnlyCount: 0 };
-        if (mapping.active) {
-          existing.activeCount += 1;
-        } else {
-          existing.historyOnlyCount += 1;
+        if (mappingsError) {
+          setErrorMessage(mappingsError.message);
+          setLoading(false);
+          return;
         }
-        nextMappingStatus[mapping.profile_id] = existing;
+
+        for (const mapping of mappings ?? []) {
+          const existing = nextMappingStatus[mapping.profile_id] ?? { activeCount: 0, historyOnlyCount: 0 };
+          if (mapping.active) {
+            existing.activeCount += 1;
+          } else {
+            existing.historyOnlyCount += 1;
+          }
+          nextMappingStatus[mapping.profile_id] = existing;
+        }
       }
     }
 
