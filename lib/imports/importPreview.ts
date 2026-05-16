@@ -6,7 +6,7 @@ import {
   csvPositiveIntegerStringSchema,
   optionalIsoDateStringSchema,
   requiredStringSchema,
-} from "@/lib/validation";
+} from "../validation";
 import type {
   BuildImportPreviewInput,
   FeeOverrideImportRow,
@@ -15,7 +15,7 @@ import type {
   KavlingImportRow,
   PreviewRow,
   ResidentMappingImportRow,
-} from "@/lib/imports/importTypes";
+} from "./importTypes";
 
 const DEFAULT_MAX_ROWS = 5000;
 
