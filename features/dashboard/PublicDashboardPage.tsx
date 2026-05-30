@@ -182,7 +182,7 @@ export function PublicDashboardPage() {
               <p className="text-sm text-muted-foreground">Memuat periode...</p>
             ) : (
               <>
-                <div className="space-y-2 md:hidden">
+                <div className="space-y-2 lg:hidden">
                   {pagedRows.length === 0 ? (
                     <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
                       Belum ada ringkasan periode.
@@ -219,7 +219,7 @@ export function PublicDashboardPage() {
                   ))}
                 </div>
 
-                <div className="hidden overflow-x-auto md:block">
+                <div className="hidden overflow-x-auto lg:block">
                   <Table className="min-w-[860px]">
                     <TableHeader>
                       <TableRow className="text-xs uppercase tracking-wide text-muted-foreground">

@@ -17,7 +17,7 @@ export default function NotFound() {
         <CardContent className="flex flex-wrap gap-3 text-sm text-slate-600">
           <p className="w-full">Rute yang Anda cari tidak tersedia.</p>
           <Button asChild>
-            <Link href="/">Kembali ke dashboard publik</Link>
+            <Link href="/">Kembali ke login</Link>
           </Button>
         </CardContent>
       </Card>

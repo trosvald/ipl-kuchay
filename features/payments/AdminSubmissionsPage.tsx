@@ -394,7 +394,7 @@ export function AdminSubmissionsPage() {
             <p className="text-sm text-slate-600">Tidak ada submission pada tab ini.</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedItems.map((item) => {
                   const invoice = normalizeOne(item.invoices);
                   const kavling = normalizeOne(invoice?.kavlings ?? null);
@@ -443,10 +443,12 @@ export function AdminSubmissionsPage() {
 
                       <div className="mt-3 space-y-2 text-xs text-slate-600">
                         <p>Waktu: {formatDateId(item.created_at)}</p>
+                        <p>Rekening: {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name}` : "-"}</p>
                         {reviewTime ? <p>Review: {formatDateId(reviewTime)}</p> : null}
                         {reviewerId ? <p>Reviewer: {profileDisplayName(profileMap[reviewerId])}</p> : null}
-                        <p>Rekening: {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}</p>
-                        <p className="break-words">Catatan: {item.status === "rejected" ? item.rejection_reason ?? item.note ?? "-" : item.note ?? "-"}</p>
+                        {(item.rejection_reason ?? item.note) ? (
+                          <p className="break-words">Catatan: {item.status === "rejected" ? item.rejection_reason ?? item.note : item.note}</p>
+                        ) : null}
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -458,7 +460,7 @@ export function AdminSubmissionsPage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[1320px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">

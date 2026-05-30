@@ -502,27 +502,27 @@ export function BillingPeriodsPage() {
           <CardContent>
             <form className="space-y-4" onSubmit={handleCreate}>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="billingPeriodYear" className="space-y-2 text-sm text-slate-700">
                   <span>Tahun</span>
-                  <Input type="number" min={2020} max={2100} value={year} onChange={(event) => setYear(event.target.value)} />
+                  <Input id="billingPeriodYear" type="number" min={2020} max={2100} value={year} onChange={(event) => setYear(event.target.value)} />
                   {formErrors.year ? <p className="text-xs text-red-600">{formErrors.year}</p> : null}
                 </label>
 
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="billingPeriodMonth" className="space-y-2 text-sm text-slate-700">
                   <span>Bulan</span>
-                  <Input type="number" min={1} max={12} value={month} onChange={(event) => setMonth(event.target.value)} />
+                  <Input id="billingPeriodMonth" type="number" min={1} max={12} value={month} onChange={(event) => setMonth(event.target.value)} />
                   {formErrors.month ? <p className="text-xs text-red-600">{formErrors.month}</p> : null}
                 </label>
 
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="billingPeriodDueDate" className="space-y-2 text-sm text-slate-700">
                   <span>Due date</span>
-                  <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+                  <Input id="billingPeriodDueDate" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
                   {formErrors.due_date ? <p className="text-xs text-red-600">{formErrors.due_date}</p> : null}
                 </label>
 
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="billingPeriodLabel" className="space-y-2 text-sm text-slate-700">
                   <span>Label</span>
-                  <Input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="April 2026" />
+                  <Input id="billingPeriodLabel" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="April 2026" />
                   {formErrors.label ? <p className="text-xs text-red-600">{formErrors.label}</p> : null}
                 </label>
               </div>
@@ -544,7 +544,7 @@ export function BillingPeriodsPage() {
             <p className="text-sm text-slate-600">Memuat data...</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-2 lg:hidden">
                 {pagedItems.length === 0 ? (
                   <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
                     Belum ada periode billing.
@@ -579,7 +579,7 @@ export function BillingPeriodsPage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[980px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -657,7 +657,7 @@ export function BillingPeriodsPage() {
 
       {/* Invoice Preview Dialog */}
       <Dialog open={previewPeriod !== null} onOpenChange={(open: boolean) => !open && setPreviewPeriod(null)}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Pratinjau Tagihan — {previewPeriod ? formatMonthYearId(previewPeriod.year, previewPeriod.month) : ""}</DialogTitle>
             <DialogDescription>
@@ -716,7 +716,7 @@ export function BillingPeriodsPage() {
                 </div>
               ) : null}
 
-              <div className="flex justify-end gap-2">
+              <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-background pt-3">
                 <Button variant="secondary" onClick={() => setPreviewPeriod(null)}>
                   Batal
                 </Button>
@@ -752,7 +752,7 @@ export function BillingPeriodsPage() {
 
       {/* Penalty Preview Dialog */}
       <Dialog open={penaltyPeriod !== null} onOpenChange={(open: boolean) => !open && setPenaltyPeriod(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Pratinjau Denda — {penaltyPeriod ? formatMonthYearId(penaltyPeriod.year, penaltyPeriod.month) : ""}</DialogTitle>
             <DialogDescription>
@@ -802,7 +802,7 @@ export function BillingPeriodsPage() {
                 </div>
               ) : null}
 
-              <div className="flex justify-end gap-2">
+              <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-background pt-3">
                 <Button variant="secondary" onClick={() => setPenaltyPeriod(null)}>
                   Batal
                 </Button>

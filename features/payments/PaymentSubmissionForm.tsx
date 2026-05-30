@@ -5,6 +5,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/authHooks";
 import {
   buildPaymentProofPath,
@@ -282,13 +283,15 @@ export function PaymentSubmissionForm({
         {successMessage ? <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p> : null}
 
         <form className="space-y-3" onSubmit={handleSubmit}>
-          <label className="space-y-1 text-sm text-slate-700">
+          <label htmlFor="amountSubmitted" className="space-y-1 text-sm text-slate-700">
             <span>Nominal transfer</span>
             <Input
+              id="amountSubmitted"
               type="number"
               min={1}
               max={Math.max(outstandingAmount, 1)}
               step={1}
+              inputMode="numeric"
               value={amountSubmitted}
               onChange={(event) => setAmountSubmitted(event.target.value)}
               disabled={saving || !canSubmit}
@@ -296,10 +299,11 @@ export function PaymentSubmissionForm({
             />
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label htmlFor="bankAccountId" className="space-y-1 text-sm text-slate-700">
             <span>Rekening tujuan</span>
-            <select
-              className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
+            <Select
+              id="bankAccountId"
+              className="h-11 w-full text-left text-sm"
               value={bankAccountId}
               onChange={(event) => setBankAccountId(event.target.value)}
               disabled={saving || loadingAccounts || !canSubmit}
@@ -312,12 +316,13 @@ export function PaymentSubmissionForm({
                   {account.label} - {account.bank_name} {account.account_number} a/n {account.account_holder}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label htmlFor="proofFile" className="space-y-1 text-sm text-slate-700">
             <span>Bukti transfer (JPG, PNG, WEBP, PDF - max 5 MB)</span>
             <Input
+              id="proofFile"
               type="file"
               accept="image/jpeg,image/png,image/webp,application/pdf"
               onChange={(event) => setProofFile(event.target.files?.[0] ?? null)}
@@ -326,9 +331,10 @@ export function PaymentSubmissionForm({
             />
           </label>
 
-          <label className="space-y-1 text-sm text-slate-700">
+          <label htmlFor="paymentNote" className="space-y-1 text-sm text-slate-700">
             <span>Catatan (opsional)</span>
             <textarea
+              id="paymentNote"
               className="min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
               value={note}
               onChange={(event) => setNote(event.target.value)}

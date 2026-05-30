@@ -1,5 +1,5 @@
-import { PublicDashboardPage } from "@/features/dashboard/PublicDashboardPage";
+import { LoginPage } from "@/features/auth/LoginPage";
 
 export default function HomePage() {
-  return <PublicDashboardPage />;
+  return <LoginPage />;
 }

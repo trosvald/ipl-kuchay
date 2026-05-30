@@ -135,10 +135,6 @@ export function AdminTelegramPage() {
   const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
-    setPage(1);
-  }, [filterTemplate, filterStatus, pageSize]);
-
-  useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
@@ -286,7 +282,10 @@ export function AdminTelegramPage() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <select
               value={filterTemplate}
-              onChange={(e) => setFilterTemplate(e.target.value)}
+              onChange={(e) => {
+                setFilterTemplate(e.target.value);
+                setPage(1);
+              }}
               className="rounded-md border border-slate-300 px-2 py-1 text-sm"
             >
               <option value="">Semua template</option>
@@ -296,7 +295,10 @@ export function AdminTelegramPage() {
             </select>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setPage(1);
+              }}
               className="rounded-md border border-slate-300 px-2 py-1 text-sm"
             >
               <option value="">Semua status</option>
@@ -312,7 +314,7 @@ export function AdminTelegramPage() {
             <p className="text-sm text-slate-500">Belum ada pengiriman.</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedDeliveries.map((row) => (
                   <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -337,7 +339,7 @@ export function AdminTelegramPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">

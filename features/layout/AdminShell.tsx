@@ -3,14 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  LayoutDashboard,
-  LogOut,
-  Search,
-  Shield,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, LogOut, Menu, Search, Shield, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -127,7 +120,17 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
               className="absolute inset-0 bg-black/40"
               onClick={() => setMobileOpen(false)}
             />
-            <aside className="relative h-full w-72 bg-sidebar text-sidebar-foreground">
+            <aside className="relative h-full w-[min(20rem,85vw)] bg-sidebar text-sidebar-foreground">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Tutup menu admin"
+                className="absolute right-3 top-3 z-10 md:hidden"
+                onClick={() => setMobileOpen(false)}
+              >
+                <X className="size-4" />
+              </Button>
               {navContent}
             </aside>
           </div>
@@ -136,17 +139,18 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
         <div className="min-w-0 flex-1">
           <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b bg-background/90 px-4 backdrop-blur-md md:px-6">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(true)}>
-                <LayoutDashboard className="size-4" />
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Buka menu admin" onClick={() => setMobileOpen(true)}>
+                <Menu className="size-5" />
               </Button>
-              <Button variant="ghost" size="sm" className="justify-start text-muted-foreground">
+              <Button variant="ghost" size="sm" className="hidden justify-start text-muted-foreground md:inline-flex">
                 <Search className="size-4" />
                 Search
               </Button>
+              <p className="max-w-[60vw] truncate text-sm font-medium text-foreground md:hidden">{currentPageTitle}</p>
             </div>
             <div className="flex items-center gap-2">
               <p className="hidden text-sm text-muted-foreground md:block">{currentPageTitle}</p>
-              <Badge variant="outline">Admin Shell</Badge>
+              <Badge variant="outline" className="hidden sm:inline-flex">Admin Shell</Badge>
             </div>
           </header>
 

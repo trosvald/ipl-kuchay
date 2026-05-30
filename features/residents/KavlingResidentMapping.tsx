@@ -290,7 +290,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
   } else {
     mappingContent = (
       <>
-        <div className="space-y-2 md:hidden">
+        <div className="space-y-3 lg:hidden">
           {pagedMappings.map((mapping) => (
             <div key={mapping.id} className="rounded-lg border bg-background px-3 py-3">
               <div className="flex items-start justify-between gap-3">
@@ -317,7 +317,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
           ))}
         </div>
 
-        <div className="hidden overflow-x-auto md:block">
+        <div className="hidden overflow-x-auto lg:block">
           <Table className="min-w-[640px]">
             <TableHeader>
               <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -367,7 +367,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
 
       {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto_auto]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_auto_auto]">
         <label className="space-y-1 text-xs text-slate-600">
           <span>Kavling</span>
           <select
@@ -398,9 +398,10 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
           </select>
         </label>
 
-        <label className="space-y-1 text-xs text-slate-600">
+        <label htmlFor="mappingRelationLabel" className="space-y-1 text-xs text-slate-600">
           <span>Detail relasi</span>
           <Input
+            id="mappingRelationLabel"
             value={relationLabel}
             onChange={(event) => setRelationLabel(event.target.value)}
             placeholder={relationType === "other" ? "Contoh: Kerabat" : "Opsional"}
@@ -408,8 +409,9 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
           />
         </label>
 
-        <label className="flex items-center gap-2 text-xs text-slate-700">
+        <label htmlFor="mappingIsPrimary" className="flex items-center gap-2 text-xs text-slate-700">
           <input
+            id="mappingIsPrimary"
             type="checkbox"
             checked={isPrimary}
             onChange={(event) => setIsPrimary(event.target.checked)}

@@ -134,10 +134,6 @@ export function AuditLogPage() {
   const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
-    setPage(1);
-  }, [actionFilter, entityFilter, pageSize]);
-
-  useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
@@ -172,12 +168,18 @@ export function AuditLogPage() {
                   : "Filter action (contoh: payment_submission)"
               }
               value={actionFilter}
-              onChange={(event) => setActionFilter(event.target.value)}
+              onChange={(event) => {
+                setActionFilter(event.target.value);
+                setPage(1);
+              }}
             />
             <Input
               placeholder="Filter entity table/id"
               value={entityFilter}
-              onChange={(event) => setEntityFilter(event.target.value)}
+              onChange={(event) => {
+                setEntityFilter(event.target.value);
+                setPage(1);
+              }}
             />
           </div>
         </CardHeader>
@@ -192,7 +194,7 @@ export function AuditLogPage() {
             <p className="text-sm text-slate-600">Belum ada data audit yang cocok.</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedItems.map((row) => (
                   <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -205,11 +207,11 @@ export function AuditLogPage() {
                     <div className="mt-3 space-y-2 text-xs text-slate-600">
                       <p>
                         Aktor: {profileName(row.actor_id ? profileMap[row.actor_id] : undefined)}
-                        {row.actor_id ? <span className="block break-all font-mono text-slate-500">{row.actor_id}</span> : null}
+                        {row.actor_id ? <span className="mt-1 block rounded-md bg-slate-50 px-2 py-1 font-mono text-slate-500 break-all">{row.actor_id}</span> : null}
                       </p>
                       <p>
                         Entity: <span className="font-medium text-slate-900">{row.entity_table}</span>
-                        <span className="block break-all font-mono text-slate-500">{row.entity_id}</span>
+                        <span className="mt-1 block rounded-md bg-slate-50 px-2 py-1 font-mono text-slate-500 break-all">{row.entity_id}</span>
                       </p>
                       <p className="break-all font-mono">Request: {row.request_id ?? "-"}</p>
                     </div>
@@ -217,7 +219,7 @@ export function AuditLogPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[1080px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">

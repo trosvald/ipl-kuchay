@@ -181,10 +181,6 @@ export function AdminEventsPage() {
   const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
-    setPage(1);
-  }, [activeTab, pageSize]);
-
-  useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
@@ -256,8 +252,8 @@ export function AdminEventsPage() {
       ...(isNew ? { created_by: profile.id } : { updated_by: profile.id }),
     };
 
-    let data;
-    let error;
+    let data: EventRow | null = null;
+    let error: { message: string } | null = null;
     if (isNew) {
       const result = await client
         .from("events")
@@ -369,7 +365,7 @@ export function AdminEventsPage() {
             <p className="text-sm text-slate-600">Tidak ada acara pada tab ini.</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedItems.map((row) => {
                   const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
                   const isPast = new Date(row.starts_at) < new Date();
@@ -391,7 +387,7 @@ export function AdminEventsPage() {
                       {row.description ? (
                         <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.description}</p>
                       ) : null}
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                         <div className="rounded-md bg-slate-50 px-2 py-1.5">
                           <p className="text-muted-foreground">Hadir</p>
                           <p className="font-semibold text-foreground">{rsvp.attending}</p>
@@ -426,7 +422,7 @@ export function AdminEventsPage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -557,7 +553,7 @@ export function AdminEventsPage() {
 
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={(open) => !open && setEditorOpen(false)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {editor.id ? "Edit Acara" : "Acara Baru"}
@@ -568,9 +564,10 @@ export function AdminEventsPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <label className="space-y-2 text-sm text-slate-700">
+            <label htmlFor="eventTitle" className="space-y-2 text-sm text-slate-700">
               <span>Judul Acara <span className="text-red-500">*</span></span>
               <Input
+                id="eventTitle"
                 value={editor.title}
                 onChange={(e) => setEditor((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="Judul acara"
@@ -578,9 +575,10 @@ export function AdminEventsPage() {
               {formErrors.title ? <p className="text-xs text-red-600">{formErrors.title}</p> : null}
             </label>
 
-            <label className="space-y-2 text-sm text-slate-700">
+            <label htmlFor="eventDescription" className="space-y-2 text-sm text-slate-700">
               <span>Deskripsi</span>
               <Textarea
+                id="eventDescription"
                 value={editor.description}
                 onChange={(e) => setEditor((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="Deskripsi acara (opsional)"
@@ -588,9 +586,10 @@ export function AdminEventsPage() {
               />
             </label>
 
-            <label className="space-y-2 text-sm text-slate-700">
+            <label htmlFor="eventLocation" className="space-y-2 text-sm text-slate-700">
               <span>Lokasi <span className="text-red-500">*</span></span>
               <Input
+                id="eventLocation"
                 value={editor.location}
                 onChange={(e) => setEditor((prev) => ({ ...prev, location: e.target.value }))}
                 placeholder="Lokasi acara"
@@ -598,10 +597,11 @@ export function AdminEventsPage() {
               {formErrors.location ? <p className="text-xs text-red-600">{formErrors.location}</p> : null}
             </label>
 
-            <div className="grid grid-cols-2 gap-4">
-              <label className="space-y-2 text-sm text-slate-700">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label htmlFor="eventStartsAt" className="space-y-2 text-sm text-slate-700">
                 <span>Waktu Mulai <span className="text-red-500">*</span></span>
                 <Input
+                  id="eventStartsAt"
                   type="datetime-local"
                   value={editor.starts_at}
                   onChange={(e) => setEditor((prev) => ({ ...prev, starts_at: e.target.value }))}
@@ -609,9 +609,10 @@ export function AdminEventsPage() {
                 {formErrors.starts_at ? <p className="text-xs text-red-600">{formErrors.starts_at}</p> : null}
               </label>
 
-              <label className="space-y-2 text-sm text-slate-700">
+              <label htmlFor="eventEndsAt" className="space-y-2 text-sm text-slate-700">
                 <span>Waktu Selesai</span>
                 <Input
+                  id="eventEndsAt"
                   type="datetime-local"
                   value={editor.ends_at}
                   onChange={(e) => setEditor((prev) => ({ ...prev, ends_at: e.target.value }))}
@@ -621,7 +622,7 @@ export function AdminEventsPage() {
             </div>
           </div>
 
-          <DialogFooter className="flex flex-wrap gap-2">
+          <DialogFooter className="sticky bottom-0 flex flex-wrap gap-2 border-t bg-background pt-3">
             <Button variant="secondary" onClick={() => setEditorOpen(false)} disabled={saving}>
               Batal
             </Button>
@@ -645,9 +646,10 @@ export function AdminEventsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-2">
-            <label className="space-y-2 text-sm text-slate-700">
+            <label htmlFor="eventCancelNote" className="space-y-2 text-sm text-slate-700">
               <span>Catatan Pembatalan</span>
               <Textarea
+                id="eventCancelNote"
                 value={confirmCancel?.note ?? ""}
                 onChange={(e) =>
                   setConfirmCancel((prev) => (prev ? { ...prev, note: e.target.value } : null))

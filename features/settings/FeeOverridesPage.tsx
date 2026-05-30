@@ -480,9 +480,10 @@ export function FeeOverridesPage() {
           <CardContent>
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="feeOverrideKavling" className="space-y-2 text-sm text-slate-700">
                   <span>Kavling</span>
                   <select
+                    id="feeOverrideKavling"
                     className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
                     value={kavlingId}
                     onChange={(event) => setKavlingId(event.target.value)}
@@ -497,9 +498,10 @@ export function FeeOverridesPage() {
                   {formErrors.kavling_id ? <p className="text-xs text-red-600">{formErrors.kavling_id}</p> : null}
                 </label>
 
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="feeOverrideType" className="space-y-2 text-sm text-slate-700">
                   <span>Jenis biaya</span>
                   <select
+                    id="feeOverrideType"
                     className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
                     value={feeTypeId}
                     onChange={(event) => setFeeTypeId(event.target.value)}
@@ -516,28 +518,29 @@ export function FeeOverridesPage() {
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="feeOverrideAmount" className="space-y-2 text-sm text-slate-700">
                   <span>Nominal override</span>
-                  <Input type="number" min={0} value={amount} onChange={(event) => setAmount(event.target.value)} />
+                  <Input id="feeOverrideAmount" type="number" min={0} value={amount} onChange={(event) => setAmount(event.target.value)} />
                   {formErrors.amount ? <p className="text-xs text-red-600">{formErrors.amount}</p> : null}
                 </label>
 
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="feeOverrideActiveFrom" className="space-y-2 text-sm text-slate-700">
                   <span>Aktif dari</span>
-                  <Input type="date" value={activeFrom} onChange={(event) => setActiveFrom(event.target.value)} />
+                  <Input id="feeOverrideActiveFrom" type="date" value={activeFrom} onChange={(event) => setActiveFrom(event.target.value)} />
                   {formErrors.active_from ? <p className="text-xs text-red-600">{formErrors.active_from}</p> : null}
                 </label>
 
-                <label className="space-y-2 text-sm text-slate-700">
+                <label htmlFor="feeOverrideActiveUntil" className="space-y-2 text-sm text-slate-700">
                   <span>Aktif sampai</span>
-                  <Input type="date" value={activeUntil} onChange={(event) => setActiveUntil(event.target.value)} />
+                  <Input id="feeOverrideActiveUntil" type="date" value={activeUntil} onChange={(event) => setActiveUntil(event.target.value)} />
                   {formErrors.active_until ? <p className="text-xs text-red-600">{formErrors.active_until}</p> : null}
                 </label>
               </div>
 
-              <label className="space-y-2 text-sm text-slate-700">
+              <label htmlFor="feeOverrideNotes" className="space-y-2 text-sm text-slate-700">
                 <span>Catatan</span>
                 <textarea
+                  id="feeOverrideNotes"
                   className="min-h-20 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
@@ -578,7 +581,7 @@ export function FeeOverridesPage() {
             <p className="text-sm text-slate-600">Memuat data...</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-2 lg:hidden">
                 {pagedItems.map((row) => {
                   const kavling = normalizeOne(row.kavlings);
                   const feeType = normalizeOne(row.fee_types);
@@ -604,7 +607,7 @@ export function FeeOverridesPage() {
                       </p>
                       {row.notes ? <p className="mt-2 break-words text-sm text-slate-700">{row.notes}</p> : null}
 
-                      <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <Button
                           size="sm"
                           variant="outline"
@@ -641,7 +644,7 @@ export function FeeOverridesPage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">

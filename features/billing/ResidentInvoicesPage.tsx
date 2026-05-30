@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 import {
   Accordion,
@@ -192,44 +192,35 @@ function InvoiceCard({
     >
       <Accordion type="single" collapsible defaultValue={undefined}>
         <AccordionItem value="invoice" className="px-4 py-0 border-none">
-          <div className="flex items-start justify-between gap-3 py-4">
-            <div className="flex-1 space-y-1">
-              <p
-                className={`text-base font-semibold ${
-                  isHistorical ? "text-muted-foreground" : "text-slate-900"
-                }`}
-              >
-                {periodLabel}
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={statusVariant}>{statusLabel}</Badge>
-                {isHistorical && (
-                  <span className="text-xs text-muted-foreground">Riwayat</span>
-                )}
+          <AccordionTrigger className="py-4 hover:no-underline">
+            <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+              <div className="flex-1 space-y-1">
+                <p
+                  className={`text-base font-semibold ${
+                    isHistorical ? "text-muted-foreground" : "text-slate-900"
+                  }`}
+                >
+                  {periodLabel}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant={statusVariant}>{statusLabel}</Badge>
+                  {isHistorical && <span className="text-xs text-muted-foreground">Riwayat</span>}
+                </div>
+              </div>
+              <div className="pr-2 text-right">
+                <p
+                  className={`text-base font-semibold ${
+                    isHistorical ? "text-muted-foreground" : "text-slate-900"
+                  }`}
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {amountDue}
+                </p>
+                {amountPaid && <p className="text-xs text-muted-foreground">Dibayar: {amountPaid}</p>}
+                <p className="text-xs text-muted-foreground">Jatuh tempo: {dueDateFormatted}</p>
               </div>
             </div>
-            <div className="text-right">
-              <p
-                className={`text-base font-semibold ${
-                  isHistorical ? "text-muted-foreground" : "text-slate-900"
-                }`}
-                style={{ fontVariantNumeric: "tabular-nums" }}
-              >
-                {amountDue}
-              </p>
-              {amountPaid && (
-                <p className="text-xs text-muted-foreground">
-                  Dibayar: {amountPaid}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Jatuh tempo: {dueDateFormatted}
-              </p>
-            </div>
-            <AccordionTrigger className="p-0 hover:no-underline">
-              <ChevronDown className="size-5 text-muted-foreground" />
-            </AccordionTrigger>
-          </div>
+          </AccordionTrigger>
 
           <AccordionContent className="pb-4">
             <div className="space-y-3">
@@ -508,21 +499,21 @@ export function ResidentInvoicesPage() {
         </div>
       ) : (
         /* Multi-kavling - show tabs */
-        <Tabs
-          defaultValue={kavlingGroups[0]?.code}
-          onValueChange={(value) => {}}
-        >
-          <TabsList className="h-11 w-full justify-start overflow-x-auto">
-            {kavlingGroups.map((group) => (
-              <TabsTrigger
-                key={group.code}
-                value={group.code}
-                className="min-h-[44px]"
-              >
-                Kavling {group.code}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <Tabs defaultValue={kavlingGroups[0]?.code}>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Geser tab untuk melihat kavling lain.</p>
+            <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto pr-8 [mask-image:linear-gradient(to_right,black_85%,transparent)] [scrollbar-width:none] snap-x snap-mandatory">
+              {kavlingGroups.map((group) => (
+                <TabsTrigger
+                  key={group.code}
+                  value={group.code}
+                  className="min-h-[44px] shrink-0 snap-start"
+                >
+                  Kavling {group.code}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
           {kavlingGroups.map((group) => (
             <TabsContent key={group.code} value={group.code} className="mt-4 space-y-3">

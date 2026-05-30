@@ -220,7 +220,7 @@ export function ImportJobsPage() {
 
             {preview.errors.length > 0 ? (
               <>
-                <div className="space-y-2 md:hidden">
+                <div className="space-y-3 lg:hidden">
                   {preview.errors.map((error: ImportPreviewError, index) => (
                     <div key={`${error.rowNumber}-${error.field}-${index}`} className="rounded-lg border bg-background px-3 py-3">
                       <div className="flex items-start justify-between gap-3 text-sm">
@@ -231,7 +231,7 @@ export function ImportJobsPage() {
                     </div>
                   ))}
                 </div>
-                <div className="hidden overflow-x-auto md:block">
+                <div className="hidden overflow-x-auto lg:block">
                   <Table>
                     <TableHeader>
                       <TableRow>

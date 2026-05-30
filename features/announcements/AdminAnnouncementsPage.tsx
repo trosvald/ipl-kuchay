@@ -170,10 +170,6 @@ export function AdminAnnouncementsPage() {
   const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
-    setPage(1);
-  }, [activeTab, pageSize]);
-
-  useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
@@ -259,8 +255,8 @@ export function AdminAnnouncementsPage() {
       ...(isNew ? { created_by: profile.id } : { updated_by: profile.id }),
     };
 
-    let data;
-    let error;
+    let data: AnnouncementRow | null = null;
+    let error: { message: string } | null = null;
     if (isNew) {
       const result = await client
         .from("announcements")
@@ -457,7 +453,7 @@ export function AdminAnnouncementsPage() {
             <p className="text-sm text-slate-600">Tidak ada pengumuman pada tab ini.</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedItems.map((row) => {
                   const attachCount = attachmentCounts[row.id] ?? 0;
                   return (
@@ -481,7 +477,7 @@ export function AdminAnnouncementsPage() {
                           </Badge>
                         ) : null}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -536,7 +532,7 @@ export function AdminAnnouncementsPage() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -684,7 +680,7 @@ export function AdminAnnouncementsPage() {
 
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={(open) => !open && setEditorOpen(false)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>
               {editor.id ? "Edit Pengumuman" : "Pengumuman Baru"}
@@ -701,9 +697,10 @@ export function AdminAnnouncementsPage() {
               <p className="mb-1 text-sm font-medium text-slate-700">Beranda warga hanya menampilkan satu hero penting. Pengumuman penting lain tetap muncul di daftar.</p>
             </div>
 
-            <label className="space-y-2 text-sm text-slate-700">
+            <label htmlFor="announcementTitle" className="space-y-2 text-sm text-slate-700">
               <span>Judul <span className="text-red-500">*</span></span>
               <Input
+                id="announcementTitle"
                 value={editor.title}
                 onChange={(e) => setEditor((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="Judul pengumuman"
@@ -711,9 +708,10 @@ export function AdminAnnouncementsPage() {
               {formErrors.title ? <p className="text-xs text-red-600">{formErrors.title}</p> : null}
             </label>
 
-            <label className="space-y-2 text-sm text-slate-700">
+            <label htmlFor="announcementBody" className="space-y-2 text-sm text-slate-700">
               <span>Isi Pengumuman <span className="text-red-500">*</span></span>
               <Textarea
+                id="announcementBody"
                 value={editor.body}
                 onChange={(e) => setEditor((prev) => ({ ...prev, body: e.target.value }))}
                 placeholder="Tulis isi pengumuman di sini..."
@@ -789,7 +787,7 @@ export function AdminAnnouncementsPage() {
             </div>
           </div>
 
-          <DialogFooter className="flex flex-wrap gap-2">
+          <DialogFooter className="sticky bottom-0 flex flex-wrap gap-2 border-t bg-background pt-3">
             <Button variant="secondary" onClick={() => setEditorOpen(false)} disabled={saving}>
               Batal
             </Button>

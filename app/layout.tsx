@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 
 import { APP_NAME } from "@/lib/constants";
@@ -14,6 +14,12 @@ const jakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: APP_NAME,
   description: "IPL management portal for Jatiloka Residence",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

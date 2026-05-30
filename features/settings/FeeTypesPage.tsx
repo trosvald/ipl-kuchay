@@ -295,7 +295,7 @@ export function FeeTypesPage() {
             <p className="text-sm text-slate-600">Memuat data...</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-2 lg:hidden">
                 {pagedItems.map((row) => (
                   <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -341,7 +341,7 @@ export function FeeTypesPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[840px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">

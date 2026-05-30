@@ -70,3 +70,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-body), "Segoe UI", sans-serif;
 }
+
+html {
+  scroll-behavior: smooth;
+}

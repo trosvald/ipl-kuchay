@@ -52,13 +52,14 @@ export function ReportsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
-  const [outputLoading, setOutputLoading] = useState(false);
   const [outputError, setOutputError] = useState<string | null>(null);
   const [generatingReceiptId, setGeneratingReceiptId] = useState<string | null>(null);
   const [summaryPage, setSummaryPage] = useState(1);
   const [summaryPageSize, setSummaryPageSize] = useState<number>(5);
   const [arrearsPage, setArrearsPage] = useState(1);
   const [arrearsPageSize, setArrearsPageSize] = useState<number>(5);
+  const [outputPage, setOutputPage] = useState(1);
+  const [receiptPage, setReceiptPage] = useState(1);
 
   // Period summaries for dropdown
   const loadPeriodSummaries = useCallback(async () => {
@@ -192,10 +193,22 @@ export function ReportsPage() {
 
   const arrearsStart = arrearsRows.length === 0 ? 0 : (arrearsPage - 1) * arrearsPageSize + 1;
   const arrearsEnd = Math.min(arrearsPage * arrearsPageSize, arrearsRows.length);
-
-  useEffect(() => {
-    setSummaryPage(1);
-  }, [selectedPeriodId, summaryPageSize]);
+  const outputPageSize = 5;
+  const outputTotalPages = Math.max(1, Math.ceil(outputRows.length / outputPageSize));
+  const pagedOutputRows = useMemo(() => {
+    const start = (outputPage - 1) * outputPageSize;
+    return outputRows.slice(start, start + outputPageSize);
+  }, [outputPage, outputRows]);
+  const outputStart = outputRows.length === 0 ? 0 : (outputPage - 1) * outputPageSize + 1;
+  const outputEnd = Math.min(outputPage * outputPageSize, outputRows.length);
+  const receiptPageSize = 5;
+  const receiptTotalPages = Math.max(1, Math.ceil(receiptCandidates.length / receiptPageSize));
+  const pagedReceiptCandidates = useMemo(() => {
+    const start = (receiptPage - 1) * receiptPageSize;
+    return receiptCandidates.slice(start, start + receiptPageSize);
+  }, [receiptCandidates, receiptPage]);
+  const receiptStart = receiptCandidates.length === 0 ? 0 : (receiptPage - 1) * receiptPageSize + 1;
+  const receiptEnd = Math.min(receiptPage * receiptPageSize, receiptCandidates.length);
 
   useEffect(() => {
     if (summaryPage > summaryTotalPages) {
@@ -204,14 +217,22 @@ export function ReportsPage() {
   }, [summaryPage, summaryTotalPages]);
 
   useEffect(() => {
-    setArrearsPage(1);
-  }, [selectedPeriodId, arrearsPageSize]);
-
-  useEffect(() => {
     if (arrearsPage > arrearsTotalPages) {
       setArrearsPage(arrearsTotalPages);
     }
   }, [arrearsPage, arrearsTotalPages]);
+
+  useEffect(() => {
+    if (outputPage > outputTotalPages) {
+      setOutputPage(outputTotalPages);
+    }
+  }, [outputPage, outputTotalPages]);
+
+  useEffect(() => {
+    if (receiptPage > receiptTotalPages) {
+      setReceiptPage(receiptTotalPages);
+    }
+  }, [receiptPage, receiptTotalPages]);
 
   const handleExportCsv = useCallback(async () => {
     if (!selectedPeriodId || summaryRows.length === 0) return;
@@ -354,7 +375,13 @@ export function ReportsPage() {
           <div className="flex flex-wrap items-center gap-4">
             <Select
               value={selectedPeriodId}
-              onChange={(e) => setSelectedPeriodId(e.target.value)}
+              onChange={(e) => {
+                setSelectedPeriodId(e.target.value);
+                setSummaryPage(1);
+                setArrearsPage(1);
+                setOutputPage(1);
+                setReceiptPage(1);
+              }}
               className="w-[200px]"
             >
               <option value="">Pilih periode...</option>
@@ -480,7 +507,10 @@ export function ReportsPage() {
                   <span>Limit:</span>
                   <Select
                     value={String(summaryPageSize)}
-                    onChange={(e) => setSummaryPageSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      setSummaryPageSize(Number(e.target.value));
+                      setSummaryPage(1);
+                    }}
                     className="h-8 w-[90px]"
                   >
                     {PAGE_SIZE_OPTIONS.map((size) => (
@@ -490,7 +520,7 @@ export function ReportsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedSummaryRows.map((row) => (
                   <div key={row.kavling_id} className="rounded-lg border bg-background px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -524,7 +554,7 @@ export function ReportsPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -608,7 +638,10 @@ export function ReportsPage() {
                   <span>Limit:</span>
                   <Select
                     value={String(arrearsPageSize)}
-                    onChange={(e) => setArrearsPageSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      setArrearsPageSize(Number(e.target.value));
+                      setArrearsPage(1);
+                    }}
                     className="h-8 w-[90px]"
                   >
                     {PAGE_SIZE_OPTIONS.map((size) => (
@@ -618,7 +651,7 @@ export function ReportsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedArrearsRows.map((row) => (
                   <div key={row.kavling_id} className="rounded-lg border bg-background px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
@@ -656,7 +689,7 @@ export function ReportsPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[900px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -745,7 +778,7 @@ export function ReportsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {outputLoading ? (
+          {loading ? (
             <p className="text-sm text-slate-600">Memuat output...</p>
           ) : outputRows.length === 0 ? (
             <p className="text-sm text-slate-600">
@@ -753,7 +786,32 @@ export function ReportsPage() {
             </p>
           ) : (
             <div className="space-y-3">
-              {outputRows.map((row) => (
+              <div className="flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <span>
+                  Menampilkan {outputStart}-{outputEnd} dari {outputRows.length} output
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOutputPage((page) => Math.max(1, page - 1))}
+                    disabled={outputPage === 1}
+                  >
+                    Prev
+                  </Button>
+                  <span className="text-xs">Page {outputPage}/{outputTotalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setOutputPage((page) => Math.min(outputTotalPages, page + 1))}
+                    disabled={outputPage >= outputTotalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+
+              {pagedOutputRows.map((row) => (
                 <div key={row.id} className="flex flex-col gap-3 rounded-md border border-slate-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-col gap-0.5">
                     <span className="text-sm font-medium text-slate-900">{row.title}</span>
@@ -791,8 +849,33 @@ export function ReportsPage() {
             </p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
-                {receiptCandidates.map((candidate) => (
+              <div className="mb-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <span>
+                  Menampilkan {receiptStart}-{receiptEnd} dari {receiptCandidates.length} kandidat
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReceiptPage((page) => Math.max(1, page - 1))}
+                    disabled={receiptPage === 1}
+                  >
+                    Prev
+                  </Button>
+                  <span className="text-xs">Page {receiptPage}/{receiptTotalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReceiptPage((page) => Math.min(receiptTotalPages, page + 1))}
+                    disabled={receiptPage >= receiptTotalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-3 lg:hidden">
+                {pagedReceiptCandidates.map((candidate) => (
                   <div key={candidate.payment_id} className="rounded-lg border bg-background px-3 py-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -815,7 +898,7 @@ export function ReportsPage() {
                   </div>
                 ))}
               </div>
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[600px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -827,7 +910,7 @@ export function ReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {receiptCandidates.map((candidate) => (
+                    {pagedReceiptCandidates.map((candidate) => (
                       <TableRow key={candidate.payment_id}>
                         <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
                         <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>

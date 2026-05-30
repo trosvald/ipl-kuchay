@@ -119,10 +119,6 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
   const totalPaid = useMemo(() => filteredInvoices.reduce((sum, item) => sum + item.amount_paid, 0), [filteredInvoices]);
 
   useEffect(() => {
-    setPage(1);
-  }, [statusFilter]);
-
-  useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
@@ -193,7 +189,10 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
               <select
                 className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value as StatusFilter);
+                  setPage(1);
+                }}
               >
                 {statusFilterOptions.map((option) => (
                   <option key={option} value={option}>
@@ -209,7 +208,7 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
             <p className="text-sm text-slate-600">Memuat invoice...</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedInvoices.length === 0 ? (
                   <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
                     Tidak ada invoice pada filter ini.
@@ -232,7 +231,7 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
                           {formatInvoiceStatusLabel(item.status)}
                         </Badge>
                       </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                         <div className="rounded-md bg-slate-50 px-2 py-1.5">
                           <p className="text-muted-foreground">Tagihan</p>
                           <p className="font-semibold text-foreground">{formatRupiah(item.amount_due)}</p>
@@ -251,7 +250,7 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[920px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">

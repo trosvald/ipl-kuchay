@@ -380,7 +380,7 @@ export function ResidentListPage() {
             <p className="text-sm text-slate-600">Memuat data resident...</p>
           ) : (
             <div className="space-y-3">
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-3 lg:hidden">
                 {pagedItems.length === 0 ? (
                   <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
                     Belum ada data resident.
@@ -409,7 +409,7 @@ export function ResidentListPage() {
                         {item.phone ? <Badge variant="secondary">{item.phone}</Badge> : null}
                       </div>
 
-                      <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
                         <Button
                           size="sm"
                           variant="secondary"
@@ -434,7 +434,7 @@ export function ResidentListPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="w-full"
+                          className="col-span-2 w-full"
                           disabled={!item.is_active || saving || !canEditSuperAdmin}
                           onClick={() => handleDeactivate(item)}
                         >
@@ -445,12 +445,18 @@ export function ResidentListPage() {
                       {canEditSuperAdmin ? null : (
                         <p className="mt-2 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
                       )}
+
+                      {isExpanded ? (
+                        <div className="mt-3 border-t pt-3">
+                          <KavlingResidentMapping residentId={item.id} />
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[860px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -573,7 +579,9 @@ export function ResidentListPage() {
               </div>
 
               {expandedResidentId ? (
+                <div className="hidden lg:block">
                 <KavlingResidentMapping residentId={expandedResidentId} />
+                </div>
               ) : null}
             </div>
           )}

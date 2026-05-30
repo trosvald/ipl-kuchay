@@ -303,7 +303,7 @@ export function KavlingListPage() {
             <p className="text-sm text-slate-600">Memuat data kavling...</p>
           ) : (
             <>
-              <div className="space-y-2 md:hidden">
+              <div className="space-y-2 lg:hidden">
                 {pagedItems.length === 0 ? (
                   <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
                     Belum ada data kavling.
@@ -357,7 +357,7 @@ export function KavlingListPage() {
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto lg:block">
                 <Table className="min-w-[760px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
