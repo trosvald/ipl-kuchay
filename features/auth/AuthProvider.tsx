@@ -127,12 +127,27 @@ function clearedAuthDerivedState(): AuthDerivedState {
   };
 }
 
-function deriveNeedsPasswordSetup(session: Session | null): boolean {
+export function deriveNeedsPasswordSetup(
+  session: Session | null,
+  role: AppRole | null,
+): boolean {
   const userMetadata = session?.user?.user_metadata as
     | { password_setup_completed?: boolean }
     | undefined;
 
-  return userMetadata?.password_setup_completed === false;
+  if (!session) {
+    return false;
+  }
+
+  if (userMetadata?.password_setup_completed === true) {
+    return false;
+  }
+
+  if (userMetadata?.password_setup_completed === false) {
+    return true;
+  }
+
+  return role === "resident";
 }
 
 export async function resolveAuthDerivedState(
@@ -214,7 +229,7 @@ export function AuthProvider({
         email,
         options: {
           emailRedirectTo: redirectTo,
-          shouldCreateUser: true,
+          shouldCreateUser: false,
         },
       });
 
@@ -342,7 +357,7 @@ export function AuthProvider({
       session,
       profile,
       role: profile?.role ?? null,
-      needsPasswordSetup: deriveNeedsPasswordSetup(session),
+      needsPasswordSetup: deriveNeedsPasswordSetup(session, profile?.role ?? null),
       accessState:
         !session
           ? "anonymous"

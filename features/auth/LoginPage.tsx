@@ -76,7 +76,7 @@ export function LoginPage({ reason }: Readonly<{ reason?: string }>) {
 
     try {
       await signIn({ email: email.trim(), magicLink: true });
-      setSuccessMessage("Link masuk terkirim. Cek email Anda.");
+      setSuccessMessage("Jika email Anda sudah terdaftar dan disetujui pengurus, cek inbox untuk link masuk.");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim link masuk.");
     } finally {
