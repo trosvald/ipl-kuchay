@@ -12,6 +12,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL || vars.APP_SITE_URL || secrets.NEXT_PUBLIC_SITE_URL || secrets.APP_SITE_URL }}
 
     steps:
       - name: Checkout
@@ -33,11 +35,14 @@ jobs:
             PROD_FLAG="--prod"
           fi
 
+          test -n "$NEXT_PUBLIC_SITE_URL" || { echo "NEXT_PUBLIC_SITE_URL or APP_SITE_URL must be set in GitHub vars/secrets."; exit 1; }
+
           npx vercel deploy \
             --token="${{ secrets.VERCEL_TOKEN }}" \
             $PROD_FLAG \
             --env NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" \
-            --env NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}"
+            --env NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" \
+            --env NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

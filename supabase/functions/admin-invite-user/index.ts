@@ -11,6 +11,7 @@ import {
 import {
   createServiceRoleClient,
   createUserClient,
+  getOptionalEnv,
 } from "../_shared/supabase.ts";
 
 type AppRole = "resident" | "treasurer" | "admin" | "super_admin";
@@ -40,6 +41,30 @@ interface ExistingProfile {
   display_name: string | null;
   phone: string | null;
   email: string | null;
+}
+
+interface AuthAdminUser {
+  id: string;
+  email?: string | null;
+}
+
+interface InviteAuthError {
+  message: string;
+  status?: number;
+  code?: string;
+}
+
+function getInviteRedirectTo(): string | undefined {
+  const baseUrl =
+    getOptionalEnv("APP_SITE_URL") ??
+    getOptionalEnv("NEXT_PUBLIC_SITE_URL") ??
+    getOptionalEnv("SITE_URL");
+
+  if (!baseUrl) {
+    return undefined;
+  }
+
+  return `${baseUrl.replace(/\/$/, "")}/login`;
 }
 
 function normalizeString(value: unknown): string | null {
@@ -133,6 +158,49 @@ function ensureExistingProfileChangeAllowed(
   }
 }
 
+function isInviteAuthError(error: unknown): error is InviteAuthError {
+  return typeof error === "object" && error !== null && "message" in error;
+}
+
+function isExistingAuthUserError(error: InviteAuthError): boolean {
+  return error.code === "email_exists" || error.code === "user_already_exists";
+}
+
+async function findExistingAuthUserByEmail(
+  serviceClient: ServiceClient,
+  email: string,
+): Promise<AuthAdminUser | null> {
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await serviceClient.auth.admin.listUsers({
+      page,
+      perPage: 100,
+    });
+
+    if (error) {
+      throw new HttpError(error.status ?? 500, "Failed to read existing auth users");
+    }
+
+    const existingUser = data.users.find(
+      (user) => user.email?.toLowerCase() === email,
+    );
+
+    if (existingUser?.id) {
+      return {
+        id: existingUser.id,
+        email: existingUser.email ?? null,
+      };
+    }
+
+    if (!data.nextPage) {
+      return null;
+    }
+
+    page = data.nextPage;
+  }
+}
+
 async function inviteUserAndResolveProfileId(
   serviceClient: ServiceClient,
   input: NormalizedInviteInput,
@@ -149,10 +217,21 @@ async function inviteUserAndResolveProfileId(
         display_name: input.displayName,
         phone: input.phone,
       },
+      redirectTo: getInviteRedirectTo(),
     });
 
   if (inviteError) {
-    throw new HttpError(400, inviteError.message);
+    if (isInviteAuthError(inviteError) && isExistingAuthUserError(inviteError)) {
+      const existingAuthUser = await findExistingAuthUserByEmail(serviceClient, input.email);
+      if (existingAuthUser?.id) {
+        return existingAuthUser.id;
+      }
+    }
+
+    throw new HttpError(
+      isInviteAuthError(inviteError) ? inviteError.status ?? 400 : 400,
+      isInviteAuthError(inviteError) ? inviteError.message : "Failed to invite user",
+    );
   }
 
   const invitedProfileId = inviteData.user?.id;

@@ -1,5 +1,6 @@
 "use client";
 
+import { FunctionsHttpError } from "@supabase/supabase-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Inbox, Plus, RefreshCw, SquarePen } from "lucide-react";
 
@@ -51,6 +52,26 @@ async function writeAuditLog(payload: AuditLogInput) {
     next_data: payload.afterData ?? null,
     source_request_id: payload.requestId ?? null,
   });
+}
+
+async function resolveFunctionErrorMessage(error: unknown): Promise<string> {
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    try {
+      const response = error.context.clone();
+      const payload = (await response.json()) as { error?: string };
+      if (typeof payload.error === "string" && payload.error.trim().length > 0) {
+        return payload.error;
+      }
+    } catch {
+      // Ignore JSON parse errors and fall back below.
+    }
+  }
+
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Gagal mengundang resident.";
 }
 
 export function ResidentListPage() {
@@ -183,7 +204,7 @@ export function ResidentListPage() {
     });
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(await resolveFunctionErrorMessage(error));
       setSaving(false);
       return;
     }

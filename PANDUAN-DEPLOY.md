@@ -338,6 +338,7 @@ Jalankan dari Terminal:
 supabase secrets set SUPABASE_URL="https://<project-ref>.supabase.co"
 supabase secrets set SUPABASE_ANON_KEY="<anon-key>"
 supabase secrets set SUPABASE_SERVICE_ROLE_KEY="<service-role-key>"
+supabase secrets set APP_SITE_URL="https://ipl-jatiloka.vercel.app"
 ```
 
 Telegram:
@@ -364,6 +365,8 @@ Cek daftar secret:
 ```bash
 supabase secrets list
 ```
+
+Untuk GitHub Actions, simpan URL aplikasi produksi sebagai `APP_SITE_URL` atau `NEXT_PUBLIC_SITE_URL` di repository variables/secrets supaya workflow deploy frontend dan Supabase bisa sinkron.
 
 Jangan menyalin isi secret ke chat umum.
 

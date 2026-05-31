@@ -21,6 +21,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      APP_SITE_URL: ${{ vars.APP_SITE_URL || vars.NEXT_PUBLIC_SITE_URL || secrets.APP_SITE_URL || secrets.NEXT_PUBLIC_SITE_URL }}
 
     steps:
       - name: Checkout
@@ -37,6 +38,12 @@ jobs:
       - name: Push database migrations
         if: ${{ inputs.deploy_migrations }}
         run: supabase db push
+
+      - name: Sync Edge Function runtime secrets
+        if: ${{ inputs.deploy_functions }}
+        run: |
+          test -n "$APP_SITE_URL" || { echo "APP_SITE_URL or NEXT_PUBLIC_SITE_URL must be set in GitHub vars/secrets."; exit 1; }
+          supabase secrets set APP_SITE_URL="$APP_SITE_URL"
 
       - name: Deploy JWT-verified Edge Functions
         if: ${{ inputs.deploy_functions }}
