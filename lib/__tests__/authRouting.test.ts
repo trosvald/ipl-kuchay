@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { canRedirectAfterAuthResolution, getAuthenticatedLandingPath } from "@/features/auth/authRouting";
+import {
+  canRedirectAfterAuthResolution,
+  getAuthenticatedLandingPath,
+  getPostAuthRedirectPath,
+} from "@/features/auth/authRouting";
 
 describe("auth routing", () => {
   it("routes admin-like roles to the admin shell", () => {
@@ -12,6 +16,12 @@ describe("auth routing", () => {
   it("routes residents and unresolved roles to the resident shell", () => {
     expect(getAuthenticatedLandingPath("resident")).toBe("/app");
     expect(getAuthenticatedLandingPath(null)).toBe("/app");
+  });
+
+  it("routes invited users to set-password before the normal landing path", () => {
+    expect(getPostAuthRedirectPath({ role: "resident", needsPasswordSetup: true })).toBe("/set-password");
+    expect(getPostAuthRedirectPath({ role: "admin", needsPasswordSetup: true })).toBe("/set-password");
+    expect(getPostAuthRedirectPath({ role: "admin", needsPasswordSetup: false })).toBe("/admin");
   });
 
   it("waits for session and profile resolution before redirecting", () => {

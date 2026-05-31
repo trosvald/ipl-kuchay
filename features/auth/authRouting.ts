@@ -6,6 +6,20 @@ export function getAuthenticatedLandingPath(role: AppRole | null): "/admin" | "/
   return role === "treasurer" || role === "admin" || role === "super_admin" ? "/admin" : "/app";
 }
 
+export function getPostAuthRedirectPath({
+  role,
+  needsPasswordSetup,
+}: {
+  role: AppRole | null;
+  needsPasswordSetup: boolean;
+}): "/set-password" | "/admin" | "/app" {
+  if (needsPasswordSetup) {
+    return "/set-password";
+  }
+
+  return getAuthenticatedLandingPath(role);
+}
+
 export function canRedirectAfterAuthResolution({
   loading,
   hasSession,

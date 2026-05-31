@@ -9,10 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { APP_NAME } from "@/lib/constants";
 import { useAuth } from "./authHooks";
-import { canRedirectAfterAuthResolution, getAuthenticatedLandingPath } from "./authRouting";
+import { canRedirectAfterAuthResolution, getPostAuthRedirectPath } from "./authRouting";
 
 export function LoginPage({ reason }: Readonly<{ reason?: string }>) {
-  const { accessState, loading: authLoading, role, session, signIn } = useAuth();
+  const { accessState, loading: authLoading, needsPasswordSetup, role, session, signIn } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -29,6 +29,11 @@ export function LoginPage({ reason }: Readonly<{ reason?: string }>) {
   }, [reason]);
 
   useEffect(() => {
+    if (!authLoading && session && needsPasswordSetup) {
+      router.replace(getPostAuthRedirectPath({ role, needsPasswordSetup }));
+      return;
+    }
+
     if (
       canRedirectAfterAuthResolution({
         loading: authLoading,
@@ -36,9 +41,9 @@ export function LoginPage({ reason }: Readonly<{ reason?: string }>) {
         accessState,
       })
     ) {
-      router.replace(getAuthenticatedLandingPath(role));
+      router.replace(getPostAuthRedirectPath({ role, needsPasswordSetup }));
     }
-  }, [accessState, authLoading, role, router, session]);
+  }, [accessState, authLoading, needsPasswordSetup, role, router, session]);
 
   const onSubmitPassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

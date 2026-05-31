@@ -35,6 +35,7 @@ export interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
   role: AppRole | null;
+  needsPasswordSetup: boolean;
   accessState: "anonymous" | "missing-profile" | "inactive" | "active-mapped" | "active-unmapped";
   hasActiveKavlingMapping: boolean;
   loading: boolean;
@@ -124,6 +125,14 @@ function clearedAuthDerivedState(): AuthDerivedState {
     profile: null,
     hasActiveKavlingMapping: false,
   };
+}
+
+function deriveNeedsPasswordSetup(session: Session | null): boolean {
+  const userMetadata = session?.user?.user_metadata as
+    | { password_setup_completed?: boolean }
+    | undefined;
+
+  return userMetadata?.password_setup_completed === false;
 }
 
 export async function resolveAuthDerivedState(
@@ -290,7 +299,7 @@ export function AuthProvider({
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((_event, nextSession) => {
+    } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
 
       if (!nextSession?.user) {
@@ -299,8 +308,10 @@ export function AuthProvider({
         return;
       }
 
-      setLoading(true);
-      applyAuthDerivedState(clearedAuthDerivedState());
+      if (event !== "USER_UPDATED") {
+        setLoading(true);
+        applyAuthDerivedState(clearedAuthDerivedState());
+      }
 
       resolveAuthDerivedState(nextSession.user.id, {
         fetchProfile: (userId) => fetchProfile(client, userId),
@@ -331,6 +342,7 @@ export function AuthProvider({
       session,
       profile,
       role: profile?.role ?? null,
+      needsPasswordSetup: deriveNeedsPasswordSetup(session),
       accessState:
         !session
           ? "anonymous"

@@ -86,6 +86,21 @@ export const residentFormSchema = z.object({
   is_active: z.boolean(),
 });
 
+export const passwordSetupFormSchema = z.object({
+  password: requiredStringSchema.min(8, "Password minimal 8 karakter"),
+  confirmPassword: requiredStringSchema,
+}).strict().superRefine((value, ctx) => {
+  if (value.password !== value.confirmPassword) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["confirmPassword"],
+      message: "Konfirmasi password harus sama",
+    });
+  }
+});
+
+export type PasswordSetupFormInput = z.infer<typeof passwordSetupFormSchema>;
+
 export const kavlingResidentMappingSchema = z.object({
   kavling_id: uuidSchema,
   profile_id: uuidSchema,

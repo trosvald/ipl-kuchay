@@ -8,6 +8,7 @@ import {
   billingPeriodFormSchema,
   kavlingResidentMappingSchema,
   paymentSubmissionFormSchema,
+  passwordSetupFormSchema,
   residentNotificationPreferencesSchema,
   residentSettingsProfileSchema,
 } from "@/lib/validation";
@@ -270,5 +271,32 @@ describe("validation schemas", () => {
       active: true,
     });
     expect(invalidRelation.success).toBe(false);
+  });
+
+  it("accepts matching password setup fields", () => {
+    const result = passwordSetupFormSchema.safeParse({
+      password: "rahasia123",
+      confirmPassword: "rahasia123",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects password setup when confirmation does not match", () => {
+    const result = passwordSetupFormSchema.safeParse({
+      password: "rahasia123",
+      confirmPassword: "rahasia124",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects password setup payload shorter than 8 characters", () => {
+    const result = passwordSetupFormSchema.safeParse({
+      password: "abc123",
+      confirmPassword: "abc123",
+    });
+
+    expect(result.success).toBe(false);
   });
 });

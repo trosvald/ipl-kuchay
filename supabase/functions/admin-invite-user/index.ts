@@ -54,17 +54,17 @@ interface InviteAuthError {
   code?: string;
 }
 
-function getInviteRedirectTo(): string | undefined {
+function getInviteRedirectTo(): string {
   const baseUrl =
     getOptionalEnv("APP_SITE_URL") ??
     getOptionalEnv("NEXT_PUBLIC_SITE_URL") ??
     getOptionalEnv("SITE_URL");
 
   if (!baseUrl) {
-    return undefined;
+    throw new HttpError(500, "APP_SITE_URL is not configured");
   }
 
-  return `${baseUrl.replace(/\/$/, "")}/login`;
+  return `${baseUrl.replace(/\/$/, "")}/set-password`;
 }
 
 function normalizeString(value: unknown): string | null {
@@ -216,6 +216,7 @@ async function inviteUserAndResolveProfileId(
         full_name: input.fullName,
         display_name: input.displayName,
         phone: input.phone,
+        password_setup_completed: false,
       },
       redirectTo: getInviteRedirectTo(),
     });

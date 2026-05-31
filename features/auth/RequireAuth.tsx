@@ -32,7 +32,7 @@ function AuthGate({
 export function RequireAuth({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const { session, profile, accessState, loading } = useAuth();
+  const { session, profile, accessState, loading, needsPasswordSetup } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [showLimitedToast, setShowLimitedToast] = useState(true);
@@ -48,7 +48,11 @@ export function RequireAuth({
       return;
     }
 
-  }, [loading, pathname, router, session]);
+    if (needsPasswordSetup) {
+      router.replace("/set-password");
+    }
+
+  }, [loading, needsPasswordSetup, pathname, router, session]);
 
   if (loading) {
     return (
@@ -65,6 +69,15 @@ export function RequireAuth({
       <AuthGate
         title="Perlu autentikasi"
         description="Anda diarahkan ke halaman login."
+      />
+    );
+  }
+
+  if (needsPasswordSetup) {
+    return (
+      <AuthGate
+        title="Buat password akun"
+        description="Selesaikan pembuatan password terlebih dahulu sebelum mengakses portal."
       />
     );
   }
