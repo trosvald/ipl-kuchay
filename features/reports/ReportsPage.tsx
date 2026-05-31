@@ -1,12 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, FileText, Receipt, RefreshCw } from "lucide-react";
+import { Download, FileText, Receipt, RefreshCw, Wallet } from "lucide-react";
 
+import { ActionBar } from "@/components/ui/ActionBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { DataList } from "@/features/layout/DataList";
+import { FilterBar, FilterGroup } from "@/components/ui/FilterBar";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PageHeader } from "@/features/layout/PageHeader";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { PaginationBar } from "@/components/ui/PaginationBar";
 import { Select, SelectItem } from "@/components/ui/select";
+import { StatsGrid } from "@/components/ui/StatsGrid";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/authHooks";
 import {
@@ -35,7 +43,6 @@ import type {
 } from "@/features/reports/reportSchemas";
 
 export function ReportsPage() {
-  const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const;
   const client = getSupabaseBrowserClient();
   const { role } = useAuth();
 
@@ -60,6 +67,8 @@ export function ReportsPage() {
   const [arrearsPageSize, setArrearsPageSize] = useState<number>(5);
   const [outputPage, setOutputPage] = useState(1);
   const [receiptPage, setReceiptPage] = useState(1);
+  const [expandedSummaryId, setExpandedSummaryId] = useState<string | null>(null);
+  const [expandedArrearsId, setExpandedArrearsId] = useState<string | null>(null);
 
   // Period summaries for dropdown
   const loadPeriodSummaries = useCallback(async () => {
@@ -178,9 +187,6 @@ export function ReportsPage() {
     return summaryRows.slice(start, start + summaryPageSize);
   }, [summaryRows, summaryPage, summaryPageSize]);
 
-  const summaryStart = summaryRows.length === 0 ? 0 : (summaryPage - 1) * summaryPageSize + 1;
-  const summaryEnd = Math.min(summaryPage * summaryPageSize, summaryRows.length);
-
   const arrearsTotalPages = useMemo(
     () => Math.max(1, Math.ceil(arrearsRows.length / arrearsPageSize)),
     [arrearsRows.length, arrearsPageSize],
@@ -191,25 +197,18 @@ export function ReportsPage() {
     return arrearsRows.slice(start, start + arrearsPageSize);
   }, [arrearsRows, arrearsPage, arrearsPageSize]);
 
-  const arrearsStart = arrearsRows.length === 0 ? 0 : (arrearsPage - 1) * arrearsPageSize + 1;
-  const arrearsEnd = Math.min(arrearsPage * arrearsPageSize, arrearsRows.length);
   const outputPageSize = 5;
   const outputTotalPages = Math.max(1, Math.ceil(outputRows.length / outputPageSize));
   const pagedOutputRows = useMemo(() => {
     const start = (outputPage - 1) * outputPageSize;
     return outputRows.slice(start, start + outputPageSize);
   }, [outputPage, outputRows]);
-  const outputStart = outputRows.length === 0 ? 0 : (outputPage - 1) * outputPageSize + 1;
-  const outputEnd = Math.min(outputPage * outputPageSize, outputRows.length);
   const receiptPageSize = 5;
   const receiptTotalPages = Math.max(1, Math.ceil(receiptCandidates.length / receiptPageSize));
   const pagedReceiptCandidates = useMemo(() => {
     const start = (receiptPage - 1) * receiptPageSize;
     return receiptCandidates.slice(start, start + receiptPageSize);
   }, [receiptCandidates, receiptPage]);
-  const receiptStart = receiptCandidates.length === 0 ? 0 : (receiptPage - 1) * receiptPageSize + 1;
-  const receiptEnd = Math.min(receiptPage * receiptPageSize, receiptCandidates.length);
-
   useEffect(() => {
     if (summaryPage > summaryTotalPages) {
       setSummaryPage(summaryTotalPages);
@@ -347,32 +346,28 @@ export function ReportsPage() {
   }, [selectedPeriodId, selectedPeriod, loadReportData]);
 
   return (
-    <section className="space-y-6">
+    <section className="page-section">
       {/* Header */}
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Keuangan</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Laporan Keuangan</h1>
-          <p className="text-sm text-slate-600">
-            Ringkasan tagihan, daftar tunggakan, dan output laporan keuangan.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => loadReportData()}
-          disabled={loading || !selectedPeriodId}
-        >
-          <RefreshCw className="size-4" /> Refresh
-        </Button>
-      </header>
+      <PageHeader
+        eyebrow="Keuangan"
+        title="Laporan Keuangan"
+        subtitle="Ringkasan tagihan, daftar tunggakan, dan output laporan keuangan."
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => loadReportData()}
+            disabled={loading || !selectedPeriodId}
+          >
+            <RefreshCw className="size-4" /> Refresh
+          </Button>
+        }
+      />
 
       {/* Period Selector */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filter Periode</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-4">
+      <div className="admin-card p-5">
+        <h3 className="text-sm font-bold text-slate-900 mb-3">Filter Periode</h3>
+        <FilterBar>
+          <FilterGroup label="Periode">
             <Select
               value={selectedPeriodId}
               onChange={(e) => {
@@ -382,7 +377,7 @@ export function ReportsPage() {
                 setOutputPage(1);
                 setReceiptPage(1);
               }}
-              className="w-[200px]"
+              className="w-[220px] rounded-lg border-slate-200"
             >
               <option value="">Pilih periode...</option>
               {periodSummaries.map((period) => (
@@ -391,76 +386,63 @@ export function ReportsPage() {
                 </SelectItem>
               ))}
             </Select>
+          </FilterGroup>
 
-            {selectedPeriod && (
-              <div className="flex flex-wrap gap-2">
-                <Badge variant={statusToBadgeVariant(selectedPeriod.status)}>
-                  {selectedPeriod.status}
-                </Badge>
-                <span className="text-sm text-slate-600">
-                  {selectedPeriod.invoice_count} invoice |
-                 {" "}
-                  <span className="text-green-600">
-                    {formatRupiah(selectedPeriod.total_collected)} terkumpul
-                  </span>
-                  {" "}|{" "}
-                  <span className="text-orange-600">
-                    {formatRupiah(selectedPeriod.total_invoiced - selectedPeriod.total_collected)} sisa
-                  </span>
-                </span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          {selectedPeriod && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              <Badge variant={statusToBadgeVariant(selectedPeriod.status)}>
+                {selectedPeriod.status}
+              </Badge>
+              <span>{selectedPeriod.invoice_count} invoice</span>
+              <span className="text-emerald-600 font-medium">
+                {formatRupiah(selectedPeriod.total_collected)} terkumpul
+              </span>
+              <span className="text-amber-600 font-medium">
+                {formatRupiah(selectedPeriod.total_invoiced - selectedPeriod.total_collected)} sisa
+              </span>
+            </div>
+          )}
+        </FilterBar>
+      </div>
 
       {/* Error/Success Messages */}
       {errorMessage && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50/80 px-5 py-3.5 text-sm text-red-700 font-medium">
           {errorMessage}
         </div>
       )}
       {actionSuccess && (
-        <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 px-5 py-3.5 text-sm text-emerald-700 font-medium">
           {actionSuccess}
         </div>
       )}
 
       {/* Summary Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Total Tagihan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-slate-900">{formatRupiah(totalInvoiced)}</p>
-            <p className="text-xs text-slate-500">{summaryRows.length} kavling</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Sudah Dibayar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-green-600">{formatRupiah(totalCollected)}</p>
-            <p className="text-xs text-slate-500">
-              {totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0}% terkumpul
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">Sisa Bayar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold text-orange-600">{formatRupiah(totalRemaining)}</p>
-            <p className="text-xs text-slate-500">{arrearsRows.length} kavling tertunda</p>
-          </CardContent>
-        </Card>
-      </div>
+      <StatsGrid
+        columns={3}
+        items={[
+          {
+            label: "Total Tagihan",
+            value: formatRupiah(totalInvoiced),
+            icon: Wallet,
+          },
+          {
+            label: "Sudah Dibayar",
+            value: formatRupiah(totalCollected),
+            icon: Wallet,
+            variant: "success",
+          },
+          {
+            label: "Sisa Bayar",
+            value: formatRupiah(totalRemaining),
+            icon: Wallet,
+            variant: "warning",
+          },
+        ]}
+      />
 
       {/* Action Buttons */}
-      <div className="flex flex-wrap gap-2">
+      <ActionBar>
         <Button
           variant="default"
           onClick={handleGenerateMonthlyReport}
@@ -485,336 +467,294 @@ export function ReportsPage() {
           <Download className="size-4" />
           {actionLoading === "arrears-export" ? "Mengekspor..." : "Export CSV Tunggakan"}
         </Button>
-      </div>
+      </ActionBar>
 
       {/* Collection Summary Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Ringkasan Tagihan per Kavling</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : summaryRows.length === 0 ? (
-            <p className="text-sm text-slate-600">Belum ada data untuk periode ini.</p>
-          ) : (
-            <div>
-              <div className="mb-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <span>
-                  Menampilkan {summaryStart}-{summaryEnd} dari {summaryRows.length} kavling
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span>Limit:</span>
-                  <Select
-                    value={String(summaryPageSize)}
-                    onChange={(e) => {
-                      setSummaryPageSize(Number(e.target.value));
-                      setSummaryPage(1);
-                    }}
-                    className="h-8 w-[90px]"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={String(size)}>{size}</option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-3 lg:hidden">
-                {pagedSummaryRows.map((row) => (
-                  <div key={row.kavling_id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{row.kavling_code}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{row.owner_name ?? "-"}</p>
+      <div className="admin-card p-5 space-y-4">
+        <h3 className="text-base font-bold text-slate-900">Ringkasan Tagihan per Kavling</h3>
+        <DataList
+          loading={loading}
+          empty={{ title: "Belum ada data untuk periode ini." }}
+          mobile={summaryRows.length > 0 ? (
+            <ListContainer>
+              {pagedSummaryRows.map((row) => {
+                const isExpanded = expandedSummaryId === row.kavling_id;
+                const isPaid = row.remaining_balance === 0;
+                return (
+                  <CompactListRow
+                    key={row.kavling_id}
+                    primary={row.kavling_code}
+                    trailing={
+                      <span className={isPaid ? "text-emerald-700" : "text-amber-700"}>{formatRupiah(row.remaining_balance)}</span>
+                    }
+                    secondary={
+                      <span className="flex items-center gap-1.5">
+                        <StatusDot variant={isPaid ? "success" : "warning"} />
+                        <span>{row.owner_name ?? "-"}</span>
+                        <span className="text-slate-300">·</span>
+                        <span>{isPaid ? "Lunas" : "Belum"}</span>
+                      </span>
+                    }
+                    accentColor={isPaid ? "border-l-emerald-500" : "border-l-amber-500"}
+                    expandedOpen={isExpanded}
+                    onToggle={() => setExpandedSummaryId(isExpanded ? null : row.kavling_id)}
+                    expanded={
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <div>
+                          <span className="text-slate-400">Tagihan</span>
+                          <p className="font-medium text-slate-800">{formatRupiah(row.total_invoiced)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Dibayar</span>
+                          <p className="font-medium text-emerald-700">{formatRupiah(row.total_paid)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Menunggu</span>
+                          <p className="font-medium text-amber-700">{formatRupiah(row.total_pending)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Sisa</span>
+                          <p className="font-medium text-slate-800">{formatRupiah(row.remaining_balance)}</p>
+                        </div>
                       </div>
-                      <Badge variant={statusToBadgeVariant(row.remaining_balance === 0 ? "paid" : "partial")} className="shrink-0">
-                        {row.remaining_balance === 0 ? "Lunas" : "Belum"}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Tagihan</p>
-                        <p className="font-semibold text-foreground">{formatRupiah(row.total_invoiced)}</p>
-                      </div>
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Dibayar</p>
-                        <p className="font-semibold text-green-700">{formatRupiah(row.total_paid)}</p>
-                      </div>
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Menunggu</p>
-                        <p className="font-semibold text-orange-700">{formatRupiah(row.total_pending)}</p>
-                      </div>
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Sisa</p>
-                        <p className="font-semibold text-foreground">{formatRupiah(row.remaining_balance)}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[900px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Kode Kavling</TableHead>
-                      <TableHead>Pemilik</TableHead>
-                      <TableHead className="text-right">Total Tagihan</TableHead>
-                      <TableHead className="text-right">Sudah Dibayar</TableHead>
-                      <TableHead className="text-right">Menunggu</TableHead>
-                      <TableHead className="text-right">Sisa Bayar</TableHead>
-                      <TableHead>Status</TableHead>
+                    }
+                  />
+                );
+              })}
+            </ListContainer>
+          ) : undefined}
+          desktop={summaryRows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[900px]">
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Kode Kavling</TableHead>
+                    <TableHead>Pemilik</TableHead>
+                    <TableHead className="text-right">Total Tagihan</TableHead>
+                    <TableHead className="text-right">Sudah Dibayar</TableHead>
+                    <TableHead className="text-right">Menunggu</TableHead>
+                    <TableHead className="text-right">Sisa Bayar</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedSummaryRows.map((row) => (
+                    <TableRow key={row.kavling_id}>
+                      <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
+                      <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
+                      <TableCell className="text-right text-slate-700">
+                        {formatRupiah(row.total_invoiced)}
+                      </TableCell>
+                      <TableCell className="text-right text-emerald-600">
+                        {formatRupiah(row.total_paid)}
+                      </TableCell>
+                      <TableCell className="text-right text-amber-600">
+                        {formatRupiah(row.total_pending)}
+                      </TableCell>
+                      <TableCell className="text-right text-slate-700">
+                        {formatRupiah(row.remaining_balance)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusToBadgeVariant(row.remaining_balance === 0 ? "paid" : "partial")}>
+                          {row.remaining_balance === 0 ? "Lunas" : "Belum"}
+                        </Badge>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedSummaryRows.map((row) => (
-                      <TableRow key={row.kavling_id}>
-                        <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
-                        <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
-                        <TableCell className="text-right text-slate-700">
-                          {formatRupiah(row.total_invoiced)}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600">
-                          {formatRupiah(row.total_paid)}
-                        </TableCell>
-                        <TableCell className="text-right text-orange-600">
-                          {formatRupiah(row.total_pending)}
-                        </TableCell>
-                        <TableCell className="text-right text-slate-700">
-                          {formatRupiah(row.remaining_balance)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusToBadgeVariant(row.remaining_balance === 0 ? "paid" : "partial")}>
-                            {row.remaining_balance === 0 ? "Lunas" : "Belum"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSummaryPage((page) => Math.max(1, page - 1))}
-                  disabled={summaryPage === 1}
-                >
-                  Prev
-                </Button>
-                <span className="text-sm text-slate-600">Page {summaryPage}/{summaryTotalPages}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSummaryPage((page) => Math.min(summaryTotalPages, page + 1))}
-                  disabled={summaryPage >= summaryTotalPages}
-                >
-                  Next
-                </Button>
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ) : undefined}
+        />
+        {!loading && summaryRows.length > 0 ? (
+          <PaginationBar
+            page={summaryPage}
+            pageSize={summaryPageSize}
+            totalRows={summaryRows.length}
+            onPageChange={setSummaryPage}
+            onPageSizeChange={(size) => { setSummaryPageSize(size); setSummaryPage(1); }}
+          />
+        ) : null}
+      </div>
 
       {/* Arrears List Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Daftar Tunggakan</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : arrearsRows.length === 0 ? (
-            <p className="text-sm text-slate-600">Tidak ada tunggakan untuk periode ini.</p>
-          ) : (
-            <div>
-              <div className="mb-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <span>
-                  Menampilkan {arrearsStart}-{arrearsEnd} dari {arrearsRows.length} item tunggakan
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span>Limit:</span>
-                  <Select
-                    value={String(arrearsPageSize)}
-                    onChange={(e) => {
-                      setArrearsPageSize(Number(e.target.value));
-                      setArrearsPage(1);
-                    }}
-                    className="h-8 w-[90px]"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={String(size)}>{size}</option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-3 lg:hidden">
-                {pagedArrearsRows.map((row) => (
-                  <div key={row.kavling_id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{row.kavling_code}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {row.owner_name ?? "-"} - {row.period_label}
-                        </p>
+      <div className="admin-card p-5 space-y-4">
+        <h3 className="text-base font-bold text-slate-900">Daftar Tunggakan</h3>
+        <DataList
+          loading={loading}
+          empty={{ title: "Tidak ada tunggakan untuk periode ini." }}
+          mobile={arrearsRows.length > 0 ? (
+            <ListContainer>
+              {pagedArrearsRows.map((row) => {
+                const isExpanded = expandedArrearsId === row.kavling_id;
+                const isOverdue = row.days_overdue > 30;
+                const sisa = row.amount_due - row.amount_paid;
+                return (
+                  <CompactListRow
+                    key={row.kavling_id}
+                    primary={row.kavling_code}
+                    trailing={
+                      <span className={isOverdue ? "text-red-600" : "text-amber-700"}>{formatRupiah(sisa)}</span>
+                    }
+                    secondary={
+                      <span className="flex items-center gap-1.5">
+                        <StatusDot variant={isOverdue ? "destructive" : "warning"} />
+                        <span>{row.owner_name ?? "-"}</span>
+                        <span className="text-slate-300">·</span>
+                        <span>{row.days_overdue} hari tertunda</span>
+                      </span>
+                    }
+                    accentColor={isOverdue ? "border-l-red-500" : "border-l-amber-500"}
+                    expandedOpen={isExpanded}
+                    onToggle={() => setExpandedArrearsId(isExpanded ? null : row.kavling_id)}
+                    expanded={
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                        <div>
+                          <span className="text-slate-400">Jumlah</span>
+                          <p className="font-medium text-slate-800">{formatRupiah(row.amount_due)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Dibayar</span>
+                          <p className="font-medium text-emerald-700">{formatRupiah(row.amount_paid)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Sisa</span>
+                          <p className="font-medium text-slate-800">{formatRupiah(sisa)}</p>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Status</span>
+                          <Badge variant={statusToBadgeVariant(row.invoice_status)} className="text-[10px] h-4 px-1.5">
+                            {formatInvoiceStatusLabel(row.invoice_status)}
+                          </Badge>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Tertunda</span>
+                          <Badge variant={isOverdue ? "destructive" : "outline"} className="text-[10px] h-4 px-1.5">
+                            {row.days_overdue} hari
+                          </Badge>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Periode</span>
+                          <p className="font-medium text-slate-800">{row.period_label}</p>
+                        </div>
                       </div>
-                      <Badge variant={statusToBadgeVariant(row.invoice_status)} className="shrink-0">
-                        {formatInvoiceStatusLabel(row.invoice_status)}
-                      </Badge>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Jumlah</p>
-                        <p className="font-semibold text-foreground">{formatRupiah(row.amount_due)}</p>
-                      </div>
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Dibayar</p>
-                        <p className="font-semibold text-green-700">{formatRupiah(row.amount_paid)}</p>
-                      </div>
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Sisa</p>
-                        <p className="font-semibold text-orange-700">{formatRupiah(row.amount_due - row.amount_paid)}</p>
-                      </div>
-                      <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                        <p className="text-muted-foreground">Tertunda</p>
+                    }
+                  />
+                );
+              })}
+            </ListContainer>
+          ) : undefined}
+          desktop={arrearsRows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[900px]">
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Kode Kavling</TableHead>
+                    <TableHead>Pemilik</TableHead>
+                    <TableHead>Periode</TableHead>
+                    <TableHead className="text-right">Jumlah</TableHead>
+                    <TableHead className="text-right">Sudah Bayar</TableHead>
+                    <TableHead className="text-right">Sisa</TableHead>
+                    <TableHead className="text-center">Hari Tertunda</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedArrearsRows.map((row) => (
+                    <TableRow key={row.kavling_id}>
+                      <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
+                      <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
+                      <TableCell className="text-slate-700">{row.period_label}</TableCell>
+                      <TableCell className="text-right text-slate-700">
+                        {formatRupiah(row.amount_due)}
+                      </TableCell>
+                      <TableCell className="text-right text-emerald-600">
+                        {formatRupiah(row.amount_paid)}
+                      </TableCell>
+                      <TableCell className="text-right text-amber-600">
+                        {formatRupiah(row.amount_due - row.amount_paid)}
+                      </TableCell>
+                      <TableCell className="text-center">
                         <Badge variant={row.days_overdue > 30 ? "destructive" : "outline"}>
                           {row.days_overdue} hari
                         </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[900px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Kode Kavling</TableHead>
-                      <TableHead>Pemilik</TableHead>
-                      <TableHead>Periode</TableHead>
-                      <TableHead className="text-right">Jumlah</TableHead>
-                      <TableHead className="text-right">Sudah Bayar</TableHead>
-                      <TableHead className="text-right">Sisa</TableHead>
-                      <TableHead className="text-center">Hari Tertunda</TableHead>
-                      <TableHead>Status</TableHead>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusToBadgeVariant(row.invoice_status)}>
+                          {formatInvoiceStatusLabel(row.invoice_status)}
+                        </Badge>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedArrearsRows.map((row) => (
-                      <TableRow key={row.kavling_id}>
-                        <TableCell className="font-medium text-slate-900">{row.kavling_code}</TableCell>
-                        <TableCell className="text-slate-700">{row.owner_name ?? "-"}</TableCell>
-                        <TableCell className="text-slate-700">{row.period_label}</TableCell>
-                        <TableCell className="text-right text-slate-700">
-                          {formatRupiah(row.amount_due)}
-                        </TableCell>
-                        <TableCell className="text-right text-green-600">
-                          {formatRupiah(row.amount_paid)}
-                        </TableCell>
-                        <TableCell className="text-right text-orange-600">
-                          {formatRupiah(row.amount_due - row.amount_paid)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={row.days_overdue > 30 ? "destructive" : "outline"}>
-                            {row.days_overdue} hari
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusToBadgeVariant(row.invoice_status)}>
-                            {formatInvoiceStatusLabel(row.invoice_status)}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setArrearsPage((page) => Math.max(1, page - 1))}
-                  disabled={arrearsPage === 1}
-                >
-                  Prev
-                </Button>
-                <span className="text-sm text-slate-600">Page {arrearsPage}/{arrearsTotalPages}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setArrearsPage((page) => Math.min(arrearsTotalPages, page + 1))}
-                  disabled={arrearsPage >= arrearsTotalPages}
-                >
-                  Next
-                </Button>
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ) : undefined}
+        />
+        {!loading && arrearsRows.length > 0 ? (
+          <PaginationBar
+            page={arrearsPage}
+            pageSize={arrearsPageSize}
+            totalRows={arrearsRows.length}
+            onPageChange={setArrearsPage}
+            onPageSizeChange={(size) => { setArrearsPageSize(size); setArrearsPage(1); }}
+          />
+        ) : null}
+      </div>
 
       {/* Reconciliation warning for stale/failed output loads (D-13) */}
       {outputError && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-5 py-3.5 text-sm text-amber-800">
           <strong>Data mungkin tidak lengkap:</strong> {outputError}{" "}
-          <Button variant="link" size="sm" className="h-auto p-0 text-amber-700 underline" onClick={() => loadReportData()}>
+          <Button variant="link" size="sm" className="h-auto p-0 text-amber-700 underline font-semibold" onClick={() => loadReportData()}>
             Coba refresh lagi
           </Button>
         </div>
       )}
 
-      {/* Output History — shows generated artifacts with download actions (D-12) */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Output Laporan yang Dibuat</CardTitle>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            {lastRefreshed && (
-              <span>Terakhir diperbarui: {formatDateId(lastRefreshed)}</span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat output...</p>
-          ) : outputRows.length === 0 ? (
-            <p className="text-sm text-slate-600">
-              Belum ada output laporan untuk periode ini.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <span>
-                  Menampilkan {outputStart}-{outputEnd} dari {outputRows.length} output
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setOutputPage((page) => Math.max(1, page - 1))}
-                    disabled={outputPage === 1}
-                  >
-                    Prev
-                  </Button>
-                  <span className="text-xs">Page {outputPage}/{outputTotalPages}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setOutputPage((page) => Math.min(outputTotalPages, page + 1))}
-                    disabled={outputPage >= outputTotalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-
+      {/* Output History */}
+      <div className="admin-card p-5 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Output Laporan yang Dibuat</h3>
+          {lastRefreshed && (
+            <p className="text-xs text-slate-500 mt-1">Terakhir diperbarui: {formatDateId(lastRefreshed)}</p>
+          )}
+        </div>
+        <DataList
+          loading={loading}
+          empty={{ title: "Belum ada output laporan untuk periode ini." }}
+          mobile={outputRows.length > 0 ? (
+            <ListContainer>
               {pagedOutputRows.map((row) => (
-                <div key={row.id} className="flex flex-col gap-3 rounded-md border border-slate-200 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <CompactListRow
+                  key={row.id}
+                  primary={row.title}
+                  secondary={
+                    <span className="flex items-center gap-1.5">
+                      <span>{formatDateId(row.generated_at)}</span>
+                    </span>
+                  }
+                  trailing={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs px-2.5"
+                      onClick={() => handleDownloadOutput(row.id)}
+                      disabled={!row.file_path}
+                    >
+                      <Download className="size-3" />
+                    </Button>
+                  }
+                />
+              ))}
+            </ListContainer>
+          ) : undefined}
+          desktop={outputRows.length > 0 ? (
+            <div className="space-y-2">
+              {pagedOutputRows.map((row) => (
+                <div key={row.id} className="flex flex-col gap-3 rounded-lg border border-slate-100 bg-slate-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium text-slate-900">{row.title}</span>
+                    <span className="text-sm font-semibold text-slate-900">{row.title}</span>
                     <span className="text-xs text-slate-500">
                       {formatDateId(row.generated_at)}
                     </span>
@@ -825,117 +765,111 @@ export function ReportsPage() {
                     onClick={() => handleDownloadOutput(row.id)}
                     disabled={!row.file_path}
                   >
-                    <Download className="size-3 mr-1" />
+                    <Download className="size-3.5 mr-1.5" />
                     Unduh
                   </Button>
                 </div>
               ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          ) : undefined}
+        />
+        {!loading && outputRows.length > 0 ? (
+          <PaginationBar
+            page={outputPage}
+            pageSize={outputPageSize}
+            totalRows={outputRows.length}
+            onPageChange={setOutputPage}
+            onPageSizeChange={() => {}}
+          />
+        ) : null}
+      </div>
 
-      {/* Receipt Candidates — resident-specific receipt generation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Bukti Bayar per Warga</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat kandidat...</p>
-          ) : receiptCandidates.length === 0 ? (
-            <p className="text-sm text-slate-600">
-              Belum ada kandidat bukti bayar untuk periode ini.
-            </p>
-          ) : (
-            <>
-              <div className="mb-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <span>
-                  Menampilkan {receiptStart}-{receiptEnd} dari {receiptCandidates.length} kandidat
-                </span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setReceiptPage((page) => Math.max(1, page - 1))}
-                    disabled={receiptPage === 1}
-                  >
-                    Prev
-                  </Button>
-                  <span className="text-xs">Page {receiptPage}/{receiptTotalPages}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setReceiptPage((page) => Math.min(receiptTotalPages, page + 1))}
-                    disabled={receiptPage >= receiptTotalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-3 lg:hidden">
-                {pagedReceiptCandidates.map((candidate) => (
-                  <div key={candidate.payment_id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{candidate.kavling_code}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{candidate.invoice_number}</p>
-                      </div>
-                      <p className="shrink-0 text-sm font-semibold text-green-700">{formatRupiah(candidate.amount_paid)}</p>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">Tanggal bayar: {formatDateId(candidate.payment_date)}</p>
+      {/* Receipt Candidates */}
+      <div className="admin-card p-5 space-y-4">
+        <h3 className="text-base font-bold text-slate-900">Bukti Bayar per Warga</h3>
+        <DataList
+          loading={loading}
+          empty={{ title: "Belum ada kandidat bukti bayar untuk periode ini." }}
+          mobile={receiptCandidates.length > 0 ? (
+            <ListContainer>
+              {pagedReceiptCandidates.map((candidate) => (
+                <CompactListRow
+                  key={candidate.payment_id}
+                  primary={candidate.kavling_code}
+                  secondary={
+                    <span className="flex items-center gap-1">
+                      <span>{candidate.invoice_number}</span>
+                      <span className="text-slate-300">·</span>
+                      <span>{formatDateId(candidate.payment_date)}</span>
+                    </span>
+                  }
+                  trailing={
+                    <span className="text-emerald-700">{formatRupiah(candidate.amount_paid)}</span>
+                  }
+                  accentColor="border-l-emerald-500"
+                  expanded={
                     <Button
                       variant="outline"
                       size="sm"
-                      className="mt-3 w-full"
+                      className="h-8 text-xs w-full"
                       onClick={() => handleGenerateResidentReceipt(candidate)}
                       disabled={generatingReceiptId === candidate.payment_id}
                     >
-                      <Receipt className="size-3 mr-1" />
-                      {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
+                      <Receipt className="size-3.5 mr-1.5" />
+                      {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti Bayar"}
                     </Button>
-                  </div>
-                ))}
-              </div>
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[600px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Kavling</TableHead>
-                      <TableHead>No. Invoice</TableHead>
-                      <TableHead className="text-right">Jumlah Bayar</TableHead>
-                      <TableHead>Tanggal Bayar</TableHead>
-                      <TableHead>Aksi</TableHead>
+                  }
+                />
+              ))}
+            </ListContainer>
+          ) : undefined}
+          desktop={receiptCandidates.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table className="min-w-[600px]">
+                <TableHeader>
+                  <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+                    <TableHead>Kavling</TableHead>
+                    <TableHead>No. Invoice</TableHead>
+                    <TableHead className="text-right">Jumlah Bayar</TableHead>
+                    <TableHead>Tanggal Bayar</TableHead>
+                    <TableHead>Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagedReceiptCandidates.map((candidate) => (
+                    <TableRow key={candidate.payment_id}>
+                      <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
+                      <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>
+                      <TableCell className="text-right text-emerald-600">{formatRupiah(candidate.amount_paid)}</TableCell>
+                      <TableCell className="text-slate-700">{formatDateId(candidate.payment_date)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateResidentReceipt(candidate)}
+                          disabled={generatingReceiptId === candidate.payment_id}
+                        >
+                          <Receipt className="size-3.5 mr-1.5" />
+                          {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedReceiptCandidates.map((candidate) => (
-                      <TableRow key={candidate.payment_id}>
-                        <TableCell className="font-medium text-slate-900">{candidate.kavling_code}</TableCell>
-                        <TableCell className="text-slate-700">{candidate.invoice_number}</TableCell>
-                        <TableCell className="text-right text-green-600">{formatRupiah(candidate.amount_paid)}</TableCell>
-                        <TableCell className="text-slate-700">{formatDateId(candidate.payment_date)}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleGenerateResidentReceipt(candidate)}
-                            disabled={generatingReceiptId === candidate.payment_id}
-                          >
-                            <Receipt className="size-3 mr-1" />
-                            {generatingReceiptId === candidate.payment_id ? "Membuat..." : "Buat Bukti"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : undefined}
+        />
+        {!loading && receiptCandidates.length > 0 ? (
+          <PaginationBar
+            page={receiptPage}
+            pageSize={receiptPageSize}
+            totalRows={receiptCandidates.length}
+            onPageChange={setReceiptPage}
+            onPageSizeChange={() => {}}
+          />
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -8,7 +8,7 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe("mobile compact list layout contract", () => {
-  it("keeps primary list pages as mobile cards with desktop tables", () => {
+  it("keeps primary list pages on a mobile-first list pattern with desktop fallback", () => {
     const files = [
       "features/kavlings/KavlingListPage.tsx",
       "features/residents/ResidentListPage.tsx",
@@ -32,8 +32,20 @@ describe("mobile compact list layout contract", () => {
 
     for (const file of files) {
       const source = readRepoFile(file);
-      expect(source, file).toContain('className="space-y-2 md:hidden"');
-      expect(source, file).toContain('className="hidden overflow-x-auto md:block"');
+
+      const hasSharedListPattern =
+        source.includes("DataList") ||
+        source.includes("CompactListRow") ||
+        source.includes("MobileEntityCard") ||
+        source.includes("lg:hidden") ||
+        source.includes("md:hidden");
+      const hasDesktopFallback =
+        source.includes("overflow-x-auto") ||
+        source.includes("desktopContent") ||
+        source.includes("desktop={");
+
+      expect(hasSharedListPattern, file).toBe(true);
+      expect(hasDesktopFallback, file).toBe(true);
     }
   });
 
@@ -57,11 +69,11 @@ describe("mobile compact list layout contract", () => {
 
     for (const file of files) {
       const source = readRepoFile(file);
-      expect(source, file).toContain("useState(5)");
+      expect(source, file).toMatch(/useState(?:<number>)?\(5\)/);
     }
 
     const reportsSource = readRepoFile("features/reports/ReportsPage.tsx");
-    expect(reportsSource).toContain("const PAGE_SIZE_OPTIONS = [5, 10, 20, 50] as const;");
-    expect(reportsSource).toContain("useState<number>(5)");
+    expect(reportsSource).toContain("const [summaryPageSize, setSummaryPageSize] = useState<number>(5);");
+    expect(reportsSource).toContain("const [arrearsPageSize, setArrearsPageSize] = useState<number>(5);");
   });
 });

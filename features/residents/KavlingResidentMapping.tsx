@@ -4,7 +4,12 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { AuditLogInput } from "@/features/audit/auditTypes";
 import { useAuth } from "@/features/auth/authHooks";
@@ -92,6 +97,7 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
   const [mappings, setMappings] = useState<MappingRow[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [kavlingId, setKavlingId] = useState("");
   const [relationType, setRelationType] = useState<MappingRow["relation_type"]>("owner");
@@ -103,8 +109,6 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
     () => mappings.slice((page - 1) * pageSize, page * pageSize),
     [mappings, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
   const selectedKavlingPrimary = useMemo(
     () => mappings.find((item) => item.kavling_id === kavlingId && item.active && item.is_primary),
     [kavlingId, mappings],
@@ -280,30 +284,77 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
     await loadAll();
   };
 
-  let mappingContent: ReactNode;
-  if (loading) {
-    mappingContent = <p className="text-sm text-slate-600">Memuat mapping...</p>;
-  } else if (mappings.length === 0) {
-    mappingContent = (
-      <p className="text-sm text-slate-600">Belum ada mapping kavling untuk resident ini.</p>
-    );
-  } else {
-    mappingContent = (
-      <>
-        <div className="space-y-3 lg:hidden">
+  const mobileContent = mappings.length === 0 ? (
+    <EmptyState icon={undefined} title="Belum ada mapping kavling untuk resident ini." />
+  ) : (
+    <ListContainer>
+      {pagedMappings.map((mapping) => {
+        const isExpanded = expandedId === mapping.id;
+        return (
+          <CompactListRow
+            key={mapping.id}
+            primary={mapping.kavlings?.code ?? "-"}
+            trailing={
+              <Badge variant={mapping.active ? "success" : "default"} className="text-[10px] h-4 px-1.5">
+                {mapping.active ? "Aktif" : "Nonaktif"}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={mapping.active ? "success" : "muted"} />
+                <span>{formatRelationLabel(mapping)}</span>
+                <span className="text-slate-300">·</span>
+                <span>Primary: {mapping.is_primary ? "Ya" : "Tidak"}</span>
+              </span>
+            }
+            accentColor={mapping.active ? "border-l-emerald-500" : "border-l-slate-300"}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : mapping.id)}
+            expanded={
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs"
+                  disabled={!mapping.active || saving}
+                  onClick={() => handleDeactivate(mapping)}
+                >
+                  Unlink
+                </Button>
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = mappings.length === 0 ? (
+    <EmptyState icon={undefined} title="Belum ada mapping kavling untuk resident ini." />
+  ) : (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[640px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Kavling</TableHead>
+            <TableHead>Relasi</TableHead>
+            <TableHead>Primary</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {pagedMappings.map((mapping) => (
-            <div key={mapping.id} className="rounded-lg border bg-background px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-semibold text-foreground">{mapping.kavlings?.code ?? "-"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{formatRelationLabel(mapping)}</p>
-                </div>
-                <Badge variant={mapping.active ? "success" : "default"} className="shrink-0">
+            <TableRow key={mapping.id}>
+              <TableCell className="font-medium text-slate-900">{mapping.kavlings?.code ?? "-"}</TableCell>
+              <TableCell className="text-slate-700">{formatRelationLabel(mapping)}</TableCell>
+              <TableCell className="text-slate-700">{mapping.is_primary ? "Ya" : "Tidak"}</TableCell>
+              <TableCell>
+                <Badge variant={mapping.active ? "success" : "default"}>
                   {mapping.active ? "Aktif" : "Nonaktif"}
                 </Badge>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 text-sm">
-                <span className="text-muted-foreground">Primary: {mapping.is_primary ? "Ya" : "Tidak"}</span>
+              </TableCell>
+              <TableCell>
                 <Button
                   size="sm"
                   variant="ghost"
@@ -312,48 +363,23 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
                 >
                   Unlink
                 </Button>
-              </div>
-            </div>
+              </TableCell>
+            </TableRow>
           ))}
-        </div>
+        </TableBody>
+      </Table>
+    </div>
+  );
 
-        <div className="hidden overflow-x-auto lg:block">
-          <Table className="min-w-[640px]">
-            <TableHeader>
-              <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                <TableHead>Kavling</TableHead>
-                <TableHead>Relasi</TableHead>
-                <TableHead>Primary</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pagedMappings.map((mapping) => (
-                <TableRow key={mapping.id}>
-                  <TableCell className="font-medium text-slate-900">{mapping.kavlings?.code ?? "-"}</TableCell>
-                  <TableCell className="text-slate-700">{formatRelationLabel(mapping)}</TableCell>
-                  <TableCell className="text-slate-700">{mapping.is_primary ? "Ya" : "Tidak"}</TableCell>
-                  <TableCell>
-                    <Badge variant={mapping.active ? "success" : "default"}>
-                      {mapping.active ? "Aktif" : "Nonaktif"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={!mapping.active || saving}
-                      onClick={() => handleDeactivate(mapping)}
-                    >
-                      Unlink
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+  let mappingContent: ReactNode;
+
+  if (loading) {
+    mappingContent = <p className="text-sm text-slate-600">Memuat mapping...</p>;
+  } else {
+    mappingContent = (
+      <>
+        {mobileContent}
+        {desktopContent}
       </>
     );
   }
@@ -427,42 +453,17 @@ export function KavlingResidentMapping({ residentId }: Readonly<KavlingResidentM
 
       {mappingContent}
 
-      {!loading ? (
-        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <p>
-            Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex items-center gap-1">
-              <span>Rows</span>
-              <select
-                className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                value={String(pageSize)}
-                onChange={(event) => {
-                  const next = Number(event.target.value);
-                  setPageSize(next);
-                  setPage(1);
-                }}
-              >
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="20">20</option>
-              </select>
-            </label>
-            <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-              Prev
-            </Button>
-            <span className="text-xs">Page {page}/{totalPages}</span>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-              disabled={page >= totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
+      {!loading && mappings.length > 0 ? (
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          totalRows={totalRows}
+          onPageChange={setPage}
+          onPageSizeChange={(size: number) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       ) : null}
     </div>
   );

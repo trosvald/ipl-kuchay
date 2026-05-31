@@ -1,21 +1,27 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { FilePlus2, Paperclip, Pin, PinOff, RefreshCw, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { FilePlus2, Inbox, Paperclip, RefreshCw, Trash2 } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { useAuth } from "@/features/auth/authHooks";
+import { cn } from "@/lib/utils";
 import { formatDateId } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
-import { announcementAttachmentSchema, announcementFormSchema, type AnnouncementStatus } from "@/lib/validation";
+import { announcementFormSchema, type AnnouncementStatus } from "@/lib/validation";
 
 type AnnouncementTab = "draft" | "published" | "archived";
 
@@ -42,13 +48,6 @@ interface AttachmentRow {
   mime_type: string;
   size_bytes: number;
   created_at: string;
-}
-
-function parseTab(value: string | null): AnnouncementTab {
-  if (value === "published" || value === "archived") {
-    return value;
-  }
-  return "draft";
 }
 
 function formatAnnouncementStatusLabel(status: AnnouncementStatus): string {
@@ -84,6 +83,14 @@ function emptyEditor(): EditorState {
   };
 }
 
+const TAB_OPTIONS: AnnouncementTab[] = ["draft", "published", "archived"];
+
+function tabLabel(tab: AnnouncementTab): string {
+  if (tab === "draft") return "Draft";
+  if (tab === "published") return "Terbit";
+  return "Arsip";
+}
+
 export function AdminAnnouncementsPage() {
   const client = getSupabaseBrowserClient();
   const { profile } = useAuth();
@@ -104,6 +111,7 @@ export function AdminAnnouncementsPage() {
   const [confirmArchive, setConfirmArchive] = useState<string | null>(null);
   const [confirmUnpublish, setConfirmUnpublish] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
@@ -166,18 +174,12 @@ export function AdminAnnouncementsPage() {
     () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
     [filteredItems, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(parseTab(value));
-  };
 
   const openNewEditor = () => {
     setEditor(emptyEditor());
@@ -405,278 +407,283 @@ export function AdminAnnouncementsPage() {
     }
   };
 
-  return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Communication</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Pengumuman</h1>
-          <p className="text-sm text-slate-600">
-            Kelola pengumuman warga. Simpan sebagai draft sebelum dipublikasikan.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => loadAnnouncements()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button onClick={openNewEditor} disabled={saving}>
-            <FilePlus2 className="size-4" /> Pengumuman Baru
-          </Button>
-        </div>
-      </header>
+  const hasNoContent = !loading && !errorMessage && filteredItems.length === 0;
 
-      {errorMessage ? (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="py-3 text-sm text-red-700">{errorMessage}</CardContent>
-        </Card>
-      ) : null}
+  const mobileContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Tidak ada pengumuman"
+      description={`Tidak ada pengumuman ${tabLabel(activeTab).toLowerCase()} saat ini.`}
+    />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((row) => {
+        const attachCount = attachmentCounts[row.id] ?? 0;
+        const isExpanded = expandedId === row.id;
+        const accentColor = row.is_urgent ? "border-l-red-500" : row.status === "published" ? "border-l-indigo-500" : row.status === "draft" ? "border-l-amber-500" : "border-l-slate-300";
+        const statusVariant = row.status === "published" ? "success" : row.status === "draft" ? "warning" : "muted";
 
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList>
-          <TabsTrigger value="draft">Draft</TabsTrigger>
-          <TabsTrigger value="published">Terbit</TabsTrigger>
-          <TabsTrigger value="archived">Arsip</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Daftar Pengumuman —{" "}
-            {activeTab === "draft" ? "Draft" : activeTab === "published" ? "Terbit" : "Arsip"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : filteredItems.length === 0 ? (
-            <p className="text-sm text-slate-600">Tidak ada pengumuman pada tab ini.</p>
-          ) : (
-            <>
-              <div className="space-y-3 lg:hidden">
-                {pagedItems.map((row) => {
-                  const attachCount = attachmentCounts[row.id] ?? 0;
-                  return (
-                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-foreground">{row.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{formatDateId(row.published_at ?? row.created_at)}</p>
-                        </div>
-                        <Badge variant={statusBadgeVariant(row.status)} className="shrink-0">
-                          {formatAnnouncementStatusLabel(row.status)}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.body}</p>
-                      <div className="mt-3 flex flex-wrap gap-1">
-                        {row.is_urgent ? <Badge variant="destructive" className="text-xs">Penting</Badge> : null}
-                        {row.is_pinned ? <Badge variant="outline" className="text-xs">Pinned</Badge> : null}
-                        {attachCount > 0 ? (
-                          <Badge variant="secondary" className="text-xs">
-                            <Paperclip className="mr-1 size-3" /> {attachCount}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        return (
+          <CompactListRow
+            key={row.id}
+            primary={row.title}
+            trailing={
+              <Badge variant={statusBadgeVariant(row.status)} className="text-[10px] h-4 px-1.5">
+                {formatAnnouncementStatusLabel(row.status)}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={statusVariant} />
+                <span>{formatDateId(row.published_at ?? row.created_at)}</span>
+                {row.is_urgent ? (
+                  <><span className="text-slate-300">·</span><Badge variant="destructive" className="text-[10px] h-4 px-1">Penting</Badge></>
+                ) : null}
+                {row.is_pinned ? (
+                  <><span className="text-slate-300">·</span><Badge variant="outline" className="text-[10px] h-4 px-1">Pin</Badge></>
+                ) : null}
+                {attachCount > 0 ? (
+                  <><span className="text-slate-300">·</span><span className="flex items-center gap-0.5"><Paperclip className="size-3" />{attachCount}</span></>
+                ) : null}
+              </span>
+            }
+            accentColor={accentColor}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : row.id)}
+            expanded={
+              <div className="space-y-2">
+                <p className="text-xs text-slate-600 whitespace-pre-wrap">{row.body}</p>
+                {(row.status === "published" || row.status === "draft") ? (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => openEditEditor(row)}
+                      disabled={workingId === row.id}
+                    >
+                      Edit
+                    </Button>
+                    {row.status === "published" ? (
+                      <>
                         <Button
                           size="sm"
                           variant="outline"
-                          className="w-full"
-                          onClick={() => openEditEditor(row)}
+                          className="h-8 text-xs"
+                          onClick={() => setConfirmUnpublish(row.id)}
                           disabled={workingId === row.id}
                         >
-                          Edit
+                          Tarik
                         </Button>
-                        {row.status === "published" ? (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="w-full"
-                            onClick={() => setConfirmArchive(row.id)}
-                            disabled={workingId === row.id}
-                          >
-                            Arsipkan
-                          </Button>
-                        ) : null}
-                        {row.status === "draft" ? (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="w-full"
-                            onClick={async () => {
-                              setWorkingId(row.id);
-                              await handleUpdateFields(row.id, {
-                                status: "published",
-                                published_at: new Date().toISOString(),
-                              });
-                            }}
-                            disabled={workingId === row.id}
-                          >
-                            Publikasikan
-                          </Button>
-                        ) : null}
-                        {row.status === "published" ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => setConfirmUnpublish(row.id)}
-                            disabled={workingId === row.id}
-                          >
-                            Tarik
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-8 text-xs"
+                          onClick={() => setConfirmArchive(row.id)}
+                          disabled={workingId === row.id}
+                        >
+                          Arsipkan
+                        </Button>
+                      </>
+                    ) : null}
+                    {row.status === "draft" ? (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="h-8 text-xs"
+                        onClick={async () => {
+                          setWorkingId(row.id);
+                          await handleUpdateFields(row.id, {
+                            status: "published",
+                            published_at: new Date().toISOString(),
+                          });
+                        }}
+                        disabled={workingId === row.id}
+                      >
+                        Publikasikan
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
 
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[900px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Judul</TableHead>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Label</TableHead>
-                      <TableHead>Lampiran</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((row) => {
-                    const attachCount = attachmentCounts[row.id] ?? 0;
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="max-w-xs">
-                          <p className="truncate font-medium text-slate-900">{row.title}</p>
-                          <p className="truncate text-xs text-slate-500">{row.body.slice(0, 60)}{row.body.length > 60 ? "…" : ""}</p>
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          <p>{formatDateId(row.published_at ?? row.created_at)}</p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusBadgeVariant(row.status)}>
-                            {formatAnnouncementStatusLabel(row.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {row.is_urgent ? (
-                              <Badge variant="destructive" className="text-xs">Penting</Badge>
-                            ) : null}
-                            {row.is_pinned ? (
-                              <Badge variant="outline" className="text-xs">Pinned</Badge>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          {attachCount > 0 ? (
-                            <span className="flex items-center gap-1 text-xs">
-                              <Paperclip className="size-3" /> {attachCount}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openEditEditor(row)}
-                              disabled={workingId === row.id}
-                            >
-                              Edit
-                            </Button>
-                            {row.status === "published" && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setConfirmUnpublish(row.id)}
-                                  disabled={workingId === row.id}
-                                >
-                                  Tarik Publikasi
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => setConfirmArchive(row.id)}
-                                  disabled={workingId === row.id}
-                                >
-                                  Arsipkan
-                                </Button>
-                              </>
-                            )}
-                            {row.status === "draft" && (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={async () => {
-                                  setWorkingId(row.id);
-                                  await handleUpdateFields(row.id, {
-                                    status: "published",
-                                    published_at: new Date().toISOString(),
-                                  });
-                                }}
-                                disabled={workingId === row.id}
-                              >
-                                Publikasikan
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-
-          {!loading && filteredItems.length > 0 ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
+  const desktopContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Tidak ada pengumuman"
+      description={`Tidak ada pengumuman ${tabLabel(activeTab).toLowerCase()} saat ini.`}
+    />
+  ) : (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[900px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Judul</TableHead>
+            <TableHead>Tanggal</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Label</TableHead>
+            <TableHead>Lampiran</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((row) => {
+          const attachCount = attachmentCounts[row.id] ?? 0;
+          return (
+            <TableRow key={row.id}>
+              <TableCell className="max-w-xs">
+                <p className="truncate font-medium text-slate-900">{row.title}</p>
+                <p className="truncate text-xs text-slate-500">{row.body.slice(0, 60)}{row.body.length > 60 ? "…" : ""}</p>
+              </TableCell>
+              <TableCell className="text-slate-700">
+                <p>{formatDateId(row.published_at ?? row.created_at)}</p>
+              </TableCell>
+              <TableCell>
+                <Badge variant={statusBadgeVariant(row.status)}>
+                  {formatAnnouncementStatusLabel(row.status)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  {row.is_urgent ? (
+                    <Badge variant="destructive" className="text-xs">Penting</Badge>
+                  ) : null}
+                  {row.is_pinned ? (
+                    <Badge variant="outline" className="text-xs">Pinned</Badge>
+                  ) : null}
+                </div>
+              </TableCell>
+              <TableCell className="text-slate-700">
+                {attachCount > 0 ? (
+                  <span className="flex items-center gap-1 text-xs">
+                    <Paperclip className="size-3" /> {attachCount}
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-400">-</span>
+                )}
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openEditEditor(row)}
+                    disabled={workingId === row.id}
                   >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+                    Edit
+                  </Button>
+                  {row.status === "published" && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setConfirmUnpublish(row.id)}
+                        disabled={workingId === row.id}
+                      >
+                        Tarik Publikasi
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setConfirmArchive(row.id)}
+                        disabled={workingId === row.id}
+                      >
+                        Arsipkan
+                      </Button>
+                    </>
+                  )}
+                  {row.status === "draft" && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={async () => {
+                        setWorkingId(row.id);
+                        await handleUpdateFields(row.id, {
+                          status: "published",
+                          published_at: new Date().toISOString(),
+                        });
+                      }}
+                      disabled={workingId === row.id}
+                    >
+                      Publikasikan
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  return (
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin Communication"
+        title="Pengumuman"
+        subtitle="Kelola pengumuman warga. Simpan sebagai draft sebelum dipublikasikan."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadAnnouncements()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button size="sm" onClick={openNewEditor} disabled={saving}>
+              <FilePlus2 className="size-4" /> Pengumuman Baru
+            </Button>
+          </>
+        }
+      />
+
+      {/* Tab switcher — scrollable pills on mobile, inline on desktop */}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="inline-flex min-w-max gap-1 rounded-lg bg-muted p-1 sm:min-w-0">
+          {TAB_OPTIONS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={cn(
+                "touch-target-sm whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
+                tab === activeTab
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setActiveTab(tab)}
+              disabled={loading || saving}
+            >
+              {tabLabel(tab)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* List */}
+      <DataList
+        loading={loading}
+        skeletonCount={5}
+        error={errorMessage}
+        onRetry={loadAnnouncements}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
+
+      {/* Pagination */}
+      {!loading && !errorMessage && filteredItems.length > 0 ? (
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          totalRows={totalRows}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
 
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={(open) => !open && setEditorOpen(false)}>

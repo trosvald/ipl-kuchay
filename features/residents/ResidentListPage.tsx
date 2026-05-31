@@ -1,12 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, RefreshCw, SquarePen } from "lucide-react";
+import { ChevronDown, ChevronRight, Inbox, Plus, RefreshCw, SquarePen } from "lucide-react";
 
+import { ActionBar } from "@/components/ui/ActionBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { PaginationBar } from "@/components/ui/PaginationBar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import type { AuditLogInput } from "@/features/audit/auditTypes";
 import { useAuth } from "@/features/auth/authHooks";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
@@ -72,9 +79,6 @@ export function ResidentListPage() {
     () => items.slice((page - 1) * pageSize, page * pageSize),
     [items, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
-
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
@@ -300,56 +304,227 @@ export function ResidentListPage() {
     return { text: "Belum terhubung", variant: "default" as const };
   };
 
+  const hasNoContent = !loading && !errorMessage && items.length === 0;
+
+  const mobileContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada data resident." />
+  ) : (
+    <ListContainer>
+      {pagedItems.length === 0 && !hasNoContent ? (
+        <EmptyState icon={Inbox} title="Belum ada data resident." />
+      ) : null}
+      {pagedItems.map((item) => {
+        const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
+        const isExpanded = expandedResidentId === item.id;
+        const status = getMappingStatusLabel(item.id);
+        const accentColor = item.is_active ? "border-l-emerald-500" : "border-l-slate-400";
+
+        return (
+          <div key={item.id}>
+            <CompactListRow
+              primary={item.full_name}
+              secondary={
+                <span className="flex items-center gap-1.5">
+                  <StatusDot variant={item.is_active ? "success" : "muted"} />
+                  <span>{item.email ?? "Email belum diisi"}</span>
+                  <span className="text-slate-300">·</span>
+                  <Badge variant="outline" className="text-[10px] h-4 px-1.5">{item.role}</Badge>
+                  <Badge variant={status.variant as "default" | "secondary" | "destructive" | "outline" | "success" | "warning"} className="text-[10px] h-4 px-1.5">{status.text}</Badge>
+                </span>
+              }
+              trailing={
+                <Badge variant={item.is_active ? "success" : "default"} className="text-[10px] h-4 px-1.5 shrink-0">
+                  {item.is_active ? "Aktif" : "Nonaktif"}
+                </Badge>
+              }
+              accentColor={accentColor}
+              expandedOpen={isExpanded}
+              onToggle={() => setExpandedResidentId(isExpanded ? null : item.id)}
+              expanded={
+                <div className="space-y-2">
+                  {item.phone ? (
+                    <div className="text-xs">
+                      <span className="text-slate-400">Telepon</span>
+                      <p className="font-medium text-slate-800">{item.phone}</p>
+                    </div>
+                  ) : null}
+                  {canEditSuperAdmin ? null : (
+                    <p className="text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
+                  )}
+
+                  {/* Inline h-8 actions */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 text-xs"
+                      disabled={!canEditSuperAdmin}
+                      onClick={() => {
+                        setCreating(false);
+                        setEditingId(item.id);
+                      }}
+                    >
+                      <SquarePen className="size-3" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      disabled={!item.is_active || saving || !canEditSuperAdmin}
+                      onClick={() => handleDeactivate(item)}
+                    >
+                      Nonaktif
+                    </Button>
+                  </div>
+
+                  {/* Mapping section */}
+                  <div className="border-t border-slate-100 pt-2">
+                    <KavlingResidentMapping residentId={item.id} />
+                  </div>
+                </div>
+              }
+            />
+          </div>
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada data resident." />
+  ) : (
+    <div className="overflow-x-auto rounded-xl border border-slate-200/70 bg-white shadow-sm">
+      <Table className="min-w-[860px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Nama</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Telepon</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Mapping</TableHead>
+            <TableHead>Kelola Mapping</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((item) => {
+            const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
+            const isExpanded = expandedResidentId === item.id;
+
+            return (
+              <TableRow key={item.id} className="align-top">
+                <TableCell>
+                  <p className="font-medium text-slate-900">{item.full_name}</p>
+                  <p className="text-xs text-slate-500">{item.display_name ?? "-"}</p>
+                </TableCell>
+                <TableCell className="text-slate-700">{item.email ?? "-"}</TableCell>
+                <TableCell className="text-slate-700">{item.phone ?? "-"}</TableCell>
+                <TableCell className="text-slate-700">{item.role}</TableCell>
+                <TableCell>
+                  <Badge variant={item.is_active ? "success" : "default"}>
+                    {item.is_active ? "Aktif" : "Nonaktif"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {(() => {
+                    const status = getMappingStatusLabel(item.id);
+                    return <Badge variant={status.variant}>{status.text}</Badge>;
+                  })()}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpandedResidentId(isExpanded ? null : item.id)}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown className="size-3.5" />
+                    ) : (
+                      <ChevronRight className="size-3.5" />
+                    )}
+                    {isExpanded ? "Tutup" : "Kelola"}
+                  </Button>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!canEditSuperAdmin}
+                      onClick={() => {
+                        setCreating(false);
+                        setEditingId(item.id);
+                      }}
+                    >
+                      <SquarePen className="size-3.5" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!item.is_active || saving || !canEditSuperAdmin}
+                      onClick={() => handleDeactivate(item)}
+                    >
+                      Nonaktifkan
+                    </Button>
+                  </div>
+                  {canEditSuperAdmin ? null : (
+                    <p className="mt-1 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Manajemen Resident</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => loadResidents()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button
-            onClick={() => {
-              setCreating((value) => !value);
-              setEditingId(null);
-            }}
-          >
-            <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah/Invite Resident"}
-          </Button>
-        </div>
-      </header>
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin"
+        title="Manajemen Resident"
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadResidents()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCreating((value) => !value);
+                setEditingId(null);
+              }}
+            >
+              <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah/Invite Resident"}
+            </Button>
+          </>
+        }
+      />
 
       {errorMessage ? (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="py-3 text-sm text-red-700">{errorMessage}</CardContent>
-        </Card>
+        <div className="rounded-xl border border-red-200 bg-red-50/80 px-5 py-3.5 text-sm text-red-700 font-medium">
+          {errorMessage}
+        </div>
       ) : null}
 
       {creating ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Resident Baru</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResidentForm
-              canManageSuperAdmin={canManageSuperAdmin}
-              submitLabel="Invite Resident"
-              saving={saving}
-              onSubmit={handleInviteCreate}
-            />
-          </CardContent>
-        </Card>
+        <div className="admin-card p-5">
+          <h3 className="text-base font-bold text-slate-900 mb-4">Resident Baru</h3>
+          <ResidentForm
+            canManageSuperAdmin={canManageSuperAdmin}
+            submitLabel="Invite Resident"
+            saving={saving}
+            onSubmit={handleInviteCreate}
+          />
+        </div>
       ) : null}
 
       {editingId && currentEditing ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit {currentEditing.full_name}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <div className="admin-card p-5">
+          <h3 className="text-base font-bold text-slate-900 mb-4">Edit {currentEditing.full_name}</h3>
+          <div className="space-y-3">
             <ResidentForm
               canManageSuperAdmin={canManageSuperAdmin}
               submitLabel="Perbarui Resident"
@@ -367,226 +542,39 @@ export function ResidentListPage() {
             <Button variant="ghost" onClick={() => setEditingId(null)}>
               Batal Edit
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Resident</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data resident...</p>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-3 lg:hidden">
-                {pagedItems.length === 0 ? (
-                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                    Belum ada data resident.
-                  </p>
-                ) : null}
-                {pagedItems.map((item) => {
-                  const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
-                  const isExpanded = expandedResidentId === item.id;
-                  const status = getMappingStatusLabel(item.id);
+      <div className="admin-card p-5 space-y-4">
+        <h3 className="text-base font-bold text-slate-900">Daftar Resident</h3>
+        <DataList
+          loading={loading}
+          error={null}
+          onRetry={loadResidents}
+          mobile={mobileContent}
+          desktop={desktopContent}
+        />
 
-                  return (
-                    <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-foreground">{item.full_name}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">{item.email ?? "Email belum diisi"}</p>
-                        </div>
-                        <Badge variant={item.is_active ? "success" : "default"} className="shrink-0">
-                          {item.is_active ? "Aktif" : "Nonaktif"}
-                        </Badge>
-                      </div>
+        {!loading && !errorMessage && items.length > 0 ? (
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={(size: number) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        ) : null}
 
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        <Badge variant="outline">{item.role}</Badge>
-                        <Badge variant={status.variant}>{status.text}</Badge>
-                        {item.phone ? <Badge variant="secondary">{item.phone}</Badge> : null}
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="w-full"
-                          disabled={!canEditSuperAdmin}
-                          onClick={() => {
-                            setCreating(false);
-                            setEditingId(item.id);
-                          }}
-                        >
-                          <SquarePen className="size-3.5" /> Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setExpandedResidentId(isExpanded ? null : item.id)}
-                        >
-                          {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                          {isExpanded ? "Tutup" : "Mapping"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="col-span-2 w-full"
-                          disabled={!item.is_active || saving || !canEditSuperAdmin}
-                          onClick={() => handleDeactivate(item)}
-                        >
-                          Nonaktif
-                        </Button>
-                      </div>
-
-                      {canEditSuperAdmin ? null : (
-                        <p className="mt-2 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
-                      )}
-
-                      {isExpanded ? (
-                        <div className="mt-3 border-t pt-3">
-                          <KavlingResidentMapping residentId={item.id} />
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[860px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Nama</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Telepon</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Mapping</TableHead>
-                      <TableHead>Kelola Mapping</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((item) => {
-                      const canEditSuperAdmin = canManageSuperAdmin || item.role !== "super_admin";
-                      const isExpanded = expandedResidentId === item.id;
-
-                      return (
-                        <TableRow key={item.id} className="align-top">
-                          <TableCell>
-                            <p className="font-medium text-slate-900">{item.full_name}</p>
-                            <p className="text-xs text-slate-500">{item.display_name ?? "-"}</p>
-                          </TableCell>
-                          <TableCell className="text-slate-700">{item.email ?? "-"}</TableCell>
-                          <TableCell className="text-slate-700">{item.phone ?? "-"}</TableCell>
-                          <TableCell className="text-slate-700">{item.role}</TableCell>
-                          <TableCell>
-                            <Badge variant={item.is_active ? "success" : "default"}>
-                              {item.is_active ? "Aktif" : "Nonaktif"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {(() => {
-                              const status = getMappingStatusLabel(item.id);
-                              return <Badge variant={status.variant}>{status.text}</Badge>;
-                            })()}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setExpandedResidentId(isExpanded ? null : item.id)}
-                            >
-                              {isExpanded ? (
-                                <ChevronDown className="size-3.5" />
-                              ) : (
-                                <ChevronRight className="size-3.5" />
-                              )}
-                              {isExpanded ? "Tutup" : "Kelola"}
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                disabled={!canEditSuperAdmin}
-                                onClick={() => {
-                                  setCreating(false);
-                                  setEditingId(item.id);
-                                }}
-                              >
-                                <SquarePen className="size-3.5" /> Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={!item.is_active || saving || !canEditSuperAdmin}
-                                onClick={() => handleDeactivate(item)}
-                              >
-                                Nonaktifkan
-                              </Button>
-                            </div>
-                            {canEditSuperAdmin ? null : (
-                              <p className="mt-1 text-xs text-amber-700">Role super_admin hanya dapat dikelola super_admin.</p>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                <p>
-                  Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="inline-flex items-center gap-1">
-                    <span>Rows</span>
-                    <select
-                      className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                      value={String(pageSize)}
-                      onChange={(event) => {
-                        const next = Number(event.target.value);
-                        setPageSize(next);
-                        setPage(1);
-                      }}
-                    >
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                      <option value="20">20</option>
-                    </select>
-                  </label>
-                  <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                    Prev
-                  </Button>
-                  <span className="text-xs">Page {page}/{totalPages}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                    disabled={page >= totalPages}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-
-              {expandedResidentId ? (
-                <div className="hidden lg:block">
-                <KavlingResidentMapping residentId={expandedResidentId} />
-                </div>
-              ) : null}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {expandedResidentId ? (
+          <div className="hidden lg:block">
+            <KavlingResidentMapping residentId={expandedResidentId} />
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

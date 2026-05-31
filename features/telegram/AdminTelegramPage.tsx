@@ -1,13 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle, RefreshCw, RotateCcw, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, MessageSquare, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { DataList } from "@/features/layout/DataList";
+import { FilterBar, FilterGroup } from "@/components/ui/FilterBar";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PageHeader } from "@/features/layout/PageHeader";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { StatsGrid } from "@/components/ui/StatsGrid";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/features/auth/authHooks";
@@ -75,6 +82,8 @@ export function AdminTelegramPage() {
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
 
   // Template editor
   const [editingTemplate, setEditingTemplate] = useState<TemplateRow | null>(null);
@@ -205,19 +214,17 @@ export function AdminTelegramPage() {
   };
 
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Communication</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Telegram</h1>
-          <p className="text-sm text-slate-600">Status pengiriman notifikasi Telegram dan pengelolaan template.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Admin Communication"
+        title="Telegram"
+        subtitle="Status pengiriman notifikasi Telegram dan pengelolaan template."
+        actions={
           <Button variant="secondary" onClick={() => loadData()} disabled={loading}>
             <RefreshCw className="size-4" /> Refresh
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {errorMessage ? (
         <Card className="border-red-200 bg-red-50">
@@ -232,44 +239,26 @@ export function AdminTelegramPage() {
       ) : null}
 
       {/* Summary cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm text-slate-500">Akun Terhubung</CardTitle>
-          </CardHeader>
-          <CardContent className="py-0 pb-3">
-            <p className="text-2xl font-bold text-slate-900">{linkedCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm text-slate-500">Terkirim</CardTitle>
-          </CardHeader>
-          <CardContent className="py-0 pb-3">
-            <p className="text-2xl font-bold text-emerald-600">{sentCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm text-slate-500">Gagal</CardTitle>
-          </CardHeader>
-          <CardContent className="py-0 pb-3">
-            <p className="text-2xl font-bold text-red-600">{failedCount}</p>
-            {failedCount > 0 && (
-              <div className="mt-1 space-y-1">
-                {deliveries
-                  .filter((d) => d.status === "failed" && d.error_message)
-                  .slice(0, 3)
-                  .map((d) => (
-                    <p key={d.id} className="text-xs text-red-500 truncate">
-                      {d.template_code}: {d.error_message}
-                    </p>
-                  ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <StatsGrid
+        columns={3}
+        items={[
+          { label: "Akun Terhubung", value: linkedCount, icon: MessageSquare },
+          { label: "Terkirim", value: sentCount, icon: CheckCircle, variant: "success" },
+          { label: "Gagal", value: failedCount, icon: XCircle, variant: failedCount > 0 ? "destructive" : "default" },
+        ]}
+      />
+      {failedCount > 0 ? (
+        <div className="space-y-1 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+          {deliveries
+            .filter((d) => d.status === "failed" && d.error_message)
+            .slice(0, 3)
+            .map((d) => (
+              <p key={d.id} className="truncate">
+                {TEMPLATE_CODE_LABELS[d.template_code] ?? d.template_code}: {d.error_message}
+              </p>
+            ))}
+        </div>
+      ) : null}
 
       {/* Delivery History */}
       <Card>
@@ -279,67 +268,84 @@ export function AdminTelegramPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <select
-              value={filterTemplate}
-              onChange={(e) => {
-                setFilterTemplate(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-            >
-              <option value="">Semua template</option>
-              {Object.entries(TEMPLATE_CODE_LABELS).map(([code, label]) => (
-                <option key={code} value={code}>{label}</option>
-              ))}
-            </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setPage(1);
-              }}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-            >
-              <option value="">Semua status</option>
-              <option value="sent">Terkirim</option>
-              <option value="failed">Gagal</option>
-              <option value="queued">Antrian</option>
-            </select>
-          </div>
-
-          {loading ? (
-            <p className="text-sm text-slate-500">Memuat data...</p>
-          ) : filteredDeliveries.length === 0 ? (
-            <p className="text-sm text-slate-500">Belum ada pengiriman.</p>
-          ) : (
-            <>
-              <div className="space-y-3 lg:hidden">
-                {pagedDeliveries.map((row) => (
-                  <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
-                          {TEMPLATE_CODE_LABELS[row.template_code] ?? row.template_code}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatDate(row.sent_at ?? row.created_at)}</p>
-                      </div>
-                      <Badge variant={statusBadgeVariant(row.status)} className="shrink-0 text-xs">
-                        {row.status === "sent" ? <CheckCircle className="mr-1 inline size-3" /> : null}
-                        {row.status === "failed" ? <XCircle className="mr-1 inline size-3" /> : null}
-                        {row.status === "queued" ? <AlertTriangle className="mr-1 inline size-3" /> : null}
-                        {row.status === "sent" ? "Terkirim" : row.status === "failed" ? "Gagal" : "Antrian"}
-                      </Badge>
-                    </div>
-                    <p className="mt-3 line-clamp-3 text-xs text-slate-700">{row.message_text}</p>
-                    {row.error_message ? (
-                      <p className="mt-2 break-words text-xs text-red-600">{row.error_message}</p>
-                    ) : null}
-                  </div>
+          <FilterBar className="mb-3">
+            <FilterGroup label="Template">
+              <select
+                value={filterTemplate}
+                onChange={(e) => {
+                  setFilterTemplate(e.target.value);
+                  setPage(1);
+                }}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs"
+              >
+                <option value="">Semua template</option>
+                {Object.entries(TEMPLATE_CODE_LABELS).map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
                 ))}
-              </div>
+              </select>
+            </FilterGroup>
+            <FilterGroup label="Status">
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setPage(1);
+                }}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs"
+              >
+                <option value="">Semua status</option>
+                <option value="sent">Terkirim</option>
+                <option value="failed">Gagal</option>
+                <option value="queued">Antrian</option>
+              </select>
+            </FilterGroup>
+          </FilterBar>
 
-              <div className="hidden overflow-x-auto lg:block">
+          <DataList
+            loading={loading}
+            empty={{ title: "Belum ada pengiriman.", description: "Data pengiriman akan muncul setelah notifikasi dikirim." }}
+            mobile={filteredDeliveries.length > 0 ? (
+              <ListContainer>
+                {pagedDeliveries.map((row) => {
+                  const isExpanded = expandedId === row.id;
+                  const statusVariant = row.status === "sent" ? "success" : row.status === "failed" ? "destructive" : "warning";
+                  const statusLabel = row.status === "sent" ? "Terkirim" : row.status === "failed" ? "Gagal" : "Antrian";
+                  return (
+                    <CompactListRow
+                      key={row.id}
+                      primary={TEMPLATE_CODE_LABELS[row.template_code] ?? row.template_code}
+                      trailing={
+                        <Badge variant={statusBadgeVariant(row.status)} className="text-[10px] h-4 px-1.5">
+                          {row.status === "sent" ? <CheckCircle className="mr-0.5 inline size-2.5" /> : null}
+                          {row.status === "failed" ? <XCircle className="mr-0.5 inline size-2.5" /> : null}
+                          {row.status === "queued" ? <AlertTriangle className="mr-0.5 inline size-2.5" /> : null}
+                          {statusLabel}
+                        </Badge>
+                      }
+                      secondary={
+                        <span className="flex items-center gap-1.5">
+                          <StatusDot variant={statusVariant} />
+                          <span>{formatDate(row.sent_at ?? row.created_at)}</span>
+                        </span>
+                      }
+                      accentColor={row.status === "failed" ? "border-l-red-500" : row.status === "sent" ? "border-l-emerald-500" : "border-l-amber-500"}
+                      expandedOpen={isExpanded}
+                      onToggle={() => setExpandedId(isExpanded ? null : row.id)}
+                      expanded={
+                        <div className="space-y-1.5 text-xs">
+                          <p className="text-slate-700">{row.message_text}</p>
+                          {row.error_message ? (
+                            <p className="break-words text-red-600">{row.error_message}</p>
+                          ) : null}
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </ListContainer>
+            ) : undefined}
+            desktop={filteredDeliveries.length > 0 ? (
+              <div className="overflow-x-auto">
                 <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -364,10 +370,10 @@ export function AdminTelegramPage() {
                             {row.status === "sent" ? "Terkirim" : row.status === "failed" ? "Gagal" : "Antrian"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="max-w-xs text-xs text-slate-700 truncate">
+                        <TableCell className="max-w-xs truncate text-xs text-slate-700">
                           {row.message_text}
                         </TableCell>
-                        <TableCell className="max-w-xs text-xs text-red-500 truncate">
+                        <TableCell className="max-w-xs truncate text-xs text-red-500">
                           {row.error_message ?? "-"}
                         </TableCell>
                         <TableCell className="text-xs text-slate-500">
@@ -378,46 +384,18 @@ export function AdminTelegramPage() {
                   </TableBody>
                 </Table>
               </div>
-            </>
-          )}
+            ) : undefined}
+          />
 
           {!loading && filteredDeliveries.length > 0 ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+            <PaginationBar
+              page={page}
+              pageSize={pageSize}
+              totalRows={totalRows}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              className="mt-3"
+            />
           ) : null}
         </CardContent>
       </Card>
@@ -433,42 +411,57 @@ export function AdminTelegramPage() {
           {loading ? (
             <p className="text-sm text-slate-500">Memuat template...</p>
           ) : (
-            <div className="space-y-3">
-              {templates.map((tpl) => (
-                <div key={tpl.id} className="rounded-md border border-slate-200 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">{tpl.title}</p>
-                      <p className="text-xs text-slate-500">{tpl.code}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingTemplate(tpl);
-                          setEditBody(tpl.body_template);
-                        }}
-                        disabled={saving}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleResetTemplate(tpl)}
-                        disabled={saving}
-                      >
-                        <RotateCcw className="size-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-600 bg-slate-50 rounded p-2 font-mono whitespace-pre-wrap">
-                    {tpl.body_template}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <ListContainer>
+              {templates.map((tpl) => {
+                const tplExpanded = expandedTemplateId === tpl.id;
+                return (
+                  <CompactListRow
+                    key={tpl.id}
+                    primary={tpl.title}
+                    trailing={
+                      <span className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs px-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingTemplate(tpl);
+                            setEditBody(tpl.body_template);
+                          }}
+                          disabled={saving}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResetTemplate(tpl);
+                          }}
+                          disabled={saving}
+                        >
+                          <RotateCcw className="size-3.5" />
+                        </Button>
+                      </span>
+                    }
+                    secondary={
+                      <span className="text-slate-500">{tpl.code}</span>
+                    }
+                    accentColor="border-l-indigo-400"
+                    expandedOpen={tplExpanded}
+                    onToggle={() => setExpandedTemplateId(tplExpanded ? null : tpl.id)}
+                    expanded={
+                      <p className="text-xs text-slate-600 bg-slate-50 rounded p-2 font-mono whitespace-pre-wrap">
+                        {tpl.body_template}
+                      </p>
+                    }
+                  />
+                );
+              })}
+            </ListContainer>
           )}
         </CardContent>
       </Card>

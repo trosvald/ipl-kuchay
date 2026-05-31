@@ -1,12 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, SquarePen } from "lucide-react";
+import { Inbox, Plus, RefreshCw, SquarePen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { writeAuditLog } from "@/features/audit/writeAuditLog";
 import { useAuth } from "@/features/auth/authHooks";
 import { formatRupiah } from "@/lib/format";
@@ -39,6 +46,7 @@ export function FeeTypesPage() {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
@@ -49,9 +57,6 @@ export function FeeTypesPage() {
     () => items.slice((page - 1) * pageSize, page * pageSize),
     [items, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
-
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
@@ -225,27 +230,166 @@ export function FeeTypesPage() {
     await loadFeeTypes();
   };
 
+  const hasNoContent = !loading && !errorMessage && items.length === 0;
+
+  const mobileContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada jenis biaya." />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((row) => {
+        const isExpanded = expandedId === row.id;
+        const typeLabel = row.is_recurring
+          ? row.billing_cycle === "yearly"
+            ? `Yearly (bln ${row.charge_month ?? "-"})`
+            : "Monthly"
+          : "One-off";
+        return (
+          <CompactListRow
+            key={row.id}
+            primary={row.name}
+            trailing={
+              <Badge variant={row.active ? "success" : "secondary"} className="text-[10px] h-4 px-1.5">
+                {row.active ? "Aktif" : "Nonaktif"}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={row.active ? "success" : "muted"} />
+                <span>{row.code}</span>
+                <span className="text-slate-300">·</span>
+                <span>{formatRupiah(row.default_amount)}</span>
+                <span className="text-slate-300">·</span>
+                <span>{typeLabel}{row.is_penalty ? " · Penalty" : ""}</span>
+              </span>
+            }
+            accentColor={row.active ? "border-l-emerald-500" : "border-l-slate-300"}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : row.id)}
+            expanded={
+              <div className="space-y-2">
+                {row.description ? (
+                  <div className="text-xs">
+                    <span className="text-slate-400">Keterangan</span>
+                    <p className="mt-0.5 text-slate-700">{row.description}</p>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={saving}
+                    onClick={() => {
+                      setEditingId(row.id);
+                      setCreating(false);
+                    }}
+                  >
+                    <SquarePen className="size-3" /> Edit
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" disabled={saving} onClick={() => handleToggleActive(row)}>
+                    {row.active ? "Nonaktifkan" : "Aktifkan"}
+                  </Button>
+                </div>
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada jenis biaya." />
+  ) : (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[840px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Kode</TableHead>
+            <TableHead>Nama</TableHead>
+            <TableHead>Nominal</TableHead>
+            <TableHead>Tipe</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="font-medium text-slate-900">{row.code}</TableCell>
+              <TableCell>
+                <div>
+                  <p className="font-medium text-slate-900">{row.name}</p>
+                  {row.description ? <p className="text-xs text-slate-500">{row.description}</p> : null}
+                </div>
+              </TableCell>
+              <TableCell className="text-slate-700">{formatRupiah(row.default_amount)}</TableCell>
+              <TableCell>
+                <div className="flex gap-1">
+                  <Badge variant={row.is_recurring ? "success" : "secondary"}>
+                    {row.is_recurring ? "Recurring" : "One-off"}
+                  </Badge>
+                  {row.is_recurring ? (
+                    <Badge variant="outline">
+                      {row.billing_cycle === "yearly"
+                        ? `Yearly (bulan ${row.charge_month ?? "-"})`
+                        : "Monthly"}
+                    </Badge>
+                  ) : null}
+                  <Badge variant={row.is_penalty ? "outline" : "secondary"}>{row.is_penalty ? "Penalty" : "Reguler"}</Badge>
+                </div>
+              </TableCell>
+              <TableCell>
+                <Badge variant={row.active ? "success" : "secondary"}>{row.active ? "Aktif" : "Nonaktif"}</Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => {
+                      setEditingId(row.id);
+                      setCreating(false);
+                    }}
+                  >
+                    <SquarePen className="size-4" /> Edit
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleToggleActive(row)}>
+                    {row.active ? "Nonaktifkan" : "Aktifkan"}
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">Jenis Biaya</h2>
-          <p className="text-sm text-slate-600">Kelola recurring, penalty, dan nominal default per item biaya.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => loadFeeTypes()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button
-            onClick={() => {
-              setCreating((value) => !value);
-              setEditingId(null);
-            }}
-          >
-            <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah Jenis Biaya"}
-          </Button>
-        </div>
-      </header>
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin"
+        title="Jenis Biaya"
+        subtitle="Kelola recurring, penalty, dan nominal default per item biaya."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadFeeTypes()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCreating((value) => !value);
+                setEditingId(null);
+              }}
+            >
+              <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah Jenis Biaya"}
+            </Button>
+          </>
+        }
+      />
 
       {errorMessage ? (
         <Card className="border-red-200 bg-red-50">
@@ -286,167 +430,28 @@ export function FeeTypesPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Jenis Biaya</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : (
-            <>
-              <div className="space-y-2 lg:hidden">
-                {pagedItems.map((row) => (
-                  <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{row.name}</p>
-                        <p className="mt-1 text-xs font-medium text-muted-foreground">{row.code}</p>
-                      </div>
-                      <Badge variant={row.active ? "success" : "secondary"} className="shrink-0">
-                        {row.active ? "Aktif" : "Nonaktif"}
-                      </Badge>
-                    </div>
-                    <p className="mt-2 text-lg font-semibold text-foreground">{formatRupiah(row.default_amount)}</p>
-                    {row.description ? <p className="mt-1 break-words text-sm text-slate-700">{row.description}</p> : null}
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <Badge variant={row.is_recurring ? "success" : "secondary"}>
-                        {row.is_recurring ? "Recurring" : "One-off"}
-                      </Badge>
-                      {row.is_recurring ? (
-                        <Badge variant="outline">
-                          {row.billing_cycle === "yearly" ? `Yearly bulan ${row.charge_month ?? "-"}` : "Monthly"}
-                        </Badge>
-                      ) : null}
-                      <Badge variant={row.is_penalty ? "outline" : "secondary"}>{row.is_penalty ? "Penalty" : "Reguler"}</Badge>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full"
-                        disabled={saving}
-                        onClick={() => {
-                          setEditingId(row.id);
-                          setCreating(false);
-                        }}
-                      >
-                        <SquarePen className="size-4" /> Edit
-                      </Button>
-                      <Button size="sm" variant="ghost" className="w-full" disabled={saving} onClick={() => handleToggleActive(row)}>
-                        {row.active ? "Nonaktifkan" : "Aktifkan"}
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      <DataList
+        loading={loading}
+        error={errorMessage}
+        onRetry={loadFeeTypes}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
 
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[840px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Kode</TableHead>
-                      <TableHead>Nama</TableHead>
-                      <TableHead>Nominal</TableHead>
-                      <TableHead>Tipe</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium text-slate-900">{row.code}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-slate-900">{row.name}</p>
-                            {row.description ? <p className="text-xs text-slate-500">{row.description}</p> : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-slate-700">{formatRupiah(row.default_amount)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Badge variant={row.is_recurring ? "success" : "secondary"}>
-                              {row.is_recurring ? "Recurring" : "One-off"}
-                            </Badge>
-                            {row.is_recurring ? (
-                              <Badge variant="outline">
-                                {row.billing_cycle === "yearly"
-                                  ? `Yearly (bulan ${row.charge_month ?? "-"})`
-                                  : "Monthly"}
-                              </Badge>
-                            ) : null}
-                            <Badge variant={row.is_penalty ? "outline" : "secondary"}>{row.is_penalty ? "Penalty" : "Reguler"}</Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={row.active ? "success" : "secondary"}>{row.active ? "Aktif" : "Nonaktif"}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={saving}
-                              onClick={() => {
-                                setEditingId(row.id);
-                                setCreating(false);
-                              }}
-                            >
-                              <SquarePen className="size-4" /> Edit
-                            </Button>
-                            <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleToggleActive(row)}>
-                              {row.active ? "Nonaktifkan" : "Aktifkan"}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-          {!loading ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      {!loading && !errorMessage && items.length > 0 ? (
+        <div className="mt-3">
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={(size: number) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

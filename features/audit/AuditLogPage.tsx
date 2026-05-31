@@ -6,7 +6,13 @@ import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { DataList } from "@/features/layout/DataList";
+import { FilterBar, FilterGroup } from "@/components/ui/FilterBar";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PageHeader } from "@/features/layout/PageHeader";
+import { PaginationBar } from "@/components/ui/PaginationBar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateId } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
@@ -48,6 +54,7 @@ export function AuditLogPage() {
   const [entityFilter, setEntityFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
   const isFinanceOnlyScope = role === "treasurer";
 
   const loadAuditLogs = useCallback(async () => {
@@ -140,86 +147,98 @@ export function AuditLogPage() {
   }, [page, totalPages]);
 
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Security</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Audit Log</h1>
-          <p className="text-sm text-slate-600">Riwayat aksi sensitif pengurus.</p>
-          <p className="text-xs text-slate-500">
-            {isFinanceOnlyScope
-              ? "Cakupan audit: Keuangan (billing, verifikasi, pembayaran, laporan)."
-              : "Cakupan audit: Operasional penuh untuk admin/super admin."}
-          </p>
-        </div>
-        <Button variant="secondary" onClick={() => loadAuditLogs()} disabled={loading}>
-          <RefreshCw className="size-4" /> Refresh
-        </Button>
-      </header>
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Admin Security"
+        title="Audit Log"
+        subtitle="Riwayat aksi sensitif pengurus."
+        actions={
+          <Button variant="secondary" onClick={() => loadAuditLogs()} disabled={loading}>
+            <RefreshCw className="size-4" /> Refresh
+          </Button>
+        }
+      />
+      <p className="-mt-4 text-xs text-muted-foreground">
+        {isFinanceOnlyScope
+          ? "Cakupan audit: Keuangan (billing, verifikasi, pembayaran, laporan)."
+          : "Cakupan audit: Operasional penuh untuk admin/super admin."}
+      </p>
 
       <Card>
-        <CardHeader className="space-y-3">
+        <CardHeader>
           <CardTitle className="text-base">Filter Audit</CardTitle>
-          <div className="grid gap-2 md:grid-cols-2">
-            <Input
-              placeholder={
-                isFinanceOnlyScope
-                  ? "Filter action (contoh: payment, verification, billing, report)"
-                  : "Filter action (contoh: payment_submission)"
-              }
-              value={actionFilter}
-              onChange={(event) => {
-                setActionFilter(event.target.value);
-                setPage(1);
-              }}
-            />
-            <Input
-              placeholder="Filter entity table/id"
-              value={entityFilter}
-              onChange={(event) => {
-                setEntityFilter(event.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
         </CardHeader>
         <CardContent>
-          {errorMessage ? (
-            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p>
-          ) : null}
-
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat audit log...</p>
-          ) : filteredItems.length === 0 ? (
-            <p className="text-sm text-slate-600">Belum ada data audit yang cocok.</p>
-          ) : (
-            <>
-              <div className="space-y-3 lg:hidden">
+          <FilterBar>
+            <FilterGroup label="Action">
+              <Input
+                placeholder={
+                  isFinanceOnlyScope
+                    ? "Filter action (contoh: payment, verification, billing, report)"
+                    : "Filter action (contoh: payment_submission)"
+                }
+                value={actionFilter}
+                onChange={(event) => {
+                  setActionFilter(event.target.value);
+                  setPage(1);
+                }}
+              />
+            </FilterGroup>
+            <FilterGroup label="Entity">
+              <Input
+                placeholder="Filter entity table/id"
+                value={entityFilter}
+                onChange={(event) => {
+                  setEntityFilter(event.target.value);
+                  setPage(1);
+                }}
+              />
+            </FilterGroup>
+          </FilterBar>
+          <DataList
+            loading={loading}
+            error={errorMessage}
+            onRetry={loadAuditLogs}
+            empty={{ title: "Belum ada data audit yang cocok." }}
+            mobile={filteredItems.length > 0 ? (
+              <ListContainer>
                 {pagedItems.map((row) => (
-                  <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-xs font-semibold text-foreground">{row.action}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{formatDateId(row.created_at)}</p>
+                  <CompactListRow
+                    key={row.id}
+                    primary={<span className="font-mono text-xs">{row.action}</span>}
+                    secondary={
+                      <span className="flex items-center gap-1.5">
+                        <span>{formatDateId(row.created_at)}</span>
+                        <span className="text-slate-300">·</span>
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{row.actor_role ?? "-"}</Badge>
+                      </span>
+                    }
+                    trailing={null}
+                    expandedOpen={expandedAuditId === row.id}
+                    onToggle={() => setExpandedAuditId(expandedAuditId === row.id ? null : row.id)}
+                    expanded={
+                      <div className="space-y-1.5 text-xs text-slate-600">
+                        <p>
+                          <span className="text-slate-400">Aktor: </span>
+                          <span className="font-medium text-slate-800">{profileName(row.actor_id ? profileMap[row.actor_id] : undefined)}</span>
+                        </p>
+                        {row.actor_id ? (
+                          <p className="break-all font-mono bg-slate-50 px-2 py-1 rounded text-slate-500">{row.actor_id}</p>
+                        ) : null}
+                        <p>
+                          <span className="text-slate-400">Entity: </span>
+                          <span className="font-medium text-slate-800">{row.entity_table}</span>
+                        </p>
+                        <p className="break-all font-mono bg-slate-50 px-2 py-1 rounded text-slate-500">{row.entity_id}</p>
+                        <p className="break-all font-mono text-slate-500">Request: {row.request_id ?? "-"}</p>
                       </div>
-                      <Badge variant="secondary" className="shrink-0">{row.actor_role ?? "-"}</Badge>
-                    </div>
-                    <div className="mt-3 space-y-2 text-xs text-slate-600">
-                      <p>
-                        Aktor: {profileName(row.actor_id ? profileMap[row.actor_id] : undefined)}
-                        {row.actor_id ? <span className="mt-1 block rounded-md bg-slate-50 px-2 py-1 font-mono text-slate-500 break-all">{row.actor_id}</span> : null}
-                      </p>
-                      <p>
-                        Entity: <span className="font-medium text-slate-900">{row.entity_table}</span>
-                        <span className="mt-1 block rounded-md bg-slate-50 px-2 py-1 font-mono text-slate-500 break-all">{row.entity_id}</span>
-                      </p>
-                      <p className="break-all font-mono">Request: {row.request_id ?? "-"}</p>
-                    </div>
-                  </div>
+                    }
+                  />
                 ))}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
+              </ListContainer>
+            ) : undefined}
+            desktop={filteredItems.length > 0 ? (
+              <div className="overflow-x-auto">
                 <Table className="min-w-[1080px]">
                   <TableHeader>
                     <TableRow className="text-xs uppercase tracking-wide text-slate-500">
@@ -253,46 +272,18 @@ export function AuditLogPage() {
                   </TableBody>
                 </Table>
               </div>
-            </>
-          )}
+            ) : undefined}
+          />
 
-          {!loading && filteredItems.length > 0 ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
+          {!loading && !errorMessage && filteredItems.length > 0 ? (
+            <PaginationBar
+              page={page}
+              pageSize={pageSize}
+              totalRows={totalRows}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              className="mt-3"
+            />
           ) : null}
         </CardContent>
       </Card>

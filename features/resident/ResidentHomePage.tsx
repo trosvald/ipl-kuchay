@@ -1,15 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, Megaphone, RefreshCw } from "lucide-react";
+import {
+  Calendar,
+  ChevronRight,
+  Megaphone,
+  ReceiptText,
+  RefreshCw,
+  Settings,
+  Shield,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { APP_NAME } from "@/lib/constants";
 import { formatDateId, formatRupiah } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/authHooks";
 
 interface ResidentKavlingMapping {
@@ -375,6 +386,32 @@ function EmptyCard({
   );
 }
 
+type ResidentQuickItem = {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+  accent: string;
+};
+
+function ResidentQuickTile({ item }: Readonly<{ item: ResidentQuickItem }>) {
+  return (
+    <Link
+      href={item.href}
+      className="group flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-sm ring-1 ring-slate-200 transition-all hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <div className={cn("flex size-10 items-center justify-center rounded-xl", item.accent)}>
+        <item.icon className="size-4.5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-slate-900 leading-snug">{item.title}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
+    </Link>
+  );
+}
+
 export function ResidentHomePage() {
   const { profile } = useAuth();
   const client = getSupabaseBrowserClient();
@@ -550,25 +587,90 @@ export function ResidentHomePage() {
       .slice(0, 3);
   }, [events]);
 
+  const canAccessAdmin = profile?.role === "admin" || profile?.role === "super_admin" || profile?.role === "treasurer";
+
+  const quickMenuItems: ResidentQuickItem[] = useMemo(() => {
+    const items: ResidentQuickItem[] = [
+      {
+        title: "Tagihan",
+        description: "Cek status, bayar, dan lihat riwayat",
+        href: "/app/invoices",
+        icon: ReceiptText,
+        accent: "bg-emerald-100 text-emerald-700",
+      },
+      {
+        title: "Pengumuman",
+        description: "Informasi terkini dari pengurus",
+        href: "/app/announcements",
+        icon: Megaphone,
+        accent: "bg-amber-100 text-amber-700",
+      },
+      {
+        title: "Acara",
+        description: "Kegiatan lingkungan mendatang",
+        href: "/app/events",
+        icon: Calendar,
+        accent: "bg-fuchsia-100 text-fuchsia-700",
+      },
+      {
+        title: "Pengaturan",
+        description: "Profil, notifikasi, dan Telegram",
+        href: "/app/settings",
+        icon: Settings,
+        accent: "bg-sky-100 text-sky-700",
+      },
+    ];
+
+    if (canAccessAdmin) {
+      items.push({
+        title: "Panel Admin",
+        description: "Kelola data, billing, dan laporan",
+        href: "/admin",
+        icon: Shield,
+        accent: "bg-indigo-100 text-indigo-700",
+      });
+    }
+
+    return items;
+  }, [canAccessAdmin]);
+
   return (
-    <section className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">User Portal</p>
-          <h2 className="text-xl font-semibold text-foreground">Layanan IPL Jatiloka</h2>
+    <section className="page-section">
+      {/* Hero header */}
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+            {APP_NAME}
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Selamat datang{profile?.display_name ? `, ${profile.display_name.split(" ")[0]}` : ""}
+          </h1>
+          <p className="text-sm text-slate-500">
+            Pantau tagihan, baca pengumuman, dan ikuti acara lingkungan.
+          </p>
         </div>
-        <Badge variant={profile?.is_active ? "success" : "destructive"}>
+        <Badge variant={profile?.is_active ? "success" : "destructive"} className="mt-1">
           {profile?.is_active ? "Akun aktif" : "Akun nonaktif"}
         </Badge>
       </header>
 
+      {/* Quick-access tiles */}
+      <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+        {quickMenuItems.map((item) => (
+          <ResidentQuickTile key={item.href} item={item} />
+        ))}
+      </div>
+
       {/* Section 1: Ringkasan Tagihan */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">Ringkasan Tagihan</h3>
-          <Button asChild size="sm" variant="outline">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Ringkasan Tagihan</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Status pembayaran periode aktif</p>
+          </div>
+          <Button asChild size="sm" variant="outline" className="gap-1.5">
             <Link href="/app/invoices">
-              <RefreshCw className="size-4" /> Lihat Semua
+              Semua <RefreshCw className="size-3.5" />
             </Link>
           </Button>
         </div>
@@ -597,7 +699,10 @@ export function ResidentHomePage() {
 
       {/* Section 2: Pengumuman Hero (if urgent) + Pengumuman Terbaru */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-foreground">Pengumuman Terbaru</h3>
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Pengumuman Terbaru</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Informasi dan himbauan dari pengurus lingkungan</p>
+        </div>
 
         {announcementsLoading ? (
           <div className="space-y-3">
@@ -632,7 +737,10 @@ export function ResidentHomePage() {
 
       {/* Section 3: Acara Mendatang */}
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-foreground">Acara Mendatang</h3>
+        <div>
+          <h3 className="text-base font-bold text-slate-900">Acara Mendatang</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">Kegiatan warga yang akan datang</p>
+        </div>
 
         {eventsLoading ? (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">

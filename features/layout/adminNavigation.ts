@@ -22,6 +22,7 @@ interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  description?: string;
 }
 
 interface NavGroup {
@@ -30,45 +31,45 @@ interface NavGroup {
 }
 
 const SHARED_PAGES_GROUP: NavGroup = {
-  label: "Pages",
+  label: "Portal Warga",
   items: [
-    { title: "User Portal", href: "/app", icon: Home },
-    { title: "Resident Invoices", href: "/app/invoices", icon: ReceiptText },
+    { title: "Portal Warga", href: "/app", icon: Home, description: "Beranda dan akses cepat warga" },
+    { title: "Tagihan Saya", href: "/app/invoices", icon: ReceiptText, description: "Cek tagihan dan riwayat pembayaran" },
   ],
 };
 
 const ADMIN_DASHBOARDS_GROUP: NavGroup = {
-  label: "Dashboards",
+  label: "Operasional",
   items: [
-    { title: "Default", href: "/admin", icon: LayoutDashboard },
-    { title: "Kavlings", href: "/admin/kavlings", icon: Building2 },
-    { title: "Residents", href: "/admin/residents", icon: Users },
-    { title: "Settings", href: "/admin/settings", icon: Cog },
-    { title: "Billing", href: "/admin/billing", icon: Wallet },
-    { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
-    { title: "Imports", href: "/admin/imports", icon: FileSpreadsheet },
-    { title: "Laporan", href: "/admin/reports", icon: ReceiptText },
-    { title: "Audit Log", href: "/admin/audit", icon: ShieldCheck },
-    { title: "Telegram", href: "/admin/telegram", icon: Send },
+    { title: "Beranda", href: "/admin", icon: LayoutDashboard, description: "Ringkasan dan akses cepat admin" },
+    { title: "Data Kavling", href: "/admin/kavlings", icon: Building2, description: "Atur blok, nomor, dan status kavling" },
+    { title: "Data Warga", href: "/admin/residents", icon: Users, description: "Kelola akun penghuni dan mapping kavling" },
+    { title: "Pengaturan", href: "/admin/settings", icon: Cog, description: "Konfigurasi biaya dan gateway pembayaran" },
+    { title: "Tagihan", href: "/admin/billing", icon: Wallet, description: "Buat periode dan kelola penagihan" },
+    { title: "Verifikasi Pembayaran", href: "/admin/submissions", icon: ClipboardCheck, description: "Cek bukti transfer dan approval" },
+    { title: "Impor Data", href: "/admin/imports", icon: FileSpreadsheet, description: "Unggah data massal kavling dan mapping" },
+    { title: "Laporan", href: "/admin/reports", icon: ReceiptText, description: "Ringkasan pembayaran dan tunggakan" },
+    { title: "Log Audit", href: "/admin/audit", icon: ShieldCheck, description: "Jejak perubahan operasional admin" },
+    { title: "Telegram", href: "/admin/telegram", icon: Send, description: "Template pesan dan kirim notifikasi" },
   ],
 };
 
 const COMMUNICATION_GROUP: NavGroup = {
-  label: "Communication",
+  label: "Komunikasi",
   items: [
-    { title: "Pengumuman", href: "/admin/announcements", icon: Megaphone },
-    { title: "Acara", href: "/admin/events", icon: Calendar },
+    { title: "Pengumuman", href: "/admin/announcements", icon: Megaphone, description: "Publikasi informasi ke warga" },
+    { title: "Acara", href: "/admin/events", icon: Calendar, description: "Kelola kegiatan dan RSVP warga" },
   ],
 };
 
 const TREASURER_DASHBOARDS_GROUP: NavGroup = {
   label: "Keuangan",
   items: [
-    { title: "Default", href: "/admin", icon: LayoutDashboard },
-    { title: "Billing", href: "/admin/billing", icon: Wallet },
-    { title: "Submissions", href: "/admin/submissions", icon: ClipboardCheck },
-    { title: "Laporan", href: "/admin/reports", icon: ReceiptText },
-    { title: "Audit Keuangan", href: "/admin/audit", icon: ShieldCheck },
+    { title: "Beranda", href: "/admin", icon: LayoutDashboard, description: "Ringkasan dan akses cepat" },
+    { title: "Tagihan", href: "/admin/billing", icon: Wallet, description: "Buat periode dan kelola penagihan" },
+    { title: "Verifikasi Pembayaran", href: "/admin/submissions", icon: ClipboardCheck, description: "Cek bukti transfer dan approval" },
+    { title: "Laporan", href: "/admin/reports", icon: ReceiptText, description: "Ringkasan pembayaran dan tunggakan" },
+    { title: "Audit Keuangan", href: "/admin/audit", icon: ShieldCheck, description: "Jejak perubahan pembayaran" },
   ],
 };
 

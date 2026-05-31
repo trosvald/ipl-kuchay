@@ -1,9 +1,14 @@
 "use client";
 
 import { type ChangeEvent, useMemo, useState } from "react";
+import { CheckCircle, Upload, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PageHeader } from "@/features/layout/PageHeader";
+import { StatsGrid } from "@/components/ui/StatsGrid";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ImportPreviewError, ImportPreviewResult, ImportType, RawImportRow } from "@/lib/imports/importTypes";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
@@ -144,12 +149,12 @@ export function ImportJobsPage() {
   };
 
   return (
-    <section className="space-y-4">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin</p>
-        <h1 className="text-2xl font-semibold text-slate-900">Import Data</h1>
-        <p className="text-sm text-slate-600">Unggah CSV, cek hasil preview, lalu apply hanya jika semua baris valid.</p>
-      </header>
+    <section className="space-y-6">
+      <PageHeader
+        eyebrow="Admin"
+        title="Import Data"
+        subtitle="Unggah CSV, cek hasil preview, lalu apply hanya jika semua baris valid."
+      />
 
       {errorMessage ? (
         <Card className="border-red-200 bg-red-50">
@@ -212,24 +217,29 @@ export function ImportJobsPage() {
             <CardTitle className="text-base">Hasil Preview {filename ? `- ${filename}` : ""}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
-              <p>Total baris: {preview.rowCount}</p>
-              <p>Valid: {preview.validCount}</p>
-              <p>Tidak valid: {preview.invalidCount}</p>
-            </div>
+            <StatsGrid
+              columns={3}
+              items={[
+                { label: "Total Baris", value: preview.rowCount, icon: Upload },
+                { label: "Valid", value: preview.validCount, icon: CheckCircle, variant: "success" },
+                { label: "Tidak Valid", value: preview.invalidCount, icon: XCircle, variant: preview.invalidCount > 0 ? "destructive" : "default" },
+              ]}
+            />
 
             {preview.errors.length > 0 ? (
               <>
-                <div className="space-y-3 lg:hidden">
-                  {preview.errors.map((error: ImportPreviewError, index) => (
-                    <div key={`${error.rowNumber}-${error.field}-${index}`} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3 text-sm">
-                        <p className="font-semibold text-foreground">Baris {error.rowNumber}</p>
-                        <p className="shrink-0 text-xs text-muted-foreground">{error.field}</p>
-                      </div>
-                      <p className="mt-2 break-words text-sm text-slate-700">{error.message}</p>
-                    </div>
-                  ))}
+                <div className="lg:hidden">
+                  <ListContainer>
+                    {preview.errors.map((error: ImportPreviewError, index) => (
+                      <CompactListRow
+                        key={`${error.rowNumber}-${error.field}-${index}`}
+                        primary={`Baris ${error.rowNumber}`}
+                        trailing={<span className="text-xs text-slate-500">{error.field}</span>}
+                        secondary={<span className="break-words text-slate-700">{error.message}</span>}
+                        accentColor="border-l-red-500"
+                      />
+                    ))}
+                  </ListContainer>
                 </div>
                 <div className="hidden overflow-x-auto lg:block">
                   <Table>

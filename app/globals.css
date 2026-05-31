@@ -32,31 +32,31 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --radius: 0.75rem;
+  --background: oklch(0.967 0.003 264.5);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.45 0.12 264);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.95 0.005 264);
+  --secondary-foreground: oklch(0.3 0.01 264);
+  --muted: oklch(0.94 0.005 264);
+  --muted-foreground: oklch(0.55 0.01 264);
+  --accent: oklch(0.88 0.04 264);
+  --accent-foreground: oklch(0.25 0.06 264);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --border: oklch(0.9 0.005 264);
+  --input: oklch(0.9 0.005 264);
+  --ring: oklch(0.45 0.12 264);
+  --sidebar: oklch(0.2 0.02 260);
+  --sidebar-foreground: oklch(0.85 0.01 260);
+  --sidebar-accent: oklch(0.28 0.03 260);
+  --sidebar-accent-foreground: oklch(0.95 0 0);
+  --sidebar-border: oklch(0.28 0.03 260);
 }
 
 * {
@@ -73,4 +73,118 @@ body {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* ── Admin Design System Utilities ── */
+
+/* Elevated white card */
+@utility admin-card {
+  @apply rounded-xl border border-slate-200/60 bg-white shadow-sm;
+}
+
+/* Elevated card with hover */
+@utility admin-card-hover {
+  @apply transition-all duration-150 hover:shadow-md hover:border-slate-300/80;
+}
+
+/* Card with accent top border */
+@utility admin-card-accent {
+  @apply admin-card border-t-4;
+}
+
+/* Subtle inner surface */
+@utility admin-surface {
+  @apply rounded-lg bg-slate-50 p-3;
+}
+
+/* Touch-friendly min size */
+@utility touch-target {
+  @apply min-h-11 min-w-11;
+}
+
+@utility touch-target-sm {
+  @apply min-h-9 min-w-9;
+}
+
+/* Sticky header with blur */
+@utility admin-header {
+  @apply sticky top-0 z-30 border-b border-slate-200/60 bg-white/95 backdrop-blur-md;
+}
+
+/* Floating action button */
+@utility admin-fab {
+  @apply fixed bottom-6 right-6 z-40 flex size-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition-transform active:scale-95;
+}
+
+/* Stat display */
+@utility stat-value {
+  @apply text-2xl font-bold tracking-tight text-slate-900;
+}
+
+@utility stat-label {
+  @apply text-[11px] font-semibold uppercase tracking-widest text-slate-500;
+}
+
+/* Page layout */
+@utility page-container {
+  @apply mx-auto w-full max-w-6xl;
+}
+
+@utility page-section {
+  @apply space-y-5;
+}
+
+@utility mobile-stack {
+  @apply space-y-3;
+}
+
+@utility card-grid {
+  @apply grid gap-3 md:grid-cols-2 lg:grid-cols-3;
+}
+
+/* Safe area bottom spacing */
+@utility pb-safe {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+}
+
+/* Eyebrow accent */
+@utility admin-eyebrow {
+  @apply text-xs font-semibold uppercase tracking-widest text-indigo-600;
+}
+
+/* Divider with spacing */
+@utility admin-divider {
+  @apply my-3 border-t border-slate-100;
+}
+
+/* ── Compact List Row Utilities ── */
+
+/* Compact action row — h-8 with minimal padding */
+@utility compact-action-row {
+  @apply flex flex-wrap items-center gap-1.5;
+}
+
+/* Compact detail label */
+@utility compact-label {
+  @apply text-[10px] font-semibold uppercase tracking-wider text-slate-400;
+}
+
+/* Compact detail value */
+@utility compact-value {
+  @apply text-[13px] font-medium text-slate-800;
+}
+
+/* Mini badge for compact rows (h-4 text-[10px]) */
+@utility mini-badge {
+  @apply inline-flex h-4 items-center rounded-full px-1.5 text-[10px] font-medium whitespace-nowrap;
+}
+
+/* Tighter skeleton placeholder for compact lists */
+@utility skeleton-compact {
+  @apply h-14 w-full rounded-xl;
+}
+
+/* Dense grid meta (2-col inline) */
+@utility compact-meta-grid {
+  @apply grid grid-cols-2 gap-x-3 gap-y-1 text-xs;
 }

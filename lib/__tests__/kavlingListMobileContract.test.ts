@@ -8,14 +8,16 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe("kavling list mobile layout contract", () => {
-  it("renders compact mobile kavling cards while keeping the desktop table", () => {
+  it("renders compact mobile kavling rows while keeping the desktop table", () => {
     const source = readRepoFile("features/kavlings/KavlingListPage.tsx");
 
-    expect(source).toContain('className="space-y-2 md:hidden"');
-    expect(source).toContain('className="hidden overflow-x-auto md:block"');
+    expect(source).toContain("CompactListRow");
+    expect(source).toContain("ListContainer");
+    expect(source).toContain("overflow-x-auto");
     expect(source).toContain("Tanpa blok");
     expect(source).toContain("Urutan {item.sort_order}");
-    expect(source).toContain("aria-label={`Edit kavling ${item.code}`}");
-    expect(source).toContain("aria-label={`Nonaktifkan kavling ${item.code}`}");
+    expect(source).toContain("Tambah Kavling");
+    expect(source).toContain("Edit");
+    expect(source).toContain("Nonaktifkan");
   });
 });

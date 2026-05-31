@@ -1,18 +1,24 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Calendar, FilePlus2, MapPin, RefreshCw, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Calendar, FilePlus2, Inbox, MapPin, RefreshCw } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { useAuth } from "@/features/auth/authHooks";
+import { cn } from "@/lib/utils";
 import { formatDateId } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { eventFormSchema, type EventStatus } from "@/lib/validation";
@@ -43,13 +49,6 @@ interface RSVPSummary {
 
 interface EventRowWithRSVP extends EventRow {
   rsvp: RSVPSummary;
-}
-
-function parseTab(value: string | null): EventTab {
-  if (value === "cancelled" || value === "past") {
-    return value;
-  }
-  return "scheduled";
 }
 
 function formatEventStatusLabel(status: EventStatus): string {
@@ -85,6 +84,14 @@ function emptyEditor(): EditorState {
   };
 }
 
+const TAB_OPTIONS: EventTab[] = ["scheduled", "cancelled", "past"];
+
+function tabLabel(tab: EventTab): string {
+  if (tab === "scheduled") return "Mendatang";
+  if (tab === "cancelled") return "Dibatalkan";
+  return "Selesai";
+}
+
 export function AdminEventsPage() {
   const client = getSupabaseBrowserClient();
   const { profile } = useAuth();
@@ -104,6 +111,7 @@ export function AdminEventsPage() {
   // Cancel confirmation
   const [confirmCancel, setConfirmCancel] = useState<{ id: string; title: string; note: string } | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
@@ -177,18 +185,12 @@ export function AdminEventsPage() {
     () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
     [filteredItems, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
     }
   }, [page, totalPages]);
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(parseTab(value));
-  };
 
   const openNewEditor = () => {
     setEditor(emptyEditor());
@@ -317,239 +319,238 @@ export function AdminEventsPage() {
     return "secondary";
   };
 
+  const hasNoContent = !loading && !errorMessage && filteredItems.length === 0;
+
+  const mobileContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Tidak ada acara"
+      description={`Tidak ada acara ${tabLabel(activeTab).toLowerCase()} saat ini.`}
+    />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((row) => {
+        const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
+        const isPast = new Date(row.starts_at) < new Date();
+        const isExpanded = expandedId === row.id;
+        const statusLabel = isPast && row.status === "scheduled" ? "Selesai" : formatEventStatusLabel(row.status);
+        const statusVariant = row.status === "cancelled" ? "destructive" : isPast ? "muted" : "success";
+
+        return (
+          <CompactListRow
+            key={row.id}
+            primary={row.title}
+            trailing={
+              <Badge variant={statusBadgeVariant(row.status)} className="text-[10px] h-4 px-1.5">
+                {statusLabel}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={statusVariant} />
+                <span>{formatDateId(row.starts_at)}</span>
+                <span className="text-slate-300">·</span>
+                <MapPin className="size-3 text-slate-400" />
+                <span className="truncate">{row.location}</span>
+              </span>
+            }
+            accentColor={row.status === "cancelled" ? "border-l-red-500" : isPast ? "border-l-slate-300" : "border-l-indigo-500"}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : row.id)}
+            expanded={
+              <div className="space-y-2">
+                {row.description ? (
+                  <p className="text-xs text-slate-600">{row.description}</p>
+                ) : null}
+                <div className="flex items-center gap-3 text-xs">
+                  <span><span className="text-slate-400">Hadir</span> <span className="font-semibold text-slate-800">{rsvp.attending}</span></span>
+                  <span><span className="text-slate-400">Tidak</span> <span className="font-semibold text-slate-800">{rsvp.not_attending}</span></span>
+                  <span><span className="text-slate-400">Belum</span> <span className="font-semibold text-slate-800">{rsvp.no_response}</span></span>
+                </div>
+                {row.status === "scheduled" && !isPast ? (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={() => openEditEditor(row)}
+                      disabled={workingId === row.id}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8 text-xs"
+                      onClick={() => setConfirmCancel({ id: row.id, title: row.title, note: "" })}
+                      disabled={workingId === row.id}
+                    >
+                      Batalkan
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Tidak ada acara"
+      description={`Tidak ada acara ${tabLabel(activeTab).toLowerCase()} saat ini.`}
+    />
+  ) : (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[900px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Judul</TableHead>
+            <TableHead>Waktu</TableHead>
+            <TableHead>Lokasi</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>RSVP Hadir</TableHead>
+            <TableHead>RSVP Tidak Hadir</TableHead>
+            <TableHead>Belum Menjawab</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((row) => {
+          const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
+          const isPast = new Date(row.starts_at) < new Date();
+          return (
+            <TableRow key={row.id}>
+              <TableCell className="max-w-xs">
+                <p className="truncate font-medium text-slate-900">{row.title}</p>
+                {row.description ? (
+                  <p className="truncate text-xs text-slate-500">{row.description.slice(0, 60)}{row.description.length > 60 ? "…" : ""}</p>
+                ) : null}
+              </TableCell>
+              <TableCell className="text-slate-700">
+                <p>{formatDateId(row.starts_at)}</p>
+              </TableCell>
+              <TableCell className="text-slate-700">
+                <p className="flex items-center gap-1">
+                  <MapPin className="size-3" />
+                  {row.location}
+                </p>
+              </TableCell>
+              <TableCell>
+                <Badge variant={statusBadgeVariant(row.status)}>
+                  {isPast && row.status === "scheduled"
+                    ? "Selesai"
+                    : formatEventStatusLabel(row.status)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant={rsvpVariant(rsvp.attending, rsvp.attending + rsvp.not_attending + rsvp.no_response)}>
+                  {rsvp.attending}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant={rsvpVariant(rsvp.not_attending, rsvp.attending + rsvp.not_attending + rsvp.no_response)}>
+                  {rsvp.not_attending}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <span className="text-sm text-slate-500">{rsvp.no_response}</span>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-2">
+                  {row.status === "scheduled" && !isPast && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEditEditor(row)}
+                      disabled={workingId === row.id}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                  {row.status === "scheduled" && !isPast && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setConfirmCancel({ id: row.id, title: row.title, note: "" })}
+                      disabled={workingId === row.id}
+                    >
+                      Batalkan Acara
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Communication</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Acara</h1>
-          <p className="text-sm text-slate-600">
-            Kelola acara warga dan lihat ringkasan RSVP.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => loadEvents()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button onClick={openNewEditor} disabled={saving}>
-            <FilePlus2 className="size-4" /> Acara Baru
-          </Button>
-        </div>
-      </header>
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin Communication"
+        title="Acara"
+        subtitle="Kelola acara warga dan lihat ringkasan RSVP."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadEvents()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button size="sm" onClick={openNewEditor} disabled={saving}>
+              <FilePlus2 className="size-4" /> Acara Baru
+            </Button>
+          </>
+        }
+      />
 
-      {errorMessage ? (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="py-3 text-sm text-red-700">{errorMessage}</CardContent>
-        </Card>
+      {/* Tab switcher — scrollable pills on mobile, inline on desktop */}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="inline-flex min-w-max gap-1 rounded-lg bg-muted p-1 sm:min-w-0">
+          {TAB_OPTIONS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={cn(
+                "touch-target-sm whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors",
+                tab === activeTab
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setActiveTab(tab)}
+              disabled={loading || saving}
+            >
+              {tabLabel(tab)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* List */}
+      <DataList
+        loading={loading}
+        skeletonCount={5}
+        error={errorMessage}
+        onRetry={loadEvents}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
+
+      {/* Pagination */}
+      {!loading && !errorMessage && filteredItems.length > 0 ? (
+        <PaginationBar
+          page={page}
+          pageSize={pageSize}
+          totalRows={totalRows}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       ) : null}
-
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList>
-          <TabsTrigger value="scheduled">Mendatang</TabsTrigger>
-          <TabsTrigger value="cancelled">Dibatalkan</TabsTrigger>
-          <TabsTrigger value="past">Selesai</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            Daftar Acara —{" "}
-            {activeTab === "scheduled" ? "Mendatang" : activeTab === "cancelled" ? "Dibatalkan" : "Selesai"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : filteredItems.length === 0 ? (
-            <p className="text-sm text-slate-600">Tidak ada acara pada tab ini.</p>
-          ) : (
-            <>
-              <div className="space-y-3 lg:hidden">
-                {pagedItems.map((row) => {
-                  const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
-                  const isPast = new Date(row.starts_at) < new Date();
-                  return (
-                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-foreground">{row.title}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{formatDateId(row.starts_at)}</p>
-                        </div>
-                        <Badge variant={statusBadgeVariant(row.status)} className="shrink-0">
-                          {isPast && row.status === "scheduled" ? "Selesai" : formatEventStatusLabel(row.status)}
-                        </Badge>
-                      </div>
-                      <p className="mt-2 flex items-center gap-1 text-sm text-slate-700">
-                        <MapPin className="size-3" />
-                        {row.location}
-                      </p>
-                      {row.description ? (
-                        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{row.description}</p>
-                      ) : null}
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Hadir</p>
-                          <p className="font-semibold text-foreground">{rsvp.attending}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Tidak</p>
-                          <p className="font-semibold text-foreground">{rsvp.not_attending}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Belum</p>
-                          <p className="font-semibold text-foreground">{rsvp.no_response}</p>
-                        </div>
-                      </div>
-                      {row.status === "scheduled" && !isPast ? (
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                          <Button size="sm" variant="outline" className="w-full" onClick={() => openEditEditor(row)} disabled={workingId === row.id}>
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="w-full"
-                            onClick={() => setConfirmCancel({ id: row.id, title: row.title, note: "" })}
-                            disabled={workingId === row.id}
-                          >
-                            Batalkan
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[900px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Judul</TableHead>
-                      <TableHead>Waktu</TableHead>
-                      <TableHead>Lokasi</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>RSVP Hadir</TableHead>
-                      <TableHead>RSVP Tidak Hadir</TableHead>
-                      <TableHead>Belum Menjawab</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((row) => {
-                    const rsvp = rsvpSummaries[row.id] ?? { attending: 0, not_attending: 0, no_response: 0 };
-                    const isPast = new Date(row.starts_at) < new Date();
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="max-w-xs">
-                          <p className="truncate font-medium text-slate-900">{row.title}</p>
-                          {row.description ? (
-                            <p className="truncate text-xs text-slate-500">{row.description.slice(0, 60)}{row.description.length > 60 ? "…" : ""}</p>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          <p>{formatDateId(row.starts_at)}</p>
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          <p className="flex items-center gap-1">
-                            <MapPin className="size-3" />
-                            {row.location}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusBadgeVariant(row.status)}>
-                            {isPast && row.status === "scheduled"
-                              ? "Selesai"
-                              : formatEventStatusLabel(row.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={rsvpVariant(rsvp.attending, rsvp.attending + rsvp.not_attending + rsvp.no_response)}>
-                            {rsvp.attending}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={rsvpVariant(rsvp.not_attending, rsvp.attending + rsvp.not_attending + rsvp.no_response)}>
-                            {rsvp.not_attending}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-slate-500">{rsvp.no_response}</span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            {row.status === "scheduled" && !isPast && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openEditEditor(row)}
-                                disabled={workingId === row.id}
-                              >
-                                Edit
-                              </Button>
-                            )}
-                            {row.status === "scheduled" && !isPast && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setConfirmCancel({ id: row.id, title: row.title, note: "" })}
-                                disabled={workingId === row.id}
-                              >
-                                Batalkan Acara
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-
-          {!loading && filteredItems.length > 0 ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
 
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={(open) => !open && setEditorOpen(false)}>

@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { APP_NAME } from "@/lib/constants";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 import {
   residentNotificationCategorySchema,
@@ -275,12 +276,16 @@ export function ResidentSettingsPage() {
   };
 
   return (
-    <section className="space-y-6">
-      <header className="space-y-2 border-b pb-4">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Pengaturan Warga</p>
-        <h2 className="text-xl font-semibold text-foreground">Profil & Preferensi Notifikasi</h2>
-        <p className="text-sm text-muted-foreground">
-          Anda dapat memperbarui nama tampilan, nomor telepon, dan preferensi notifikasi berdasarkan kategori.
+    <section className="page-section">
+      <header className="space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600">
+          {APP_NAME}
+        </p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          Pengaturan
+        </h1>
+        <p className="text-sm text-slate-500">
+          Kelola profil, preferensi notifikasi, dan koneksi Telegram.
         </p>
       </header>
 

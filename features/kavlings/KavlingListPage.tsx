@@ -1,12 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Power, RefreshCw, SquarePen } from "lucide-react";
+import { ArrowUpRight, Inbox, Plus, Power, RefreshCw, SquarePen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { useAuth } from "@/features/auth/authHooks";
 import type { AuditLogInput } from "@/features/audit/auditTypes";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
@@ -50,6 +58,7 @@ export function KavlingListPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const currentEditing = useMemo(
     () => items.find((item) => item.id === editingId) ?? null,
@@ -61,9 +70,6 @@ export function KavlingListPage() {
     () => items.slice((page - 1) * pageSize, page * pageSize),
     [items, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
-
   useEffect(() => {
     if (page > totalPages) {
       setPage(totalPages);
@@ -230,27 +236,150 @@ export function KavlingListPage() {
     await loadKavlings();
   };
 
+  const hasNoContent = !loading && !errorMessage && items.length === 0;
+
+  const mobileContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada data kavling." />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((item) => {
+        const isExpanded = expandedId === item.id;
+        return (
+          <CompactListRow
+            key={item.id}
+            primary={item.code}
+            trailing={
+              <Badge variant={item.active ? "success" : "default"} className="text-[10px] h-4 px-1.5">
+                {item.active ? "Aktif" : "Nonaktif"}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={item.active ? "success" : "muted"} />
+                <span>{item.block ? `Blok ${item.block}` : "Tanpa blok"}</span>
+                <span className="text-slate-300">·</span>
+                <span>Urutan {item.sort_order}</span>
+              </span>
+            }
+            accentColor={item.active ? "border-l-emerald-500" : "border-l-slate-300"}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : item.id)}
+            expanded={
+              <div className="space-y-2">
+                {item.notes ? (
+                  <div className="text-xs">
+                    <span className="text-slate-400">Catatan</span>
+                    <p className="mt-0.5 text-slate-700">{item.notes}</p>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => {
+                      setCreating(false);
+                      setEditingId(item.id);
+                    }}
+                  >
+                    <SquarePen className="size-3" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs"
+                    disabled={!item.active || saving}
+                    onClick={() => handleDeactivate(item)}
+                  >
+                    <Power className="size-3" /> Nonaktifkan
+                  </Button>
+                </div>
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada data kavling." />
+  ) : (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[760px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Kode</TableHead>
+            <TableHead>Blok</TableHead>
+            <TableHead>Urutan</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Catatan</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((item) => (
+            <TableRow key={item.id} className="align-top">
+              <TableCell className="font-medium text-slate-900">{item.code}</TableCell>
+              <TableCell className="text-slate-700">{item.block ?? "-"}</TableCell>
+              <TableCell className="text-slate-700">{item.sort_order}</TableCell>
+              <TableCell>
+                <Badge variant={item.active ? "success" : "default"}>
+                  {item.active ? "Aktif" : "Nonaktif"}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-slate-700">{item.notes ?? "-"}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      setCreating(false);
+                      setEditingId(item.id);
+                    }}
+                  >
+                    <SquarePen className="size-3.5" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!item.active || saving}
+                    onClick={() => handleDeactivate(item)}
+                  >
+                    Nonaktifkan
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Manajemen Kavling</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => loadKavlings()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button
-            onClick={() => {
-              setCreating((value) => !value);
-              setEditingId(null);
-            }}
-          >
-            <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah Kavling"}
-          </Button>
-        </div>
-      </header>
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin"
+        title="Manajemen Kavling"
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadKavlings()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCreating((value) => !value);
+                setEditingId(null);
+              }}
+            >
+              <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah Kavling"}
+            </Button>
+          </>
+        }
+      />
 
       {errorMessage ? (
         <Card className="border-red-200 bg-red-50">
@@ -294,162 +423,28 @@ export function KavlingListPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Kavling</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data kavling...</p>
-          ) : (
-            <>
-              <div className="space-y-2 lg:hidden">
-                {pagedItems.length === 0 ? (
-                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                    Belum ada data kavling.
-                  </p>
-                ) : null}
-                {pagedItems.map((item) => (
-                  <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-foreground">{item.code}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {item.block ? `Blok ${item.block}` : "Tanpa blok"} - Urutan {item.sort_order}
-                        </p>
-                      </div>
-                      <Badge variant={item.active ? "success" : "default"} className="shrink-0">
-                        {item.active ? "Aktif" : "Nonaktif"}
-                      </Badge>
-                    </div>
+      <DataList
+        loading={loading}
+        error={errorMessage}
+        onRetry={loadKavlings}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
 
-                    {item.notes ? (
-                      <p className="mt-2 break-words text-sm text-slate-700">{item.notes}</p>
-                    ) : null}
-
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="w-full"
-                        aria-label={`Edit kavling ${item.code}`}
-                        title={`Edit kavling ${item.code}`}
-                        onClick={() => {
-                          setCreating(false);
-                          setEditingId(item.id);
-                        }}
-                      >
-                        <SquarePen className="size-3.5" /> Edit
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="w-full"
-                        aria-label={`Nonaktifkan kavling ${item.code}`}
-                        title={`Nonaktifkan kavling ${item.code}`}
-                        disabled={!item.active || saving}
-                        onClick={() => handleDeactivate(item)}
-                      >
-                        <Power className="size-3.5" /> Nonaktifkan
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[760px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Kode</TableHead>
-                      <TableHead>Blok</TableHead>
-                      <TableHead>Urutan</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Catatan</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((item) => (
-                      <TableRow key={item.id} className="align-top">
-                        <TableCell className="font-medium text-slate-900">{item.code}</TableCell>
-                        <TableCell className="text-slate-700">{item.block ?? "-"}</TableCell>
-                        <TableCell className="text-slate-700">{item.sort_order}</TableCell>
-                        <TableCell>
-                          <Badge variant={item.active ? "success" : "default"}>
-                            {item.active ? "Aktif" : "Nonaktif"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-slate-700">{item.notes ?? "-"}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setCreating(false);
-                                setEditingId(item.id);
-                              }}
-                            >
-                              <SquarePen className="size-3.5" /> Edit
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={!item.active || saving}
-                              onClick={() => handleDeactivate(item)}
-                            >
-                              Nonaktifkan
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-
-          {!loading ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      const next = Number(event.target.value);
-                      setPageSize(next);
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">Page {page}/{totalPages}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      {!loading && !errorMessage && items.length > 0 ? (
+        <div className="mt-3">
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={(size: number) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

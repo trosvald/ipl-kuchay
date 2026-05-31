@@ -2,12 +2,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, Inbox, RefreshCw, Wallet } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterBar, FilterGroup } from "@/components/ui/FilterBar";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
+import { StatsGrid } from "@/components/ui/StatsGrid";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { formatBillingPeriodStatusLabel, formatDateId, formatInvoiceStatusLabel, formatMonthYearId, formatRupiah, statusToBadgeVariant } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
 
@@ -112,11 +120,14 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
     () => filteredInvoices.slice((page - 1) * pageSize, page * pageSize),
     [filteredInvoices, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
 
   const totalDue = useMemo(() => filteredInvoices.reduce((sum, item) => sum + item.amount_due, 0), [filteredInvoices]);
   const totalPaid = useMemo(() => filteredInvoices.reduce((sum, item) => sum + item.amount_paid, 0), [filteredInvoices]);
+  const totalCount = filteredInvoices.length;
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, pageSize]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -128,205 +139,199 @@ export function BillingPeriodDetailPage({ periodId }: Readonly<BillingPeriodDeta
     return <p className="text-sm text-red-600">Supabase client belum tersedia.</p>;
   }
 
-  return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/admin/billing">
-              <ArrowLeft className="size-4" /> Kembali ke Billing
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-semibold text-slate-900">Detail Periode Billing</h1>
-          {period ? (
-            <p className="text-sm text-slate-600">
-              {formatMonthYearId(period.year, period.month)} - due {formatDateId(period.due_date)}
-            </p>
-          ) : null}
-        </div>
+  const hasNoContent = !loading && !errorMessage && filteredInvoices.length === 0;
 
-        <div className="flex flex-wrap items-center gap-2">
-          {period ? <Badge variant={statusToBadgeVariant(period.status)}>{formatBillingPeriodStatusLabel(period.status)}</Badge> : null}
-          <Button variant="secondary" onClick={() => loadPeriodDetail()} disabled={loading}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-        </div>
-      </header>
+  const mobileContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Tidak ada invoice"
+      description={statusFilter !== "all" ? "Tidak ada invoice dengan status filter ini." : "Belum ada invoice untuk periode ini."}
+    />
+  ) : (
+    <ListContainer>
+      {pagedInvoices.map((item) => {
+        const kavling = normalizeOne(item.kavlings);
+        const outstanding = Math.max(item.amount_due - item.amount_paid, 0);
+        const accentColor =
+          item.status === "paid" ? "border-l-emerald-500" :
+          item.status === "overdue" ? "border-l-red-500" :
+          item.status === "pending_verification" ? "border-l-amber-500" :
+          "border-l-slate-400";
+        const statusVariant = item.status === "paid" ? "success" : item.status === "overdue" ? "destructive" : item.status === "pending_verification" ? "warning" : "default";
+
+        return (
+          <CompactListRow
+            key={item.id}
+            primary={item.invoice_number}
+            trailing={
+              <Badge variant={statusToBadgeVariant(item.status)} className="text-[10px] h-4 px-1.5">
+                {formatInvoiceStatusLabel(item.status)}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={statusVariant} />
+                <span>Kav {kavling?.code ?? "-"}</span>
+                <span className="text-slate-300">·</span>
+                <span>JT {formatDateId(item.due_date)}</span>
+              </span>
+            }
+            accentColor={accentColor}
+          >
+            <div className="flex gap-3 text-xs">
+              <span><span className="text-slate-400">Tagihan</span> <span className="font-semibold text-slate-800">{formatRupiah(item.amount_due)}</span></span>
+              <span><span className="text-slate-400">Dibayar</span> <span className="font-semibold text-emerald-700">{formatRupiah(item.amount_paid)}</span></span>
+              {outstanding > 0 ? (
+                <span><span className="text-slate-400">Sisa</span> <span className="font-semibold text-amber-700">{formatRupiah(outstanding)}</span></span>
+              ) : null}
+            </div>
+          </CompactListRow>
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Tidak ada invoice"
+      description={statusFilter !== "all" ? "Tidak ada invoice dengan status filter ini." : "Belum ada invoice untuk periode ini."}
+    />
+  ) : (
+    <div className="overflow-x-auto rounded-xl border border-slate-200/70 bg-white shadow-sm">
+      <Table className="min-w-[920px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>No Invoice</TableHead>
+            <TableHead>Kavling</TableHead>
+            <TableHead>Due Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Tagihan</TableHead>
+            <TableHead>Dibayar</TableHead>
+            <TableHead>Sisa</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedInvoices.map((item) => {
+          const kavling = normalizeOne(item.kavlings);
+          const outstanding = Math.max(item.amount_due - item.amount_paid, 0);
+
+          return (
+            <TableRow key={item.id}>
+              <TableCell className="font-medium text-slate-900">{item.invoice_number}</TableCell>
+              <TableCell className="text-slate-700">{kavling?.code ?? "-"}</TableCell>
+              <TableCell className="text-slate-700">{formatDateId(item.due_date)}</TableCell>
+              <TableCell>
+                <Badge variant={statusToBadgeVariant(item.status)}>{formatInvoiceStatusLabel(item.status)}</Badge>
+              </TableCell>
+              <TableCell className="text-slate-700">{formatRupiah(item.amount_due)}</TableCell>
+              <TableCell className="text-slate-700">{formatRupiah(item.amount_paid)}</TableCell>
+              <TableCell className="text-slate-700">{formatRupiah(outstanding)}</TableCell>
+            </TableRow>
+          );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  return (
+    <section className="page-section">
+      <PageHeader
+        title="Detail Periode"
+        subtitle={
+          period
+            ? `${formatMonthYearId(period.year, period.month)} — jatuh tempo ${formatDateId(period.due_date)}`
+            : undefined
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {period ? (
+              <Badge variant={statusToBadgeVariant(period.status)}>
+                {formatBillingPeriodStatusLabel(period.status)}
+              </Badge>
+            ) : null}
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/admin/billing">
+                <ArrowLeft className="size-4" /> Kembali
+              </Link>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => loadPeriodDetail()} disabled={loading}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+          </div>
+        }
+      />
 
       {errorMessage ? (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="py-3 text-sm text-red-700">{errorMessage}</CardContent>
-        </Card>
+        <div className="rounded-xl border border-red-200 bg-red-50/80 px-5 py-3.5 text-sm text-red-700 font-medium">
+          {errorMessage}
+        </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Jumlah Invoice</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-slate-900">{filteredInvoices.length}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Total Tagihan</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-slate-900">{formatRupiah(totalDue)}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Total Terbayar</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-slate-900">{formatRupiah(totalPaid)}</CardContent>
-        </Card>
+      {/* Summary stats */}
+      {!loading && !errorMessage && period ? (
+        <StatsGrid
+          columns={3}
+          items={[
+            {
+              label: "Jumlah Invoice",
+              value: totalCount,
+              icon: FileText,
+            },
+            {
+              label: "Total Tagihan",
+              value: formatRupiah(totalDue),
+              icon: Wallet,
+            },
+            {
+              label: "Total Terbayar",
+              value: formatRupiah(totalPaid),
+              icon: Wallet,
+              variant: "success",
+            },
+          ]}
+        />
+      ) : null}
+
+      {/* Invoice list */}
+      <div className="admin-card p-4 space-y-4">
+        <FilterBar>
+          <FilterGroup label="Status">
+            <select
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as StatusFilter);
+              }}
+            >
+              {statusFilterOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option === "all" ? "Semua" : formatInvoiceStatusLabel(option)}
+                </option>
+              ))}
+            </select>
+          </FilterGroup>
+        </FilterBar>
+
+        <DataList
+          loading={loading}
+          error={null}
+          onRetry={loadPeriodDetail}
+          mobile={mobileContent}
+          desktop={desktopContent}
+        />
+
+        {!loading && !errorMessage && filteredInvoices.length > 0 ? (
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        ) : null}
       </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Daftar Invoice</CardTitle>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-              <span>Status</span>
-              <select
-                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900"
-                value={statusFilter}
-                onChange={(event) => {
-                  setStatusFilter(event.target.value as StatusFilter);
-                  setPage(1);
-                }}
-              >
-                {statusFilterOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option === "all" ? "Semua" : formatInvoiceStatusLabel(option)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat invoice...</p>
-          ) : (
-            <>
-              <div className="space-y-3 lg:hidden">
-                {pagedInvoices.length === 0 ? (
-                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                    Tidak ada invoice pada filter ini.
-                  </p>
-                ) : null}
-                {pagedInvoices.map((item) => {
-                  const kavling = normalizeOne(item.kavlings);
-                  const outstanding = Math.max(item.amount_due - item.amount_paid, 0);
-
-                  return (
-                    <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">{item.invoice_number}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Kavling {kavling?.code ?? "-"} - due {formatDateId(item.due_date)}
-                          </p>
-                        </div>
-                        <Badge variant={statusToBadgeVariant(item.status)} className="shrink-0">
-                          {formatInvoiceStatusLabel(item.status)}
-                        </Badge>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Tagihan</p>
-                          <p className="font-semibold text-foreground">{formatRupiah(item.amount_due)}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Dibayar</p>
-                          <p className="font-semibold text-green-700">{formatRupiah(item.amount_paid)}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Sisa</p>
-                          <p className="font-semibold text-orange-700">{formatRupiah(outstanding)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[920px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>No Invoice</TableHead>
-                      <TableHead>Kavling</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Tagihan</TableHead>
-                      <TableHead>Dibayar</TableHead>
-                      <TableHead>Sisa</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedInvoices.map((item) => {
-                    const kavling = normalizeOne(item.kavlings);
-                    const outstanding = Math.max(item.amount_due - item.amount_paid, 0);
-
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium text-slate-900">{item.invoice_number}</TableCell>
-                        <TableCell className="text-slate-700">{kavling?.code ?? "-"}</TableCell>
-                        <TableCell className="text-slate-700">{formatDateId(item.due_date)}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusToBadgeVariant(item.status)}>{formatInvoiceStatusLabel(item.status)}</Badge>
-                        </TableCell>
-                        <TableCell className="text-slate-700">{formatRupiah(item.amount_due)}</TableCell>
-                        <TableCell className="text-slate-700">{formatRupiah(item.amount_paid)}</TableCell>
-                        <TableCell className="text-slate-700">{formatRupiah(outstanding)}</TableCell>
-                      </TableRow>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-          {!loading ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
     </section>
   );
 }

@@ -43,7 +43,7 @@ describe("phase 01 task 1-06-02 admin CRUD + mapping contract", () => {
 
     expect(html).toContain("Manajemen Kavling");
     expect(html).toContain("Tambah Kavling");
-    expect(html).toContain("Daftar Kavling");
+    expect(html).toContain("Refresh");
   });
 
   it("shows mapping constraints aligned with one-primary DB contract", () => {

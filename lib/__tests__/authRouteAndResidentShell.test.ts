@@ -71,7 +71,7 @@ describe("ResidentShell settings navigation behavior", () => {
     const html = renderToStaticMarkup(createElement(ResidentShell, null, createElement("div", null, "Konten")));
 
     expect(html).toContain('href="/app/settings"');
-    expect(html).toContain("Pengaturan");
+    expect(html).toContain("Setelan");
     expect(html).not.toContain('href="/admin"');
   });
 });

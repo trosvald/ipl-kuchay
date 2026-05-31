@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, SquarePen, Trash2 } from "lucide-react";
+import { Inbox, Plus, RefreshCw, SquarePen, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -16,8 +16,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { writeAuditLog } from "@/features/audit/writeAuditLog";
 import { useAuth } from "@/features/auth/authHooks";
 import { formatDateId, formatRupiah } from "@/lib/format";
@@ -134,6 +141,7 @@ export function FeeOverridesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<OverrideRow | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
@@ -152,8 +160,6 @@ export function FeeOverridesPage() {
     () => items.slice((page - 1) * pageSize, page * pageSize),
     [items, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
   let submitLabel = "Simpan Override";
   if (editingId) {
     submitLabel = "Perbarui Override";
@@ -441,30 +447,198 @@ export function FeeOverridesPage() {
     await loadAll();
   };
 
+  const hasNoContent = !loading && !errorMessage && items.length === 0;
+
+  const mobileContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada override." />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((row) => {
+        const kavling = normalizeOne(row.kavlings);
+        const feeType = normalizeOne(row.fee_types);
+        const ended = isOverrideEnded(row.active_until);
+        const isExpanded = expandedId === row.id;
+
+        return (
+          <CompactListRow
+            key={row.id}
+            primary={kavling?.code ?? "-"}
+            trailing={
+              <Badge variant={ended ? "secondary" : "success"} className="text-[10px] h-4 px-1.5">
+                {ended ? "Berakhir" : "Aktif"}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={ended ? "muted" : "success"} />
+                <span>{feeType?.name ?? "-"} ({feeType?.code ?? "-"})</span>
+                <span className="text-slate-300">·</span>
+                <span className="tabular-nums">{formatRupiah(row.amount)}</span>
+              </span>
+            }
+            accentColor={ended ? "border-l-slate-300" : "border-l-emerald-500"}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : row.id)}
+            expanded={
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <div>
+                    <span className="text-slate-400">Rentang Aktif</span>
+                    <p className="font-medium text-slate-800">
+                      {row.active_from ? formatDateId(row.active_from) : "-"} – {row.active_until ? formatDateId(row.active_until) : "terbuka"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Nominal</span>
+                    <p className="font-medium text-slate-800 tabular-nums">{formatRupiah(row.amount)}</p>
+                  </div>
+                </div>
+                {row.notes ? (
+                  <div className="text-xs">
+                    <span className="text-slate-400">Catatan</span>
+                    <p className="mt-0.5 text-slate-700">{row.notes}</p>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    disabled={saving}
+                    onClick={() => {
+                      setCreating(false);
+                      setEditingId(row.id);
+                    }}
+                  >
+                    <SquarePen className="size-3" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs"
+                    disabled={saving || Boolean(row.active_until)}
+                    onClick={() => handleEndOverrideNow(row)}
+                  >
+                    Akhiri
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="h-8 text-xs"
+                    disabled={saving}
+                    onClick={() => setConfirmDelete(row)}
+                  >
+                    <Trash2 className="size-3" /> Hapus
+                  </Button>
+                </div>
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState icon={Inbox} title="Belum ada override." />
+  ) : (
+    <div className="overflow-x-auto">
+      <Table className="min-w-[900px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Kavling</TableHead>
+            <TableHead>Jenis Biaya</TableHead>
+            <TableHead>Nominal</TableHead>
+            <TableHead>Rentang Aktif</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((row) => {
+            const kavling = normalizeOne(row.kavlings);
+            const feeType = normalizeOne(row.fee_types);
+            const ended = isOverrideEnded(row.active_until);
+
+            return (
+              <TableRow key={row.id}>
+                <TableCell className="font-medium text-slate-900">{kavling?.code ?? "-"}</TableCell>
+                <TableCell>
+                  <p className="font-medium text-slate-900">{feeType?.name ?? "-"}</p>
+                  <p className="text-xs text-slate-500">{feeType?.code ?? "-"}</p>
+                </TableCell>
+                <TableCell className="text-slate-700">{formatRupiah(row.amount)}</TableCell>
+                <TableCell className="text-sm text-slate-700">
+                  {row.active_from ? formatDateId(row.active_from) : "-"} - {row.active_until ? formatDateId(row.active_until) : "terbuka"}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={ended ? "secondary" : "success"}>{ended ? "Berakhir" : "Aktif"}</Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => {
+                        setCreating(false);
+                        setEditingId(row.id);
+                      }}
+                    >
+                      <SquarePen className="size-4" /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={saving || Boolean(row.active_until)}
+                      onClick={() => handleEndOverrideNow(row)}
+                    >
+                      Akhiri Hari Ini
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={saving}
+                      onClick={() => setConfirmDelete(row)}
+                    >
+                      <Trash2 className="size-4" /> Hapus
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold text-slate-900">Fee Override Per Kavling</h2>
-          <p className="text-sm text-slate-600">Override dipilih berdasarkan rentang aktif saat periode ditagihkan.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => loadAll()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button
-            onClick={() => {
-              setCreating((value) => !value);
-              setEditingId(null);
-              if (!creating) {
-                resetForm();
-              }
-            }}
-          >
-            <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah Override"}
-          </Button>
-        </div>
-      </header>
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin"
+        title="Fee Override Per Kavling"
+        subtitle="Override dipilih berdasarkan rentang aktif saat periode ditagihkan."
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadAll()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCreating((value) => !value);
+                setEditingId(null);
+                if (!creating) {
+                  resetForm();
+                }
+              }}
+            >
+              <Plus className="size-4" /> {creating ? "Tutup Form" : "Tambah Override"}
+            </Button>
+          </>
+        }
+      />
 
       {errorMessage ? (
         <Card className="border-red-200 bg-red-50">
@@ -572,189 +746,28 @@ export function FeeOverridesPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Override</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : (
-            <>
-              <div className="space-y-2 lg:hidden">
-                {pagedItems.map((row) => {
-                  const kavling = normalizeOne(row.kavlings);
-                  const feeType = normalizeOne(row.fee_types);
-                  const ended = isOverrideEnded(row.active_until);
+      <DataList
+        loading={loading}
+        error={errorMessage}
+        onRetry={loadAll}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
 
-                  return (
-                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-foreground">{kavling?.code ?? "-"}</p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {feeType?.name ?? "-"} ({feeType?.code ?? "-"})
-                          </p>
-                        </div>
-                        <Badge variant={ended ? "secondary" : "success"} className="shrink-0">
-                          {ended ? "Berakhir" : "Aktif"}
-                        </Badge>
-                      </div>
-
-                      <p className="mt-2 text-lg font-semibold text-foreground">{formatRupiah(row.amount)}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {row.active_from ? formatDateId(row.active_from) : "-"} - {row.active_until ? formatDateId(row.active_until) : "terbuka"}
-                      </p>
-                      {row.notes ? <p className="mt-2 break-words text-sm text-slate-700">{row.notes}</p> : null}
-
-                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full"
-                          disabled={saving}
-                          onClick={() => {
-                            setCreating(false);
-                            setEditingId(row.id);
-                          }}
-                        >
-                          <SquarePen className="size-4" /> Edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="w-full"
-                          disabled={saving || Boolean(row.active_until)}
-                          onClick={() => handleEndOverrideNow(row)}
-                        >
-                          Akhiri
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="w-full"
-                          disabled={saving}
-                          onClick={() => setConfirmDelete(row)}
-                        >
-                          <Trash2 className="size-4" /> Hapus
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[900px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Kavling</TableHead>
-                      <TableHead>Jenis Biaya</TableHead>
-                      <TableHead>Nominal</TableHead>
-                      <TableHead>Rentang Aktif</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((row) => {
-                      const kavling = normalizeOne(row.kavlings);
-                      const feeType = normalizeOne(row.fee_types);
-                      const ended = isOverrideEnded(row.active_until);
-
-                      return (
-                        <TableRow key={row.id}>
-                          <TableCell className="font-medium text-slate-900">{kavling?.code ?? "-"}</TableCell>
-                          <TableCell>
-                            <p className="font-medium text-slate-900">{feeType?.name ?? "-"}</p>
-                            <p className="text-xs text-slate-500">{feeType?.code ?? "-"}</p>
-                          </TableCell>
-                          <TableCell className="text-slate-700">{formatRupiah(row.amount)}</TableCell>
-                          <TableCell className="text-sm text-slate-700">
-                            {row.active_from ? formatDateId(row.active_from) : "-"} - {row.active_until ? formatDateId(row.active_until) : "terbuka"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={ended ? "secondary" : "success"}>{ended ? "Berakhir" : "Aktif"}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={saving}
-                                onClick={() => {
-                                  setCreating(false);
-                                  setEditingId(row.id);
-                                }}
-                              >
-                                <SquarePen className="size-4" /> Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={saving || Boolean(row.active_until)}
-                                onClick={() => handleEndOverrideNow(row)}
-                              >
-                                Akhiri Hari Ini
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                disabled={saving}
-                                onClick={() => setConfirmDelete(row)}
-                              >
-                                <Trash2 className="size-4" /> Hapus
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-          {!loading ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      {!loading && !errorMessage && items.length > 0 ? (
+        <div className="mt-3">
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={(size: number) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
+      ) : null}
 
       <AlertDialog open={Boolean(confirmDelete)} onOpenChange={(open) => !open && setConfirmDelete(null)}>
         <AlertDialogContent>

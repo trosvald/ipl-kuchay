@@ -1,19 +1,26 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { FileX, Inbox, RefreshCw, SearchX } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PaginationBar } from "@/components/ui/PaginationBar";
 import { ProofPreviewButton } from "@/features/payments/ProofPreviewButton";
 import { SubmissionReviewModal, type SubmissionReviewTarget } from "@/features/payments/SubmissionReviewModal";
 import { notifySubmissionReviewed } from "@/features/payments/submissionNotificationPlaceholder";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { formatDateId, formatInvoiceStatusLabel, formatPaymentSubmissionStatus, formatRupiah, statusToBadgeVariant } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { cn } from "@/lib/utils";
 
 type SubmissionTab = "pending" | "verified" | "rejected";
 
@@ -104,6 +111,8 @@ function profileDisplayName(profile: ProfileSummary | undefined): string {
   return profile.display_name?.trim() || profile.full_name;
 }
 
+const TAB_OPTIONS: SubmissionTab[] = ["pending", "verified", "rejected"];
+
 export function AdminSubmissionsPage() {
   const client = getSupabaseBrowserClient();
   const router = useRouter();
@@ -124,6 +133,7 @@ export function AdminSubmissionsPage() {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadSubmissions = useCallback(async () => {
     if (!client) {
@@ -243,8 +253,6 @@ export function AdminSubmissionsPage() {
     () => filteredItems.slice((page - 1) * pageSize, page * pageSize),
     [filteredItems, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
 
   useEffect(() => {
     setPage(1);
@@ -335,257 +343,327 @@ export function AdminSubmissionsPage() {
       return <span className="text-xs text-slate-500">Selesai</span>;
     }
 
+    if (layout === "mobile") {
+      return (
+        <div className="flex gap-2">
+          <Button size="sm" variant="default" onClick={() => openReview("approve", item)} disabled={working} className="flex-1">
+            Approve
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => openReview("reject", item)} disabled={working} className="flex-1">
+            Reject
+          </Button>
+        </div>
+      );
+    }
+
     return (
-      <div className={layout === "mobile" ? "grid grid-cols-2 gap-2" : "flex gap-2"}>
-        <Button size="sm" variant="default" className={layout === "mobile" ? "w-full" : undefined} onClick={() => openReview("approve", item)} disabled={working}>
+      <div className="flex gap-2">
+        <Button size="sm" variant="default" onClick={() => openReview("approve", item)} disabled={working}>
           Approve
         </Button>
-        <Button size="sm" variant="destructive" className={layout === "mobile" ? "w-full" : undefined} onClick={() => openReview("reject", item)} disabled={working}>
+        <Button size="sm" variant="destructive" onClick={() => openReview("reject", item)} disabled={working}>
           Reject
         </Button>
       </div>
     );
   };
 
-  return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Payments</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Verifikasi Submission</h1>
-          <p className="text-sm text-slate-600">Approve/reject bukti transfer manual dengan audit trail.</p>
-        </div>
-        <Button variant="secondary" onClick={() => loadSubmissions()} disabled={loading || working}>
-          <RefreshCw className="size-4" /> Refresh
-        </Button>
-      </header>
+  const hasNoContent = !loading && !errorMessage && filteredItems.length === 0;
 
-      <div className="flex flex-wrap items-center gap-2">
-        {(["pending", "verified", "rejected"] as SubmissionTab[]).map((tab) => (
-          <Button
-            key={tab}
-            size="sm"
-            variant={tab === activeTab ? "default" : "secondary"}
-            onClick={() => switchTab(tab)}
-            disabled={loading || working}
-          >
-            {tabLabel(tab)}
+  const mobileContent = hasNoContent ? (
+    <EmptyState
+      icon={searchText.trim() ? SearchX : Inbox}
+      title={searchText.trim() ? "Pencarian tidak ditemukan" : "Tidak ada submission"}
+      description={
+        searchText.trim()
+          ? `Tidak ada submission yang cocok dengan "${searchText.trim()}"`
+          : `Tidak ada submission ${tabLabel(activeTab).toLowerCase()} yang perlu ditinjau.`
+      }
+    />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((item) => {
+        const invoice = normalizeOne(item.invoices);
+        const kavling = normalizeOne(invoice?.kavlings ?? null);
+        const period = normalizeOne(invoice?.billing_periods ?? null);
+        const bankAccount = normalizeOne(item.bank_accounts);
+        const reviewerId = item.verified_by ?? item.rejected_by;
+        const reviewTime = item.verified_at ?? item.rejected_at;
+        const pendingDuplicates = pendingByInvoice[item.invoice_id] ?? 0;
+        const isExpanded = expandedId === item.id;
+        const accentColor = item.status === "submitted" ? "border-l-amber-500" : item.status === "verified" ? "border-l-emerald-500" : "border-l-red-500";
+        const statusVariant = item.status === "submitted" ? "warning" : item.status === "verified" ? "success" : "destructive";
+
+        const secondaryParts = [
+          kavling ? `${kavling.code}${kavling.block ? ` / Blok ${kavling.block}` : ""}` : null,
+          period?.label,
+        ].filter(Boolean).join(" · ");
+
+        return (
+          <CompactListRow
+            key={item.id}
+            primary={invoice?.invoice_number ?? "-"}
+            trailing={
+              <span className="tabular-nums">{formatRupiah(item.amount_submitted)}</span>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={statusVariant} />
+                <span>{formatSubmissionStatus(item.status)}</span>
+                {secondaryParts ? <><span className="text-slate-300">·</span><span className="truncate">{secondaryParts}</span></> : null}
+              </span>
+            }
+            accentColor={accentColor}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : item.id)}
+            expanded={
+              <div className="space-y-2">
+                {/* Detail lines */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <div>
+                    <span className="text-slate-400">Pengirim</span>
+                    <p className="font-medium text-slate-800">{profileDisplayName(profileMap[item.submitted_by])}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Status Invoice</span>
+                    <div>
+                      <Badge variant={statusToBadgeVariant(invoice?.status ?? "unpaid")} className="text-[10px] h-4 px-1.5">
+                        {formatInvoiceStatusLabel(invoice?.status ?? "unpaid")}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Duplikat</span>
+                    <p className="font-medium text-slate-800">
+                      {pendingDuplicates > 1 ? `${pendingDuplicates} pending` : String(pendingDuplicates)}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Waktu</span>
+                    <p className="font-medium text-slate-800">{formatDateId(item.created_at)}</p>
+                  </div>
+                </div>
+                <div className="text-xs">
+                  <span className="text-slate-400">Rekening</span>
+                  <p className="font-medium text-slate-800">{bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name}` : "-"}</p>
+                </div>
+                {reviewerId ? (
+                  <div className="text-xs">
+                    <span className="text-slate-400">Reviewer</span>
+                    <p className="font-medium text-slate-800">{profileDisplayName(profileMap[reviewerId])}</p>
+                  </div>
+                ) : null}
+                {(item.rejection_reason ?? item.note) ? (
+                  <div className="text-xs">
+                    <span className="text-slate-400">Catatan</span>
+                    <p className="font-medium text-slate-800 break-words">{item.status === "rejected" ? item.rejection_reason ?? item.note : item.note}</p>
+                  </div>
+                ) : null}
+                {reviewTime ? (
+                  <div className="text-xs">
+                    <span className="text-slate-400">Review</span>
+                    <p className="font-medium text-slate-800">{formatDateId(reviewTime)}</p>
+                  </div>
+                ) : null}
+
+                {/* Proof button */}
+                <div>
+                  {item.proof_path ? (
+                    <ProofPreviewButton submissionId={item.id} disabled={working} />
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">Belum ada bukti</p>
+                  )}
+                </div>
+
+                {/* Inline h-8 action buttons */}
+                {item.status === "submitted" ? (
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="default" className="h-8 text-xs" onClick={() => openReview("approve", item)} disabled={working}>
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => openReview("reject", item)} disabled={working}>
+                      Reject
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic py-1">Selesai</p>
+                )}
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState
+      icon={searchText.trim() ? SearchX : FileX}
+      title={searchText.trim() ? "Pencarian tidak ditemukan" : "Tidak ada submission"}
+      description={
+        searchText.trim()
+          ? `Tidak ada submission yang cocok dengan "${searchText.trim()}"`
+          : `Tidak ada submission ${tabLabel(activeTab).toLowerCase()} yang perlu ditinjau.`
+      }
+    />
+  ) : (
+    <div className="overflow-x-auto rounded-xl border border-slate-200/70 bg-white shadow-sm">
+      <Table className="min-w-[1320px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Waktu</TableHead>
+            <TableHead>Invoice</TableHead>
+            <TableHead>Kavling</TableHead>
+            <TableHead>Nominal</TableHead>
+            <TableHead>Status Submission</TableHead>
+            <TableHead>Status Invoice</TableHead>
+            <TableHead>Pengirim</TableHead>
+            <TableHead>Rekening Tujuan</TableHead>
+            <TableHead>Duplikat Pending</TableHead>
+            <TableHead>Bukti</TableHead>
+            <TableHead>Catatan</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((item) => {
+          const invoice = normalizeOne(item.invoices);
+          const kavling = normalizeOne(invoice?.kavlings ?? null);
+          const period = normalizeOne(invoice?.billing_periods ?? null);
+          const bankAccount = normalizeOne(item.bank_accounts);
+          const reviewerId = item.verified_by ?? item.rejected_by;
+          const reviewTime = item.verified_at ?? item.rejected_at;
+          const pendingDuplicates = pendingByInvoice[item.invoice_id] ?? 0;
+
+          return (
+            <TableRow key={item.id}>
+              <TableCell className="text-slate-700">
+                <div>
+                  <p>{formatDateId(item.created_at)}</p>
+                  {reviewTime ? <p className="text-xs text-slate-500">Review: {formatDateId(reviewTime)}</p> : null}
+                </div>
+              </TableCell>
+              <TableCell className="text-slate-700">
+                <p className="font-medium text-slate-900">{invoice?.invoice_number ?? "-"}</p>
+                <p className="text-xs text-slate-500">{period ? `${period.label} (${period.month}/${period.year})` : "-"}</p>
+              </TableCell>
+              <TableCell className="text-slate-700">
+                {kavling ? `${kavling.code}${kavling.block ? ` / Blok ${kavling.block}` : ""}` : "-"}
+              </TableCell>
+              <TableCell className="font-medium text-slate-900">{formatRupiah(item.amount_submitted)}</TableCell>
+              <TableCell>
+                <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)}>
+                  {formatSubmissionStatus(item.status)}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant={statusToBadgeVariant(invoice?.status ?? "unpaid")}>
+                  {formatInvoiceStatusLabel(invoice?.status ?? "unpaid")}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-slate-700">
+                <p>{profileDisplayName(profileMap[item.submitted_by])}</p>
+                {reviewerId ? <p className="text-xs text-slate-500">Reviewer: {profileDisplayName(profileMap[reviewerId])}</p> : null}
+              </TableCell>
+              <TableCell className="text-slate-700">
+                {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}
+              </TableCell>
+              <TableCell>
+                {pendingDuplicates > 1 ? (
+                  <Badge variant="destructive">{pendingDuplicates} pending</Badge>
+                ) : (
+                  <Badge variant="secondary">{pendingDuplicates}</Badge>
+                )}
+              </TableCell>
+              <TableCell>{item.proof_path ? <ProofPreviewButton submissionId={item.id} disabled={working} /> : <span className="text-xs text-slate-500">Belum ada</span>}</TableCell>
+              <TableCell className="max-w-xs text-slate-700">
+                <p className="line-clamp-3 text-sm">
+                  {item.status === "rejected" ? item.rejection_reason ?? item.note ?? "-" : item.note ?? "-"}
+                </p>
+              </TableCell>
+              <TableCell>
+                {renderReviewActions(item)}
+              </TableCell>
+            </TableRow>
+          );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  return (
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin Payments"
+        title="Verifikasi Submission"
+        subtitle="Approve/reject bukti transfer manual dengan audit trail."
+        actions={
+          <Button variant="secondary" size="sm" onClick={() => loadSubmissions()} disabled={loading || working}>
+            <RefreshCw className="size-4" /> Refresh
           </Button>
-        ))}
+        }
+      />
+
+      {/* Tab switcher — scrollable pills on mobile, inline on desktop */}
+      <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="inline-flex min-w-max gap-1 rounded-lg bg-slate-100 p-1 sm:min-w-0">
+          {TAB_OPTIONS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={cn(
+                "touch-target-sm whitespace-nowrap rounded-md px-4 py-1.5 text-sm font-medium transition-all duration-150",
+                tab === activeTab
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800",
+              )}
+              onClick={() => switchTab(tab)}
+              disabled={loading || working}
+            >
+              {tabLabel(tab)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="space-y-3">
-          <CardTitle className="text-base">Daftar Submission {tabLabel(activeTab)}</CardTitle>
-          <Input
-            placeholder="Cari invoice, kavling, atau nama pengirim..."
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+      {/* Search */}
+      <Input
+        placeholder="Cari invoice, kavling, atau nama pengirim..."
+        value={searchText}
+        onChange={(event) => setSearchText(event.target.value)}
+        className="rounded-xl border-slate-200/70 bg-white shadow-sm"
+      />
+
+      {/* Error */}
+      {errorMessage && !loading ? (
+        <div className="rounded-xl border border-red-200 bg-red-50/80 px-5 py-3.5 text-sm text-red-700 font-medium">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      {/* List */}
+      <DataList
+        loading={loading}
+        skeletonCount={5}
+        error={null}
+        onRetry={loadSubmissions}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
+
+      {/* Pagination */}
+      {!loading && !errorMessage && filteredItems.length > 0 ? (
+        <div className="admin-card px-4 py-3">
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
           />
-        </CardHeader>
-        <CardContent>
-          {errorMessage ? (
-            <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p>
-          ) : null}
-
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat submission...</p>
-          ) : filteredItems.length === 0 ? (
-            <p className="text-sm text-slate-600">Tidak ada submission pada tab ini.</p>
-          ) : (
-            <>
-              <div className="space-y-3 lg:hidden">
-                {pagedItems.map((item) => {
-                  const invoice = normalizeOne(item.invoices);
-                  const kavling = normalizeOne(invoice?.kavlings ?? null);
-                  const period = normalizeOne(invoice?.billing_periods ?? null);
-                  const bankAccount = normalizeOne(item.bank_accounts);
-                  const reviewerId = item.verified_by ?? item.rejected_by;
-                  const reviewTime = item.verified_at ?? item.rejected_at;
-                  const pendingDuplicates = pendingByInvoice[item.invoice_id] ?? 0;
-
-                  return (
-                    <div key={item.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">{invoice?.invoice_number ?? "-"}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {kavling ? `${kavling.code}${kavling.block ? ` / Blok ${kavling.block}` : ""}` : "-"} - {period ? period.label : "-"}
-                          </p>
-                        </div>
-                        <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)} className="shrink-0">
-                          {formatSubmissionStatus(item.status)}
-                        </Badge>
-                      </div>
-
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Nominal</p>
-                          <p className="font-semibold text-foreground">{formatRupiah(item.amount_submitted)}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Invoice</p>
-                          <Badge variant={statusToBadgeVariant(invoice?.status ?? "unpaid")} className="mt-1">
-                            {formatInvoiceStatusLabel(invoice?.status ?? "unpaid")}
-                          </Badge>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Pengirim</p>
-                          <p className="font-medium text-foreground">{profileDisplayName(profileMap[item.submitted_by])}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-muted-foreground">Duplikat</p>
-                          <Badge variant={pendingDuplicates > 1 ? "destructive" : "secondary"} className="mt-1">
-                            {pendingDuplicates > 1 ? `${pendingDuplicates} pending` : pendingDuplicates}
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 space-y-2 text-xs text-slate-600">
-                        <p>Waktu: {formatDateId(item.created_at)}</p>
-                        <p>Rekening: {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name}` : "-"}</p>
-                        {reviewTime ? <p>Review: {formatDateId(reviewTime)}</p> : null}
-                        {reviewerId ? <p>Reviewer: {profileDisplayName(profileMap[reviewerId])}</p> : null}
-                        {(item.rejection_reason ?? item.note) ? (
-                          <p className="break-words">Catatan: {item.status === "rejected" ? item.rejection_reason ?? item.note : item.note}</p>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {item.proof_path ? <ProofPreviewButton submissionId={item.id} disabled={working} /> : <span className="text-xs text-slate-500">Belum ada bukti</span>}
-                      </div>
-                      <div className="mt-3">{renderReviewActions(item, "mobile")}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[1320px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Waktu</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Kavling</TableHead>
-                      <TableHead>Nominal</TableHead>
-                      <TableHead>Status Submission</TableHead>
-                      <TableHead>Status Invoice</TableHead>
-                      <TableHead>Pengirim</TableHead>
-                      <TableHead>Rekening Tujuan</TableHead>
-                      <TableHead>Duplikat Pending</TableHead>
-                      <TableHead>Bukti</TableHead>
-                      <TableHead>Catatan</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((item) => {
-                    const invoice = normalizeOne(item.invoices);
-                    const kavling = normalizeOne(invoice?.kavlings ?? null);
-                    const period = normalizeOne(invoice?.billing_periods ?? null);
-                    const bankAccount = normalizeOne(item.bank_accounts);
-                    const reviewerId = item.verified_by ?? item.rejected_by;
-                    const reviewTime = item.verified_at ?? item.rejected_at;
-                    const pendingDuplicates = pendingByInvoice[item.invoice_id] ?? 0;
-
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell className="text-slate-700">
-                          <div>
-                            <p>{formatDateId(item.created_at)}</p>
-                            {reviewTime ? <p className="text-xs text-slate-500">Review: {formatDateId(reviewTime)}</p> : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          <p className="font-medium text-slate-900">{invoice?.invoice_number ?? "-"}</p>
-                          <p className="text-xs text-slate-500">{period ? `${period.label} (${period.month}/${period.year})` : "-"}</p>
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          {kavling ? `${kavling.code}${kavling.block ? ` / Blok ${kavling.block}` : ""}` : "-"}
-                        </TableCell>
-                        <TableCell className="font-medium text-slate-900">{formatRupiah(item.amount_submitted)}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusToBadgeVariant(item.status === "verified" ? "paid" : item.status)}>
-                            {formatSubmissionStatus(item.status)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={statusToBadgeVariant(invoice?.status ?? "unpaid")}>
-                            {formatInvoiceStatusLabel(invoice?.status ?? "unpaid")}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          <p>{profileDisplayName(profileMap[item.submitted_by])}</p>
-                          {reviewerId ? <p className="text-xs text-slate-500">Reviewer: {profileDisplayName(profileMap[reviewerId])}</p> : null}
-                        </TableCell>
-                        <TableCell className="text-slate-700">
-                          {bankAccount ? `${bankAccount.label} - ${bankAccount.bank_name} ${bankAccount.account_number}` : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {pendingDuplicates > 1 ? (
-                            <Badge variant="destructive">{pendingDuplicates} pending</Badge>
-                          ) : (
-                            <Badge variant="secondary">{pendingDuplicates}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>{item.proof_path ? <ProofPreviewButton submissionId={item.id} disabled={working} /> : <span className="text-xs text-slate-500">Belum ada</span>}</TableCell>
-                        <TableCell className="max-w-xs text-slate-700">
-                          <p className="line-clamp-3 text-sm">
-                            {item.status === "rejected" ? item.rejection_reason ?? item.note ?? "-" : item.note ?? "-"}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          {renderReviewActions(item)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-
-          {!loading && filteredItems.length > 0 ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      ) : null}
 
       <SubmissionReviewModal
         open={modalOpen}

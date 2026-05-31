@@ -2,15 +2,22 @@
 
 import Link from "next/link";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, FilePlus2, RefreshCw } from "lucide-react";
+import { ArrowUpRight, FilePlus2, Inbox, RefreshCw } from "lucide-react";
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompactListRow } from "@/components/ui/CompactListRow";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { ListContainer } from "@/components/ui/ListContainer";
+import { StatusDot } from "@/components/ui/StatusDot";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ActionBar } from "@/components/ui/ActionBar";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PaginationBar } from "@/components/ui/PaginationBar";
+import { DataList } from "@/features/layout/DataList";
+import { PageHeader } from "@/features/layout/PageHeader";
 import { writeAuditLog } from "@/features/audit/writeAuditLog";
 import { useAuth } from "@/features/auth/authHooks";
 import { formatMonthYearId, formatBillingPeriodStatusLabel, formatDateId, formatRupiah, statusToBadgeVariant } from "@/lib/format";
@@ -68,6 +75,13 @@ function currentYearMonth() {
   };
 }
 
+const statusCardAccent: Record<string, string> = {
+  draft: "border-l-slate-400",
+  open: "border-l-emerald-500",
+  closed: "border-l-blue-500",
+  archived: "border-l-slate-300",
+};
+
 export function BillingPeriodsPage() {
   const client = getSupabaseBrowserClient();
   const { profile } = useAuth();
@@ -88,6 +102,7 @@ export function BillingPeriodsPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Invoice preview dialog
   const [previewPeriod, setPreviewPeriod] = useState<BillingPeriodRow | null>(null);
@@ -126,8 +141,6 @@ export function BillingPeriodsPage() {
     () => items.slice((page - 1) * pageSize, page * pageSize),
     [items, page, pageSize],
   );
-  const pageStart = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
-  const pageEnd = Math.min(page * pageSize, totalRows);
 
   const loadPeriods = useCallback(async () => {
     if (!client) {
@@ -170,6 +183,10 @@ export function BillingPeriodsPage() {
       setLoading(false);
     });
   }, [loadPeriods]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -401,12 +418,9 @@ export function BillingPeriodsPage() {
   };
 
   const renderPeriodActions = (row: BillingPeriodRow, count: number, layout: "desktop" | "mobile" = "desktop") => {
-    const buttonClassName = layout === "mobile" ? "w-full" : undefined;
-    const wrapperClassName = layout === "mobile" ? "grid grid-cols-1 gap-2 sm:grid-cols-2" : "flex flex-wrap gap-2";
-
     return (
-      <div className={wrapperClassName}>
-        <Button asChild size="sm" variant="outline" className={buttonClassName}>
+      <ActionBar>
+        <Button asChild size="sm" variant="outline">
           <Link href={`/admin/billing/${row.id}`}>
             Detail <ArrowUpRight className="size-4" />
           </Link>
@@ -414,7 +428,6 @@ export function BillingPeriodsPage() {
         <Button
           size="sm"
           variant={count > 0 ? "ghost" : "secondary"}
-          className={buttonClassName}
           disabled={saving || count > 0 || row.status === "closed" || row.status === "archived"}
           onClick={() => handlePreviewInvoices(row)}
         >
@@ -423,19 +436,18 @@ export function BillingPeriodsPage() {
         <Button
           size="sm"
           variant="secondary"
-          className={buttonClassName}
           disabled={saving || row.status === "draft" || row.status === "archived"}
           onClick={() => handlePreviewPenalties(row)}
         >
           Pratinjau Denda
         </Button>
         {row.status === "draft" ? (
-          <Button size="sm" variant="ghost" className={buttonClassName} disabled={saving} onClick={() => handleStatusChange(row, "open")}>
+          <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleStatusChange(row, "open")}>
             Buka Periode
           </Button>
         ) : null}
         {row.status === "open" ? (
-          <Button size="sm" variant="ghost" className={buttonClassName} disabled={saving} onClick={() => handleStatusChange(row, "closed")}>
+          <Button size="sm" variant="ghost" disabled={saving} onClick={() => handleStatusChange(row, "closed")}>
             Tutup Periode
           </Button>
         ) : null}
@@ -443,7 +455,6 @@ export function BillingPeriodsPage() {
           <Button
             size="sm"
             variant="destructive"
-            className={buttonClassName}
             disabled={saving}
             onClick={() => handleStatusChange(row, "archived")}
           >
@@ -454,7 +465,6 @@ export function BillingPeriodsPage() {
           <Button
             size="sm"
             variant="ghost"
-            className={buttonClassName}
             disabled={saving || !canReopenClosed}
             onClick={() => handleStatusChange(row, "open")}
             title={canReopenClosed ? "Buka ulang periode" : "Hanya admin/super_admin"}
@@ -462,198 +472,267 @@ export function BillingPeriodsPage() {
             Buka Ulang Periode
           </Button>
         ) : null}
-      </div>
+      </ActionBar>
     );
   };
 
+  const hasNoContent = !loading && !errorMessage && items.length === 0;
+
+  const mobileContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Belum ada periode billing"
+      description="Buat periode billing baru untuk mulai mengelola tagihan."
+      action={
+        <Button size="sm" onClick={() => { setCreating(true); setFormErrors({}); }}>
+          <FilePlus2 className="size-4" /> Periode Baru
+        </Button>
+      }
+    />
+  ) : (
+    <ListContainer>
+      {pagedItems.map((row) => {
+        const count = invoiceCounts[row.id] ?? 0;
+        const isExpanded = expandedId === row.id;
+        const accentColor = statusCardAccent[row.status] ?? "border-l-slate-400";
+        const statusVariant = row.status === "open" ? "success" : row.status === "draft" ? "default" : row.status === "closed" ? "warning" : "muted";
+
+        return (
+          <CompactListRow
+            key={row.id}
+            primary={formatMonthYearId(row.year, row.month)}
+            trailing={
+              <Badge variant={statusToBadgeVariant(row.status)} className="text-[10px] h-4 px-1.5">
+                {formatBillingPeriodStatusLabel(row.status)}
+              </Badge>
+            }
+            secondary={
+              <span className="flex items-center gap-1.5">
+                <StatusDot variant={statusVariant} />
+                <span>{row.label}</span>
+                <span className="text-slate-300">·</span>
+                <span>Jatuh tempo {formatDateId(row.due_date)}</span>
+                <span className="text-slate-300">·</span>
+                <span>{count} tagihan</span>
+              </span>
+            }
+            accentColor={accentColor}
+            expandedOpen={isExpanded}
+            onToggle={() => setExpandedId(isExpanded ? null : row.id)}
+            expanded={
+              <div className="space-y-2">
+                {/* Detail lines */}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  {row.opened_at ? (
+                    <div>
+                      <span className="text-slate-400">Dibuka</span>
+                      <p className="font-medium text-slate-800">{formatDateId(row.opened_at)}</p>
+                    </div>
+                  ) : null}
+                  {row.closed_at ? (
+                    <div>
+                      <span className="text-slate-400">Ditutup</span>
+                      <p className="font-medium text-slate-800">{formatDateId(row.closed_at)}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Inline h-8 action buttons */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <Button asChild size="sm" variant="outline" className="h-8 text-xs">
+                    <Link href={`/admin/billing/${row.id}`}>
+                      Detail <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    variant={count > 0 ? "ghost" : "secondary"}
+                    disabled={saving || count > 0 || row.status === "closed" || row.status === "archived"}
+                    onClick={() => handlePreviewInvoices(row)}
+                  >
+                    {count > 0 ? "Sudah Ada" : "Pratinjau Tagihan"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-8 text-xs"
+                    variant="secondary"
+                    disabled={saving || row.status === "draft" || row.status === "archived"}
+                    onClick={() => handlePreviewPenalties(row)}
+                  >
+                    Pratinjau Denda
+                  </Button>
+                  {row.status === "draft" ? (
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" disabled={saving} onClick={() => handleStatusChange(row, "open")}>
+                      Buka Periode
+                    </Button>
+                  ) : null}
+                  {row.status === "open" ? (
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" disabled={saving} onClick={() => handleStatusChange(row, "closed")}>
+                      Tutup Periode
+                    </Button>
+                  ) : null}
+                  {row.status === "closed" ? (
+                    <Button size="sm" variant="destructive" className="h-8 text-xs" disabled={saving} onClick={() => handleStatusChange(row, "archived")}>
+                      Arsipkan
+                    </Button>
+                  ) : null}
+                  {row.status === "closed" ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      disabled={saving || !canReopenClosed}
+                      onClick={() => handleStatusChange(row, "open")}
+                      title={canReopenClosed ? "Buka ulang periode" : "Hanya admin/super_admin"}
+                    >
+                      Buka Ulang
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            }
+          />
+        );
+      })}
+    </ListContainer>
+  );
+
+  const desktopContent = hasNoContent ? (
+    <EmptyState
+      icon={Inbox}
+      title="Belum ada periode billing"
+      description="Buat periode billing baru untuk mulai mengelola tagihan."
+      action={
+        <Button size="sm" onClick={() => { setCreating(true); setFormErrors({}); }}>
+          <FilePlus2 className="size-4" /> Periode Baru
+        </Button>
+      }
+    />
+  ) : (
+    <div className="overflow-x-auto rounded-xl border border-slate-200/70 bg-white shadow-sm">
+      <Table className="min-w-[980px]">
+        <TableHeader>
+          <TableRow className="text-xs uppercase tracking-wide text-slate-500">
+            <TableHead>Periode</TableHead>
+            <TableHead>Label</TableHead>
+            <TableHead>Due Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Invoice</TableHead>
+            <TableHead>Aksi</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {pagedItems.map((row) => {
+          const count = invoiceCounts[row.id] ?? 0;
+          return (
+            <TableRow key={row.id}>
+              <TableCell className="font-medium text-slate-900">{formatMonthYearId(row.year, row.month)}</TableCell>
+              <TableCell className="text-slate-700">{row.label}</TableCell>
+              <TableCell className="text-slate-700">{formatDateId(row.due_date)}</TableCell>
+              <TableCell>
+                <Badge variant={statusToBadgeVariant(row.status)}>{formatBillingPeriodStatusLabel(row.status)}</Badge>
+              </TableCell>
+              <TableCell className="text-slate-700">{count}</TableCell>
+              <TableCell>
+                {renderPeriodActions(row, count)}
+              </TableCell>
+            </TableRow>
+          );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
-    <section className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Billing</p>
-          <h1 className="text-2xl font-semibold text-slate-900">Periode Billing & Generate Tagihan</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={() => loadPeriods()} disabled={loading || saving}>
-            <RefreshCw className="size-4" /> Refresh
-          </Button>
-          <Button
-            onClick={() => {
-              setCreating((value) => !value);
-              setFormErrors({});
-            }}
-          >
-            <FilePlus2 className="size-4" /> {creating ? "Tutup Form" : "Periode Baru"}
-          </Button>
-        </div>
-      </header>
+    <section className="page-section">
+      <PageHeader
+        eyebrow="Admin Billing"
+        title="Periode Billing"
+        actions={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => loadPeriods()} disabled={loading || saving}>
+              <RefreshCw className="size-4" /> Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setCreating((value) => !value);
+                setFormErrors({});
+              }}
+            >
+              <FilePlus2 className="size-4" /> {creating ? "Tutup Form" : "Periode Baru"}
+            </Button>
+          </>
+        }
+      />
+      <p className="text-sm text-slate-500 -mt-3">Buat, kelola, dan generate tagihan untuk setiap periode.</p>
 
       {errorMessage ? (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="py-3 text-sm text-red-700">{errorMessage}</CardContent>
-        </Card>
+        <div className="rounded-xl border border-red-200 bg-red-50/80 px-5 py-3.5 text-sm text-red-700 font-medium">
+          {errorMessage}
+        </div>
       ) : null}
 
       {creating ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Buat Periode Billing</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={handleCreate}>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <label htmlFor="billingPeriodYear" className="space-y-2 text-sm text-slate-700">
-                  <span>Tahun</span>
-                  <Input id="billingPeriodYear" type="number" min={2020} max={2100} value={year} onChange={(event) => setYear(event.target.value)} />
-                  {formErrors.year ? <p className="text-xs text-red-600">{formErrors.year}</p> : null}
-                </label>
+        <div className="admin-card p-5">
+          <h3 className="text-base font-bold text-slate-900 mb-4">Buat Periode Billing</h3>
+          <form className="space-y-4" onSubmit={handleCreate}>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <label htmlFor="billingPeriodYear" className="space-y-1.5 text-sm">
+                <span className="font-medium text-slate-700">Tahun</span>
+                <Input id="billingPeriodYear" type="number" min={2020} max={2100} value={year} onChange={(event) => setYear(event.target.value)} className="rounded-lg border-slate-200" />
+                {formErrors.year ? <p className="text-xs text-red-600">{formErrors.year}</p> : null}
+              </label>
 
-                <label htmlFor="billingPeriodMonth" className="space-y-2 text-sm text-slate-700">
-                  <span>Bulan</span>
-                  <Input id="billingPeriodMonth" type="number" min={1} max={12} value={month} onChange={(event) => setMonth(event.target.value)} />
-                  {formErrors.month ? <p className="text-xs text-red-600">{formErrors.month}</p> : null}
-                </label>
+              <label htmlFor="billingPeriodMonth" className="space-y-1.5 text-sm">
+                <span className="font-medium text-slate-700">Bulan</span>
+                <Input id="billingPeriodMonth" type="number" min={1} max={12} value={month} onChange={(event) => setMonth(event.target.value)} className="rounded-lg border-slate-200" />
+                {formErrors.month ? <p className="text-xs text-red-600">{formErrors.month}</p> : null}
+              </label>
 
-                <label htmlFor="billingPeriodDueDate" className="space-y-2 text-sm text-slate-700">
-                  <span>Due date</span>
-                  <Input id="billingPeriodDueDate" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
-                  {formErrors.due_date ? <p className="text-xs text-red-600">{formErrors.due_date}</p> : null}
-                </label>
+              <label htmlFor="billingPeriodDueDate" className="space-y-1.5 text-sm">
+                <span className="font-medium text-slate-700">Due date</span>
+                <Input id="billingPeriodDueDate" type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} className="rounded-lg border-slate-200" />
+                {formErrors.due_date ? <p className="text-xs text-red-600">{formErrors.due_date}</p> : null}
+              </label>
 
-                <label htmlFor="billingPeriodLabel" className="space-y-2 text-sm text-slate-700">
-                  <span>Label</span>
-                  <Input id="billingPeriodLabel" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="April 2026" />
-                  {formErrors.label ? <p className="text-xs text-red-600">{formErrors.label}</p> : null}
-                </label>
-              </div>
+              <label htmlFor="billingPeriodLabel" className="space-y-1.5 text-sm">
+                <span className="font-medium text-slate-700">Label</span>
+                <Input id="billingPeriodLabel" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="April 2026" className="rounded-lg border-slate-200" />
+                {formErrors.label ? <p className="text-xs text-red-600">{formErrors.label}</p> : null}
+              </label>
+            </div>
 
-              <Button type="submit" disabled={saving}>
-                {saving ? "Menyimpan..." : "Simpan Periode"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Menyimpan..." : "Simpan Periode"}
+            </Button>
+          </form>
+        </div>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Periode</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-sm text-slate-600">Memuat data...</p>
-          ) : (
-            <>
-              <div className="space-y-2 lg:hidden">
-                {pagedItems.length === 0 ? (
-                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                    Belum ada periode billing.
-                  </p>
-                ) : null}
-                {pagedItems.map((row) => {
-                  const count = invoiceCounts[row.id] ?? 0;
-                  return (
-                    <div key={row.id} className="rounded-lg border bg-background px-3 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-foreground">{formatMonthYearId(row.year, row.month)}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">{row.label} - due {formatDateId(row.due_date)}</p>
-                        </div>
-                        <Badge variant={statusToBadgeVariant(row.status)} className="shrink-0">
-                          {formatBillingPeriodStatusLabel(row.status)}
-                        </Badge>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-xs text-muted-foreground">Invoice</p>
-                          <p className="font-semibold text-foreground">{count}</p>
-                        </div>
-                        <div className="rounded-md bg-slate-50 px-2 py-1.5">
-                          <p className="text-xs text-muted-foreground">Status</p>
-                          <p className="font-semibold text-foreground">{formatBillingPeriodStatusLabel(row.status)}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3">{renderPeriodActions(row, count, "mobile")}</div>
-                    </div>
-                  );
-                })}
-              </div>
+      {/* Periods list */}
+      <DataList
+        loading={loading}
+        error={null}
+        onRetry={loadPeriods}
+        mobile={mobileContent}
+        desktop={desktopContent}
+      />
 
-              <div className="hidden overflow-x-auto lg:block">
-                <Table className="min-w-[980px]">
-                  <TableHeader>
-                    <TableRow className="text-xs uppercase tracking-wide text-slate-500">
-                      <TableHead>Periode</TableHead>
-                      <TableHead>Label</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Invoice</TableHead>
-                      <TableHead>Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedItems.map((row) => {
-                    const count = invoiceCounts[row.id] ?? 0;
-                    return (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium text-slate-900">{formatMonthYearId(row.year, row.month)}</TableCell>
-                        <TableCell className="text-slate-700">{row.label}</TableCell>
-                        <TableCell className="text-slate-700">{formatDateId(row.due_date)}</TableCell>
-                        <TableCell>
-                          <Badge variant={statusToBadgeVariant(row.status)}>{formatBillingPeriodStatusLabel(row.status)}</Badge>
-                        </TableCell>
-                        <TableCell className="text-slate-700">{count}</TableCell>
-                        <TableCell>
-                          {renderPeriodActions(row, count)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
-          {!loading ? (
-            <div className="mt-3 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <p>
-                Menampilkan {pageStart}-{pageEnd} dari {totalRows} data
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="inline-flex items-center gap-1">
-                  <span>Rows</span>
-                  <select
-                    className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-900"
-                    value={String(pageSize)}
-                    onChange={(event) => {
-                      setPageSize(Number(event.target.value));
-                      setPage(1);
-                    }}
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                  </select>
-                </label>
-                <Button size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
-                  Prev
-                </Button>
-                <span className="text-xs">
-                  Page {page}/{totalPages}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-                  disabled={page >= totalPages}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      {/* Pagination */}
+      {!loading && !errorMessage && items.length > 0 ? (
+        <div className="admin-card px-4 py-3">
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            totalRows={totalRows}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </div>
+      ) : null}
 
       {/* Invoice Preview Dialog */}
       <Dialog open={previewPeriod !== null} onOpenChange={(open: boolean) => !open && setPreviewPeriod(null)}>
@@ -673,15 +752,15 @@ export function BillingPeriodsPage() {
             <p className="text-sm text-slate-600 py-4">Tidak ada kavling aktif untuk periode ini.</p>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-lg border divide-y">
+              <div className="rounded-xl border divide-y bg-white overflow-hidden">
                 {pagedPreviewInvoices.map((row, idx) => (
-                  <div key={`${row.kavling_id}-${row.fee_type_id}`} className="flex items-center justify-between gap-2 p-3">
+                  <div key={`${row.kavling_id}-${row.fee_type_id}`} className="flex items-center justify-between gap-2 p-3.5">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 truncate">{row.kavling_code}</p>
                       <p className="text-xs text-slate-500">{row.fee_name}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-sm text-slate-700">
+                      <p className="text-sm text-slate-700 font-medium tabular-nums">
                         {row.amount_source === "override" ? (
                           <span>
                             <span className="text-xs text-slate-400 line-through mr-1">{formatRupiah(row.default_amount)}</span>
@@ -691,7 +770,7 @@ export function BillingPeriodsPage() {
                           formatRupiah(row.resolved_amount)
                         )}
                       </p>
-                      <Badge variant={row.amount_source === "override" ? "warning" : "secondary"} className="text-xs">
+                      <Badge variant={row.amount_source === "override" ? "warning" : "secondary"} className="text-xs mt-0.5">
                         {row.amount_source === "override" ? "Override" : "Default"}
                       </Badge>
                     </div>
@@ -716,7 +795,7 @@ export function BillingPeriodsPage() {
                 </div>
               ) : null}
 
-              <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-background pt-3">
+              <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-white pt-3">
                 <Button variant="secondary" onClick={() => setPreviewPeriod(null)}>
                   Batal
                 </Button>
@@ -768,18 +847,18 @@ export function BillingPeriodsPage() {
             <p className="text-sm text-slate-600 py-4">Tidak ada invoice yang memenuhi syarat untuk denda.</p>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-lg border divide-y">
+              <div className="rounded-xl border divide-y bg-white overflow-hidden">
                 {pagedPenalties.map((row, idx) => (
-                  <div key={`${row.invoice_id}-${row.penalty_rule_id}`} className="flex items-center justify-between gap-2 p-3">
+                  <div key={`${row.invoice_id}-${row.penalty_rule_id}`} className="flex items-center justify-between gap-2 p-3.5">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 truncate">{row.kavling_code}</p>
                       <p className="text-xs text-slate-500">{row.fee_name}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-semibold text-slate-900" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      <p className="font-semibold text-slate-900 tabular-nums">
                         {formatRupiah(row.penalty_amount)}
                       </p>
-                      <Badge variant="destructive" className="text-xs">{row.penalty_cycle_key}</Badge>
+                      <Badge variant="destructive" className="text-xs mt-0.5">{row.penalty_cycle_key}</Badge>
                     </div>
                   </div>
                 ))}
@@ -802,7 +881,7 @@ export function BillingPeriodsPage() {
                 </div>
               ) : null}
 
-              <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-background pt-3">
+              <div className="sticky bottom-0 flex justify-end gap-2 border-t bg-white pt-3">
                 <Button variant="secondary" onClick={() => setPenaltyPeriod(null)}>
                   Batal
                 </Button>
